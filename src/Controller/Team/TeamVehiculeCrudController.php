@@ -50,7 +50,7 @@ class TeamVehiculeCrudController extends AbstractCrudController
     public function configureCrud(Crud $crud): Crud
     {
         return $crud
-            ->setPageTitle(Crud::PAGE_INDEX, 'Flotte de véhicules <br /><span class="fs-6 fw-normal">Chaque membre peut se voir attribué un ou plusieurs véhicules.</span>')
+            ->setPageTitle(Crud::PAGE_INDEX, 'Flotte de véhicules <br /><span class="fs-6 fw-normal">Retrouvez ici les véhicules de vos membres, que vous pouvez saisir pour eux ou qu\'ils saisissent eux-mêmes depuis leur compte individuel. <br />Chaque membre peut se voir attribué un ou plusieurs véhicules.</span>')
             ->overrideTemplate('crud/edit', 'App/advanced_edit.html.twig')
             ->overrideTemplate('crud/new', 'App/advanced_new.html.twig')
             ->setSearchFields(['model', 'user.first_name', 'user.last_name', 'user.email'])
