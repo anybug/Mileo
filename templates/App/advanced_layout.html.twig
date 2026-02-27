@@ -2,10 +2,17 @@
 
 {% block header_custom_menu %}
      <div class="d-flex align-items-center justify-content-end gap-2">
-        {% if is_granted('ROLE_PREVIOUS_ADMIN') %}
+     {# TODO: guess who is connected: admin or manager #}
+        {% if is_granted('IS_IMPERSONATOR') %}
         <a class="btn btn-success"
             href="{{ path('manager_dashboard', {'_switch_user': '_exit'}) }}">
             <i class="fa fa-user-check"></i> {{ "Retourner à mon interface manager"|trans }}
+        </a>
+
+        {% elseif is_granted('ROLE_ADMIN') %}
+        <a class="btn btn-success"
+            href="{{ path('admin') }}">
+            <i class="fa fa-user-check"></i> {{ "Aller à mon interface administrateur"|trans }}
         </a>
 
         {% elseif is_granted('ROLE_MANAGER') %}
@@ -14,6 +21,7 @@
             <i class="fa fa-user-check"></i> {{ "Aller à mon interface manager"|trans }}
         </a>
         {% endif %}
+        
 
         {{ parent() }}
     </div>
@@ -21,9 +29,7 @@
 {% endblock %}
 
 
-{% block content_top %}
- 
-
+{% block main %}
     {{ parent() }}
 {% endblock %}
 {% block body_javascript %}

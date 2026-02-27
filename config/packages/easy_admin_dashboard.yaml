@@ -1,7 +1,7 @@
 easy_admin_dashboard:
     title: "Bienvenue sur votre espace Mileo"
     blocks:
-## ADMIN ##    
+## ADMIN : TODO: implement hierarchy roles ##    
       Bloc1:
         label: Management
         size: 12
@@ -16,7 +16,7 @@ easy_admin_dashboard:
             icon:  cog
             controller: App\Controller\Admin\UserCrudController
             link_label: "Users list"
-            #permissions: ['ROLE_ADMIN']
+            permissions: ['ROLE_ADMIN']
           Order:
             label: "Orders"
             size: 3
@@ -25,7 +25,7 @@ easy_admin_dashboard:
             icon:  layer-group
             controller: App\Controller\Admin\OrderCrudController
             link_label: "Orders list"
-            #permissions: ['ROLE_ADMIN']
+            permissions: ['ROLE_ADMIN']
           Subscription:
             label: "Subscriptions"
             size: 3
@@ -34,7 +34,7 @@ easy_admin_dashboard:
             icon:  file-invoice-dollar
             controller: App\Controller\Admin\SubscriptionCrudController
             link_label: "Subscriptions list"
-            #permissions: ['ROLE_ADMIN']
+            permissions: ['ROLE_ADMIN']
           Plan:
             label: "Plans"
             size: 3
@@ -43,7 +43,7 @@ easy_admin_dashboard:
             icon:  book
             controller: App\Controller\Admin\PlanCrudController
             link_label: "Plans list"
-            #permissions: ['ROLE_ADMIN']
+            permissions: ['ROLE_ADMIN']
 ## USER ##            
       Bloc2:
         label: Trajets

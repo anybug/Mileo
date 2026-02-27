@@ -25,7 +25,7 @@ use EasyCorp\Bundle\EasyAdminBundle\Orm\EntityRepository as EasyAdminEntityRep;
 use Symfony\Component\ExpressionLanguage\Expression;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
-#[IsGranted(new Expression('is_granted("ROLE_MANAGER")'))]
+#[IsGranted("ROLE_MANAGER")]
 class TeamAddressesCrudController extends AbstractCrudController
 {
     public static function getEntityFqcn(): string

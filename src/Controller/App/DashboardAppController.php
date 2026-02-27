@@ -349,7 +349,7 @@ class DashboardAppController extends AbstractDashboardController
             $displayName = $user->getUserIdentifier();
         }
 
-        if ($this->isGranted('ROLE_PREVIOUS_ADMIN')) {
+        if ($this->isGranted('IS_IMPERSONATOR')) {
             $menu->setName('Connecté en tant que '.$displayName);
             $menu->displayUserName(true);
         }

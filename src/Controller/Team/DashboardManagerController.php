@@ -21,7 +21,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
-#[IsGranted(new Expression('is_granted("ROLE_MANAGER") or is_granted("ROLE_PREVIOUS_ADMIN")'))]
+#[IsGranted("ROLE_MANAGER")]
 class DashboardManagerController extends AbstractDashboardController
 {
     private Packages $assets;

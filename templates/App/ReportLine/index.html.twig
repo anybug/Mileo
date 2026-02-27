@@ -57,7 +57,7 @@
             <td class="text-nowrap">
                 {{ vt.amount|number_format(2, ',', ' ') }} {{ 'EUR'|currency_symbol }}
                 {% if vt.Vehicule.Scale.Amount > 0 %}
-                    <i class="fa fa-circle-info mx-2 text-secondary" data-bs-toggle="tooltip" data-bs-placement="top" title="{{'Le montant de la provision est calculé selon le barème mensualisé'|trans}}"></i> 
+                    <i class="fa fa-circle-info mx-2 text-secondary" data-bs-toggle="tooltip" data-bs-placement="top" title="{{'Le montant de la provision est calculé selon le barème annuel mensualisé'|trans}}"></i> 
                 {% endif %}
             </td>
             <td class="text-nowrap">{{ vt.Vehicule.Scale }}</td>
