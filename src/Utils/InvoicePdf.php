@@ -45,7 +45,7 @@ class InvoicePdf extends TCPDF
             $this->setY(PDF_MARGIN_HEADER+5);
             $this->SetFont('helvetica', 'B', 18);
             $this->Cell(0, 1,'', 'B', true, 'C', 0, '', 0, false, 'M', 'M');
-            $this->Image('assets/img/logo.png', 10, 2, '', 10, 'PNG', '', 'T', false, 300, '', false, false, 0, false, false, false);         
+            $this->Image('../assets/img/logo.png', 10, 2, '', 10, 'PNG', '', 'T', false, 300, '', false, false, 0, false, false, false);         
         
             $this->setY(PDF_MARGIN_HEADER+15);
             $this->SetFont('helvetica', null, 11);
@@ -105,8 +105,8 @@ class InvoicePdf extends TCPDF
         
         $pdf->SetFont('helvetica', null, 10);
         $table_header = '<style>'
-                . '.title {font-size: 10pt; color: #ffffff; background-color: #367fa9; font-weight: bold; text-align: center}'
-                . '.libelé {font-size: 10pt; color: #ffffff; background-color: #367fa9; font-weight: bold; text-align: left}'
+                . '.title {font-size: 10pt; color: #ffffff; background-color: #6174d1; font-weight: bold; text-align: center}'
+                . '.libelé {font-size: 10pt; color: #ffffff; background-color: #6174d1; font-weight: bold; text-align: left}'
                 . '.title_footer {font-size: 10pt; font-weight: bold; text-align: right}'
                 . '.content_footer {font-size: 10pt; font-weight: bold; text-align: center}'
                 . '.line {font-size: 9pt; border-bottom: 1px solid #ccc; color: #222 }'

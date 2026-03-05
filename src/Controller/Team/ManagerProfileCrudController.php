@@ -66,15 +66,7 @@ class ManagerProfileCrudController extends AbstractCrudController
         ->remove(Crud::PAGE_EDIT, Action::SAVE_AND_CONTINUE)
         ->disable(Action::NEW)
         ->disable(Action::DELETE)
-
-        ->add(Crud::PAGE_EDIT, Action::INDEX)
-        ->update(Crud::PAGE_EDIT, Action::INDEX, function (Action $action) {
-            return $action
-                ->setLabel('Retour au profil')
-                ->setIcon('fa fa-arrow-left')
-                ->asDefaultAction()
-            ;
-        });
+        ;
 }
 
     public function edit(AdminContext $context)

@@ -8,6 +8,7 @@ use App\Entity\Subscription;
 use App\Entity\User;
 use App\Entity\Vehicule;
 use EasyAdminFriends\EasyAdminDashboardBundle\Service\EasyAdminDashboard;
+use EasyCorp\Bundle\EasyAdminBundle\Attribute\AdminDashboard;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
@@ -22,7 +23,8 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
-#[IsGranted(new Expression('is_granted("ROLE_ADMIN")'))]
+#[IsGranted("ROLE_ADMIN")]
+#[AdminDashboard(routePath: '/admin', routeName: 'admin')]
 class DashboardController extends AbstractDashboardController
 {
     private $easyAdminDashboard;
@@ -36,7 +38,6 @@ class DashboardController extends AbstractDashboardController
 
     /** Cette interface "Super Admin" est en version Beta, à utiliser uniquement à des fins logistiques (ex: factures) */
 
-    #[Route(path: '/admin', name: 'admin')]
     public function index(): Response
     {
         return $this->render('@EasyAdminDashboard/Default/index.html.twig', [
@@ -47,7 +48,6 @@ class DashboardController extends AbstractDashboardController
     public function configureDashboard(): Dashboard
     {
         return Dashboard::new()
-            ->setTitle('Mileo')
             ->setTitle(sprintf('<img src="%s" />', $this->assets->getUrl('img/logo.png')))
             ;
     }

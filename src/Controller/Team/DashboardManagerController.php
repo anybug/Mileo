@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Entity\UserAddress;
 use App\Entity\Vehicule;
 use EasyAdminFriends\EasyAdminDashboardBundle\Service\EasyAdminDashboard;
+use EasyCorp\Bundle\EasyAdminBundle\Attribute\AdminDashboard;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Assets;
@@ -22,6 +23,7 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted("ROLE_MANAGER")]
+#[AdminDashboard(routePath: '/manager', routeName: 'manager_dashboard')]
 class DashboardManagerController extends AbstractDashboardController
 {
     private Packages $assets;
@@ -36,7 +38,6 @@ class DashboardManagerController extends AbstractDashboardController
         $this->easyAdminDashboard = $easyAdminDashboard;
     }
 
-    #[Route('/manager', name: 'manager_dashboard')]
     public function index(): Response
     {
         return $this->render('Team/Dashboard/index.html.twig', [
@@ -57,6 +58,24 @@ class DashboardManagerController extends AbstractDashboardController
     {
         return Assets::new()
             ->addAssetMapperEntry('app')
+        ;
+    }
+
+    public function configureActions(): Actions
+    {
+
+        $actions = parent::configureActions();
+
+        return $actions
+            ->add(Crud::PAGE_EDIT, Action::INDEX)
+            ->update(Crud::PAGE_EDIT, Action::INDEX, function (Action $action) {
+                return $action->setIcon("fa fa-arrow-left")->setLabel("Retour");
+            })
+
+            ->add(Crud::PAGE_NEW, Action::INDEX)
+            ->update(Crud::PAGE_NEW, Action::INDEX, function (Action $action) {
+                return $action->setIcon("fa fa-arrow-left")->setLabel("Retour");
+            })
         ;
     }
 
