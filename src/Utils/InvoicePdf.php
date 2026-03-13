@@ -82,7 +82,7 @@ class InvoicePdf extends TCPDF
         $this->SetFont('helvetica', null, 8);
         $this->SetY(-18);
         $footer = '<table width="100%" border="0" cellspacing="1" cellpadding="1">';
-        $footer .= '<tr><td width="100%" style="text-align:center">Anybug/Mileo – 8 Rue Beaulieu - 17430 Cabariot</td></tr>';
+        $footer .= '<tr><td width="100%" style="text-align:center">Mileo édité par Anybug – 8 Rue Beaulieu - 17430 Cabariot</td></tr>';
         $footer .= '<tr><td width="100%" style="text-align:center">Tel : 0546894344 - Email : ' . $_ENV['CONTACT_EMAIL'] . '</td></tr>';
         $footer .= '<tr><td width="100%" style="text-align:center">RCS La Rochelle 517 653 531 - TVA FR14517653531</td></tr>';
         $footer .= '</table>';

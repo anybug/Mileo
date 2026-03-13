@@ -3,17 +3,19 @@
 
 namespace App\EventSubscriber;
 
-use App\Entity\Order;
-use App\Entity\Plan;
-use App\Entity\Subscription;
 use App\Event\UserFirstLoginEvent;
-use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
+use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
+use Symfony\Component\Mailer\MailerInterface;
+use Symfony\Component\Mime\Address;
 
 class UserFirstLoginSubscriber implements EventSubscriberInterface
 {
     public function __construct(
-        private EntityManagerInterface $em
+        private MailerInterface $mailer,
+        private LoggerInterface $logger
     ) {}
 
     public static function getSubscribedEvents(): array
@@ -27,43 +29,25 @@ class UserFirstLoginSubscriber implements EventSubscriberInterface
     {
         $user = $event->getUser();
 
-        // Si l’utilisateur a déjà une subscription, on ne fait rien
-        if ($user->getSubscription()) {
-            return;
+        // Mail de bienvenue
+        $email = (new TemplatedEmail())
+            ->to(new Address($user->getEmail()))
+            ->subject('Bienvenue sur Mileo !')
+            ->htmlTemplate('Emails/welcome.html.twig')
+            ->context([
+                'user' => $user,
+            ]);
+
+        try {
+            $this->mailer->send($email);
+        } catch (TransportExceptionInterface $e) {
+            // Journaliser l'erreur
+            $this->logger->error('Échec de l\'envoi de l\'email de bienvenue à ' . $user->getEmail(), [
+                'error' => $e->getMessage(),
+                'user_id' => $user->getId(),
+            ]);
+            // Optionnel : déclencher un événement ou une action pour réessayer plus tard
         }
-
-        // Plan gratuit
-        $plan = $this->em->getRepository(Plan::class)
-            ->findOneBy(['price_per_year' => 0]);
-
-        if (!$plan) {
-            // Rien en base => on ne casse pas la connexion
-            return;
-        }
-
-        // Subscription gratuite
-        $subscription = new Subscription();
-        $subscription->setUser($user);
-        $subscription->setPlan($plan);
-        $subscription->setSubscriptionStart(new \DateTime());
-        $subscription->setSubscriptionEnd(new \DateTime('+'.$plan->getPlanPeriod().' month'));
-        $user->setSubscription($subscription);
-
-        // Order gratuit
-        $order = new Order();
-        $order->setUser($user);
-        $order->setPlan($plan);
-        $order->setCreatedAt(new \DateTime());
-        $order->setUpdatedAt(new \DateTime());
-        $order->setProductName($plan->getName());
-        $order->setProductDescription($plan->getPlanDescription());
-        $order->setVatAmount($plan->getTotalCost());
-        $order->setTotalHt($plan->getTotalCost());
-        $order->setSubscriptionEnd($subscription->getSubscriptionEnd());
-        $order->setStatus('new');
-
-        $this->em->persist($subscription);
-        $this->em->persist($order);
-        $this->em->flush();
     }
+
 }

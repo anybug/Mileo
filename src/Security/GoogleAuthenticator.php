@@ -16,11 +16,8 @@ use Symfony\Component\Security\Http\Authenticator\Passport\Badge\UserBadge;
 use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPassport;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use App\Event\UserFirstLoginEvent;
+use App\Event\UserFirstSubscriptionEvent;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
-use Symfony\Component\Mailer\MailerInterface;
-use Symfony\Bridge\Twig\Mime\TemplatedEmail;
-use Symfony\Component\Mime\Address;
-
 
 class GoogleAuthenticator extends OAuth2Authenticator
 {
@@ -29,8 +26,7 @@ class GoogleAuthenticator extends OAuth2Authenticator
         private EntityManagerInterface $em,
         private UrlGeneratorInterface $urlGenerator,
         private UserPasswordHasherInterface $passwordHasher,
-        private EventDispatcherInterface $eventDispatcher,
-        private MailerInterface $mailer,
+        private EventDispatcherInterface $eventDispatcher
     ) {}
 
     public function supports(Request $request): bool
@@ -73,19 +69,14 @@ class GoogleAuthenticator extends OAuth2Authenticator
                     $this->em->persist($user);
                     $this->em->flush();
 
-                    $email = (new TemplatedEmail())
-                        ->to(new Address($user->getEmail()))
-                        ->subject('Bienvenue sur Mileo !')
-                        ->htmlTemplate('Emails/welcome.html.twig')
-                        ->context(['user' => $user]);
-
-                    $this->mailer->send($email);
-
-                     if (!$user->getSubscription()) {
-                        $this->eventDispatcher->dispatch(
-                            new UserFirstLoginEvent($user)
-                        );
+                    //auto subscription
+                    if (!$user->getSubscription()) {
+                        $this->eventDispatcher->dispatch(new UserFirstSubscriptionEvent($user));
                     }
+
+                    //email de bienvenue
+                    $this->eventDispatcher->dispatch(new UserFirstLoginEvent($user));
+
                 }else{
                     /** cas où le user s'était inscrit avec son adresse Gmail sans passer par le Google authenticator
                      * on met à jour son profil à la volée

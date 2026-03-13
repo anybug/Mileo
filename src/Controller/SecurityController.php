@@ -2,38 +2,38 @@
 
 namespace App\Controller;
 
-use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Routing\Annotation\Route;
-use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\Security\Http\Authentication\AuthenticationUtils;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
-use Symfony\Component\HttpFoundation\Session\SessionInterface;
-use Symfony\Bridge\Twig\Mime\TemplatedEmail;
-use Symfony\Component\Mailer\MailerInterface;
-use Symfony\Component\Mime\Address;
-use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
-use Symfony\Component\Security\Csrf\TokenGenerator\TokenGeneratorInterface;
-use KnpU\OAuth2ClientBundle\Client\ClientRegistry;
-use Symfony\Component\HttpFoundation\RedirectResponse;
-use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
-use App\Form\ResetPasswordFormType;
-use App\Form\ResetPasswordRequestFormType;
-use App\Repository\UserRepository;
 use App\Controller\App\DashboardAppController;
 use App\Controller\App\UserAppCrudController;
 use App\Entity\Order;
 use App\Entity\Plan;
-use App\Entity\User;
 use App\Entity\Purchase;
-use App\Form\ReCaptchaType;
 use App\Entity\Subscription;
-use App\Form\RegistrationType;
-use Symfony\Component\Security\Http\Authentication\UserAuthenticatorInterface;
-use App\Security\LoginAuthenticator;
-
+use App\Entity\User;
 use App\Event\UserFirstLoginEvent;
+use App\Event\UserFirstSubscriptionEvent;
+use App\Form\ReCaptchaType;
+use App\Form\RegistrationType;
+use App\Form\ResetPasswordFormType;
+use App\Form\ResetPasswordRequestFormType;
+use App\Repository\UserRepository;
+use App\Security\LoginAuthenticator;
+use Doctrine\ORM\EntityManagerInterface;
+use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
+use KnpU\OAuth2ClientBundle\Client\ClientRegistry;
+use Symfony\Bridge\Twig\Mime\TemplatedEmail;
+use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\RedirectResponse;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Session\SessionInterface;
+use Symfony\Component\Mailer\MailerInterface;
+use Symfony\Component\Mime\Address;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+use Symfony\Component\Security\Csrf\TokenGenerator\TokenGeneratorInterface;
+use Symfony\Component\Security\Http\Authentication\AuthenticationUtils;
+use Symfony\Component\Security\Http\Authentication\UserAuthenticatorInterface;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 
@@ -69,21 +69,12 @@ class SecurityController extends AbstractController
             $manager->persist($user);
             $manager->flush();
 
-            // Mail de bienvenue
-            $email = (new TemplatedEmail())
-                ->to(new Address($user->getEmail()))
-                ->subject('Bienvenue sur Mileo !')
-                ->htmlTemplate('Emails/welcome.html.twig')
-                ->context([
-                    'user' => $user,
-                ]);
-
-            $mailer->send($email);
-
-            $eventDispatcher->dispatch(
-                new UserFirstLoginEvent($user)
-            );
+            //auto subscription
+            $eventDispatcher->dispatch(new UserFirstSubscriptionEvent($user));
                 
+            //email de bienvenue
+            $eventDispatcher->dispatch(new UserFirstLoginEvent($user));
+
             //Redirect to home and autologin after registration
             $session->set('registration', true);
             //$this->addFlash('success', "Votre compte avec l'abonnement ". $session->get('subscriptionPlan')->getName() ." a bien été créé");
@@ -95,7 +86,6 @@ class SecurityController extends AbstractController
             );
 
         }    
-
 
         return $this->render('security/register.html.twig', [
             'form' => $form->createView(),
