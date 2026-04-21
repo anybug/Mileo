@@ -16,12 +16,8 @@ return [
         'path' => './assets/app.js',
         'entrypoint' => true,
     ],
-    'jquery' => [
-        'version' => '3.6.0',
-        'url' => 'https://code.jquery.com/jquery-3.6.0.min.js',
-    ],
-    'jqscript' => [
-        'path' => './assets/jqscript.js',
+    'script' => [
+        'path' => './assets/script.js',
     ],
     '@popperjs/core' => [
         'version' => '2.11.8',

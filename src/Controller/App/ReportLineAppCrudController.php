@@ -56,6 +56,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\Routing\Annotation\Route;
 
 class ReportLineAppCrudController extends AbstractCrudController
 {
@@ -109,8 +110,6 @@ class ReportLineAppCrudController extends AbstractCrudController
             ->showEntityActionsInlined()
             ->overrideTemplate('crud/index', 'App/ReportLine/index.html.twig')
             ->overrideTemplate('crud/filters', 'App/ReportLine/filters.html.twig')
-            ->overrideTemplate('crud/edit', 'App/advanced_edit.html.twig')
-            ->overrideTemplate('crud/new', 'App/advanced_new.html.twig')
             ->setPaginatorPageSize(30)
             ;
     }
@@ -189,37 +188,25 @@ class ReportLineAppCrudController extends AbstractCrudController
     public function createEntity(string $entityFqcn)
     {
         $context = $this->container->get(AdminContextProvider::class)->getContext();
+        $request = $context->getRequest();
 
-        if($context->getRequest()->query->get('sourceId')){
-            $entityManager = $this->container->get('doctrine')->getManager();
-            $id = intval($context->getRequest()->query->get('sourceId'));
-            $reportLine = $entityManager->getRepository(ReportLine::class)->find($id);
+        $reportId = $request->query->get('reportId');
 
-            if (!$reportLine) {
-                $this->addFlash('error', 'Trajet non trouvé.');
-                $url = $this->adminUrlGenerator
-                    ->setController(ReportLineAppCrudController::class)
-                    ->setAction('index')
-                    ->generateUrl()
-                    ;
-               
-                return $this->redirect($url);
+        $reportLine = new $entityFqcn();
+        $reportLine->setVehicule($this->getUser()->getDefaultVehicule());
+        $reportLine->setScale($this->getUser()->getDefaultVehicule()->getScale());
+
+        if ($reportId) {
+            $report = $this->entityManager->getRepository(Report::class)->find($reportId);
+
+            if ($report && $report->getUser() === $this->getUser()) {
+                $reportLine->setTravelDate(\DateTimeImmutable::createFromMutable($report->getStartDate()));
             }
-
-            $duplicatedLine = clone $reportLine;
-            $duplicatedLine->resetId();  // Réinitialiser l'ID pour éviter un conflit
-
-            $reportLine = $duplicatedLine;
-            
         } else {
-            $reportLine = new $entityFqcn();
-            $reportLine->setVehicule($this->getUser()->getDefaultVehicule());
-            $reportLine->setScale($this->getUser()->getDefaultVehicule()->getScale());
             $reportLine->setTravelDate(new \DateTimeImmutable());
         }
 
         return $reportLine;
-        
     }
 
     
@@ -273,7 +260,7 @@ class ReportLineAppCrudController extends AbstractCrudController
                     'attr' => ['class'=>'report_favories'],
                     'expanded' => true,
                     'mapped' => false,
-                    'required' => true,
+                    'required' => false,
                     'choice_attr' => function($choice, $key, $value) {
                         return ['class' => 'report_favories_choice'];
                     }
@@ -289,7 +276,7 @@ class ReportLineAppCrudController extends AbstractCrudController
                     'attr' => ['class'=>'report_favories'],
                     'expanded' => true,
                     'mapped' => false,
-                    'required' => true,
+                    'required' => false,
                     'choice_attr' => function($choice, $key, $value) {
                         return ['class' => 'report_favories_choice'];
                     }
@@ -424,10 +411,10 @@ class ReportLineAppCrudController extends AbstractCrudController
             //->setColumns('col-sm-4 col-lg-3 col-xxl-2')
             ;
         yield IntegerField::new('km_total','Distance (km)')
-        ->setFormTypeOptions(['attr' => ['readonly'=> true, 'class' => 'report_km_total bg-light']])
-        ->setColumns('col-sm-4 col-lg-3 col-xxl-2')
-        ->hideOnIndex()
-        ;
+            ->setFormTypeOptions(['attr' => ['readonly'=> true, 'class' => 'report_km_total bg-light']])
+            ->setColumns('col-sm-4 col-lg-3 col-xxl-2')
+            ->hideOnIndex()
+            ;
         yield IntegerField::new('km_total','Distance')
             ->onlyOnIndex()
             ->setNumberFormat('%s'.' km')
@@ -513,49 +500,53 @@ class ReportLineAppCrudController extends AbstractCrudController
 
     public function generateAmountAction(AdminContext $context): JsonResponse
     {
-        $report_id = $context->getRequest()->query->get('report_id') ?? false;
-        $report_line_id = $context->getRequest()->query->get('report_line_id') ?? false;
-        $vehicule_id = $context->getRequest()->query->get('vehicule') ?? false;
-        $distance = $context->getRequest()->query->get('distance') ?? false;
-        
-        $vehicule = $this->entityManager->getRepository(Vehicule::class)->find($vehicule_id);
+        $request = $context->getRequest();
 
-        $response = new JsonResponse();
+        $reportId = $request->query->get('report_id');
+        $reportLineId = $request->query->get('report_line_id');
+        $vehiculeId = $request->query->get('vehicule');
+        $distance = $request->query->get('distance');
 
-        if($report_id){
-            $report = $this->entityManager->getRepository(Report::class)->find($report_id);
-            foreach ($report->getVehiculesReports() as $vr) {
-                if ($vr->getVehicule() == $vehicule) {
-                    $scale = $vr->getScale();
-                }
+        $vehicule = $this->entityManager->getRepository(Vehicule::class)->find($vehiculeId);
+
+        if (!$vehicule || !$distance) {
+            return new JsonResponse(['amount' => null], 200);
+        }
+
+        $scale = null;
+        $report = null;
+
+        if ($reportId) {
+            $report = $this->entityManager->getRepository(Report::class)->find($reportId);
+        } elseif ($reportLineId) {
+            $reportLine = $this->entityManager->getRepository(ReportLine::class)->find($reportLineId);
+
+            if ($reportLine) {
+                $report = $reportLine->getReport();
             }
-        } else if($report_line_id){
-            $reportLine = $this->entityManager->getRepository(ReportLine::class)->find($report_line_id);
-            $report = $reportLine->getReport();
+        }
+
+        if ($report) {
             foreach ($report->getVehiculesReports() as $vr) {
                 if ($vr->getVehicule() == $vehicule) {
                     $scale = $vr->getScale();
+                    break;
                 }
             }
         }
 
-        if($vehicule && $distance){
-
-            //vérification si le barême n'est pas déjà attribué pour ce rapport
-            if (!isset($scale)) {
-                $scale = $vehicule->getScale();
-            }
-
-            $reportLine = new ReportLine();
-            $reportLine->setScale($scale);
-            $reportLine->setKmTotal($distance);    
-            $reportLine->calculateAmount();
-
-            $response->setData(['amount' => $reportLine->getAmount()]);
-            //die(json_encode($scale->__toString()));  <- pour verif 
+        if (!$scale) {
+            $scale = $vehicule->getScale();
         }
 
-        return $response;
+        $previewLine = new ReportLine();
+        $previewLine->setScale($scale);
+        $previewLine->setKmTotal((float) $distance);
+        $previewLine->calculateAmount();
+
+        return new JsonResponse([
+            'amount' => number_format($previewLine->getAmount(), 2, '.', '')
+        ]);
     }
 
     public function persistEntity(EntityManagerInterface $entityManager, $entityInstance): void
@@ -575,26 +566,32 @@ class ReportLineAppCrudController extends AbstractCrudController
 
     private function getReportForTravel(EntityManagerInterface $entityManager, $entityInstance): void
     {
-        //si le mois du trajet saisi a déjà un Report, on le place dedans. Sinon on crée le Rapport à associer au trajet.
         $user = $entityInstance->getVehicule()->getUser();
-        $report = $user->getReportForTravelDate($entityInstance->getTravelDate());
+        $travelDate = $entityInstance->getTravelDate();
 
-        if($report === null){
-            $report = new Report;
-            $report->setUser($user);
-            $startMonth =  \DateTime::createFromFormat("Y-m-d",$entityInstance->getTravelDate()->format('Y-m-d'));
-            $startMonth->modify('first day of this month');
-            $endMonth =  \DateTime::createFromFormat("Y-m-d",$entityInstance->getTravelDate()->format('Y-m-d'));
-            $endMonth->modify('last day of this month');
-            $report->setStartDate($startMonth);
-            $report->setEndDate($endMonth);
-            $report->addLine($entityInstance);
-            $report->calculateKm();
-            $report->calculateTotal();
-        }else{
-            $entityInstance->setReport($report);
+        if (!$travelDate) {
+            return;
         }
 
+        $report = $user->getReportForTravelDate($travelDate);
+
+        if ($report === null) {
+            $report = new Report();
+            $report->setUser($user);
+
+            $startMonth = \DateTime::createFromFormat('Y-m-d', $travelDate->format('Y-m-d'));
+            $startMonth->modify('first day of this month');
+
+            $endMonth = \DateTime::createFromFormat('Y-m-d', $travelDate->format('Y-m-d'));
+            $endMonth->modify('last day of this month');
+
+            $report->setStartDate($startMonth);
+            $report->setEndDate($endMonth);
+
+            $entityManager->persist($report);
+        }
+
+        $entityInstance->setReport($report);
     }
 
     public function generatePdfPerMonth(AdminContext $context)
@@ -655,30 +652,37 @@ class ReportLineAppCrudController extends AbstractCrudController
     
     protected function getRedirectResponseAfterSave(AdminContext $context, string $action): RedirectResponse
     {
-        $submitButtonName = $context->getRequest()->request->all()['ea']['newForm']['btn'] ?? null;
+        /** @var ReportLine $reportLine */
+        $reportLine = $context->getEntity()->getInstance();
+        $report = $reportLine->getReport();
 
-        //retour à la liste du mois saisi (pas forcément celui du referrer)
-        $reportline = $context->getEntity()->getInstance();
-        $dataParams = $reportline->getTravelDate()->format('F')."/".$reportline->getTravelDate()->format('Y');
-
-        $saveAndReturnUrl = $this->adminUrlGenerator
-                    ->setController(self::class)
-                    ->setAction(Action::INDEX)
-                    ->set("filters[period][value]", $dataParams)
-                    ->generateUrl()
-                ;
-
-
-        $url = match ($submitButtonName) {
-            Action::SAVE_AND_CONTINUE => $this->container->get(AdminUrlGenerator::class)
+        if ($report) {
+            $url = $this->adminUrlGenerator
+                ->setController(ReportAppCrudController::class)
                 ->setAction(Action::EDIT)
-                ->setEntityId($context->getEntity()->getPrimaryKeyValue())
-                ->generateUrl(),
-            Action::SAVE_AND_RETURN => $saveAndReturnUrl,
-            Action::SAVE_AND_ADD_ANOTHER => $this->container->get(AdminUrlGenerator::class)->setAction(Action::NEW)->generateUrl(),
-            default => $this->generateUrl($context->getDashboardRouteName()),
-        };
+                ->setEntityId($report->getId())
+                ->generateUrl();
 
-        return $this->redirect($url);
+            return $this->redirect($url);
+        }
+
+        return parent::getRedirectResponseAfterSave($context, $action);
+    }
+
+    #[Route('/admin/report-line/{id}/delete', name: 'admin_report_line_delete', methods: ['POST'])]
+    public function deleteReportLineAjax(ReportLine $reportLine, Request $request): JsonResponse
+    {
+        if ($reportLine->getReport()->getUser() !== $this->getUser()) {
+            throw new AccessDeniedHttpException();
+        }
+
+        if (!$this->isCsrfTokenValid('delete' . $reportLine->getId(), $request->request->get('_token'))) {
+            return new JsonResponse(['error' => 'Invalid CSRF token'], 400);
+        }
+
+        $this->entityManager->remove($reportLine);
+        $this->entityManager->flush();
+
+        return new JsonResponse(['success' => true]);
     }
 }

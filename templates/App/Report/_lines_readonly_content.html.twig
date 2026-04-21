@@ -1,0 +1,212 @@
+{% set items = report ? report.lines : [] %}
+{% set sorted = items|sort((a, b) => (a.travelDate ? a.travelDate.timestamp : 0) <=> (b.travelDate ? b.travelDate.timestamp : 0)) %}
+
+<div class="tm-report-layout">
+    <aside class="tm-report-sidebar">
+        <div class="tm-report-stats tm-report-stats--sidebar">
+            <div class="tm-report-stat-card">
+                <div class="tm-report-stat-card__icon tm-report-stat-card__icon--blue">
+                    <i class="fa-solid fa-location-dot"></i>
+                </div>
+                <div>
+                    <div class="tm-report-stat-card__label">{{ 'Trajets'|trans }}</div>
+                    <div class="tm-report-stat-card__value">
+                        <span class="js-report-stat-lines">{{ sorted|length }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tm-report-stat-card">
+                <div class="tm-report-stat-card__icon tm-report-stat-card__icon--purple">
+                    <i class="fa-solid fa-road"></i>
+                </div>
+                <div>
+                    <div class="tm-report-stat-card__label">{{ 'Distance totale'|trans }}</div>
+                    <div class="tm-report-stat-card__value">
+                        <span class="js-report-stat-km">
+                            {{ report ? report.getVehiculesReportsTotalKm() : 0 }}
+                        </span> km                   
+                     </div>
+                </div>
+            </div>
+
+            <div class="tm-report-stat-card">
+                <div class="tm-report-stat-card__icon tm-report-stat-card__icon--green">
+                    <i class="fa-solid fa-euro-sign"></i>
+                </div>
+                <div>
+                    <div class="tm-report-stat-card__label">{{ 'Montant total'|trans }}</div>
+                    <div class="tm-report-stat-card__value">
+                        <span class="js-report-stat-total">
+                            {{ (report ? report.getVehiculesReportsTotalAmount() : 0)|number_format(2, '.', '') }}
+                        </span> €
+                    </div>
+                </div>
+            </div>
+        </div>
+    </aside>
+    <div class="tm-report-main">
+        <div class="tm-report-list-card">
+            <div class="tm-report-list-card__header">
+                <h3 class="tm-report-list-card__title">
+                    {{ 'Liste des trajets'|trans }}{% if report %} ({{ sorted|length }}){% endif %}
+                </h3>
+
+                <button type="button"
+                        class="btn btn-primary"
+                        data-open-sidepanel
+                        data-url="{{ ea_url()
+                            .setController('App\\Controller\\App\\ReportLineSidebarCrudController')
+                            .setAction('new')
+                            .set('reportId', report.id)
+                            .unset('entityId')
+                            .unset('referrer')
+                            .unset('sort')
+                            .unset('page')
+                            .unset('query')
+                            .generateUrl() }}">
+                    <i class="fa-solid fa-plus me-2"></i>
+                    {{ 'Ajouter un trajet'|trans }}
+                </button>
+            </div>
+
+            <div class="tm-trip-list-shell">
+                <div class="tm-trip-search-bar">
+                    <div class="tm-trip-search-bar__field">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="search"
+                               class="form-control tm-trip-search-input"
+                               placeholder="{{ 'Rechercher un trajet, une adresse, un véhicule, un motif…'|trans }}"
+                               autocomplete="off">
+                    </div>
+                    <button type="button" class="btn btn-light tm-trip-search-reset d-none">
+                        {{ 'Effacer'|trans }}
+                    </button>
+                </div>
+
+                <div class="tm-trip-list-dropdown">
+                    {% if sorted is empty %}
+                        <div class="text-muted text-center py-4">
+                            <i class="fa fa-exclamation-circle me-1"></i>{{ 'Aucun trajet'|trans }}
+                        </div>
+                    {% else %}
+                        <div class="tm-trip-list">
+                            {% for line in sorted %}
+                                <div class="tm-trip-item"
+                                     data-trip-item
+                                     data-km="{{ line.kmTotal ?? 0 }}"
+                                     data-amount="{{ line.amount ?? 0 }}"
+                                     data-search="{{ [
+                                         line.travelDate ? line.travelDate|date('d/m/Y') : '',
+                                         line.startAdress ?? '',
+                                         line.endAdress ?? '',
+                                         line.vehicule ? line.vehicule|striptags : '',
+                                         line.comment ?? ''
+                                     ]|join(' ')|lower }}">
+
+                                    <div class="tm-trip-row">
+                                        <div class="tm-trip-row__summary">
+                                            <div class="tm-trip-row__content">
+                                                <div class="tm-trip-row__left">
+                                                    <div class="tm-trip-row__topline">
+                                                        <span class="tm-trip-row__date">
+                                                            <i class="fa-regular fa-calendar me-2"></i>
+                                                            {{ line.travelDate ? line.travelDate|date('d/m/Y') : 'Date'|trans }}
+                                                        </span>
+                                                        <span class="tm-trip-row__dot">•</span>
+
+                                                        <span>{{ line.vehicule ?: 'Véhicule'|trans }}</span>
+                                                        <span class="tm-trip-row__dot">•</span>
+                                                        <span>{{ line.kmTotal ?? 0 }} km</span>
+                                                        <span class="tm-trip-row__dot">•</span>
+                                                        {% if line.isReturn %}
+                                                            <span> {{ 'A-R'|trans }} </span>
+                                                            <span class="tm-trip-row__dot">•</span>
+
+                                                        {% endif %}
+                                                        <span>{{ line.comment ?: 'Motif'|trans }}</span>
+                                                   
+                                                    </div>
+
+                                                    <div class="tm-trip-row__route">
+                                                        <span class="tm-trip-row__route-point">
+                                                            <i class="fa-solid fa-car-side"></i>
+                                                            <span>{{ line.startAdress ?: 'Départ'|trans }}</span>
+                                                        </span>
+
+                                                        <span class="tm-trip-row__arrow">→</span>
+
+                                                        <span class="tm-trip-row__route-point">
+                                                            <i class="fa-solid fa-car-side"></i>
+                                                            <span>{{ line.endAdress ?: 'Arrivée'|trans }}</span>
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <div class="tm-trip-row__right">
+                                                    <div class="tm-trip-row__amount">{{ (line.amount ?? 0)|number_format(2, ',', ' ') }} €</div>
+                                                    <div class="tm-trip-row__amount-label">{{ 'Montant'|trans }}</div>
+                                                </div>
+                                            </div>
+
+                                            <div class="tm-trip-row__actions">
+                                                <button type="button"
+                                                        class="btn btn-light btn-sm tm-trip-row__action"
+                                                        data-edit
+                                                        data-url="{{ ea_url()
+                                                            .setController('App\\Controller\\App\\ReportLineSidebarCrudController')
+                                                            .setAction('edit')
+                                                            .setEntityId(line.id)
+                                                            .unset('referrer')
+                                                            .unset('sort')
+                                                            .unset('page')
+                                                            .unset('query')
+                                                            .generateUrl() }}"
+                                                        title="{{ 'Modifier'|trans }}">
+                                                    <i class="far fa-pen-to-square"></i>
+                                                </button>
+
+                                                <button type="button"
+                                                        class="btn btn-light btn-sm tm-trip-row__action"
+                                                        data-open-sidepanel
+                                                        data-url="{{ ea_url()
+                                                            .setController('App\\Controller\\App\\ReportLineSidebarCrudController')
+                                                            .setAction('new')
+                                                            .set('reportId', report.id)
+                                                            .set('sourceId', line.id)
+                                                            .unset('entityId')
+                                                            .unset('referrer')
+                                                            .unset('sort')
+                                                            .unset('page')
+                                                            .unset('query')
+                                                            .generateUrl() }}"
+                                                        title="{{ 'Dupliquer'|trans }}">
+                                                    <i class="far fa-copy"></i>
+                                                </button>
+
+                                                <button type="button"
+                                                        class="btn btn-light btn-sm tm-trip-row__action text-danger"
+                                                        data-delete
+                                                        data-url="{{ path('app_report_line_delete', { id: line.id }) }}"
+                                                        data-token="{{ csrf_token('delete' ~ line.id) }}"
+                                                        title="{{ 'Supprimer'|trans }}">
+                                                    <i class="far fa-trash-alt"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <div class="tm-trip-empty d-none">
+                        {{ 'Aucun trajet ne correspond à votre recherche.'|trans }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    
+</div>

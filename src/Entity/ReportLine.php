@@ -42,7 +42,7 @@ class ReportLine
     #[Assert\NotBlank]
     private $endAdress;
 
-    #[ORM\Column(type: 'integer', nullable: true)]
+    #[ORM\Column(type: 'integer')]
     #[Assert\NotBlank]
     private $km;
 
@@ -57,7 +57,7 @@ class ReportLine
     #[Assert\NotBlank]
     private $amount;
 
-    #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    #[ORM\Column(type: 'string', length: 255)]
     #[Assert\NotBlank]
     private $comment;
     
@@ -264,5 +264,10 @@ class ReportLine
         }
 
         return sprintf('<span>%s</span>', $addrEsc);
+    }
+
+    public function getLinesReportList(): string
+    {
+        return '';
     }
 }

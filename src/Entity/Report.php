@@ -19,6 +19,7 @@ use Gedmo\Timestampable\Traits\TimestampableEntity;
 #[ORM\Entity(repositoryClass: ReportRepository::class)]
 #[AppAssert\NewReport(groups: ["new"])]
 #[AppAssert\Report(groups: ["edit"])]
+
 class Report
 {
     use TimestampableEntity;
@@ -438,4 +439,8 @@ class Report
         return $this;
     }
     
+    public function getLinesReportList(): string
+    {
+        return '';
+    }
 }

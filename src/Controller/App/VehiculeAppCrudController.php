@@ -26,7 +26,7 @@ use EasyCorp\Bundle\EasyAdminBundle\Field\IdField;
 
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
-
+use Symfony\Component\Validator\Constraints\NotNull;
 use EasyCorp\Bundle\EasyAdminBundle\Field\ChoiceField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
 use EasyCorp\Bundle\EasyAdminBundle\Config\KeyValueStore;
@@ -107,7 +107,7 @@ class VehiculeAppCrudController extends AbstractCrudController
             ->setFormTypeOptions(['attr' => ['data-placeholder' => " ", 'class' => 'bg-light vehicule_power', 'disabled' => 'disabled'], 'choices' => []]);
         yield AssociationField::new('scale', 'Barème : estimation de la distance annuelle parcourue')
             ->setFormTypeOptions([
-                'required' => true, 
+                'required' => true,
                 'attr' => ['data-placeholder' => " ",'class' => 'bg-light vehicule_scale', 'disabled' => 'disabled'], 
                 'choices' => [], 
                 'help' => "Ce barème sera utilisé pour estimer les indemnités en temps réel, il vous sera demandé de le réajuster lors de l'édition du rapport annuel si besoin. Si vous changez le barème en cours d'année fiscale, vous pourrez l'appliquer aux rapports de toute l'année depuis le module Rapports."

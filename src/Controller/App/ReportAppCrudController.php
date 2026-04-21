@@ -7,6 +7,7 @@ use App\Entity\ReportLine;
 use App\Entity\Vehicule;
 use App\Entity\VehiculesReport;
 use App\Form\AssistantAIType;
+use App\Service\ReportService;
 use App\Form\ReportDuplicateType;
 use App\Form\ReportLineType;
 use App\Form\ReportTotalScaleType;
@@ -23,6 +24,7 @@ use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Assets;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
+use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Filters;
 use EasyCorp\Bundle\EasyAdminBundle\Config\KeyValueStore;
 use EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext;
@@ -46,7 +48,9 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\String\Slugger\SluggerInterface;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
+
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 class ReportAppCrudController extends AbstractCrudController
@@ -58,6 +62,8 @@ class ReportAppCrudController extends AbstractCrudController
     private $tripDuplicator;
     private $logger;
     private $dispatcher;
+    private $reportService;
+    private RequestStack $requestStack;
 
     public function __construct(
         AdminUrlGenerator $adminUrlGenerator,
@@ -66,7 +72,9 @@ class ReportAppCrudController extends AbstractCrudController
         MistralApiService $mistral,
         TripDuplicationService $tripDuplicator,
         LoggerInterface $logger,
-        EventDispatcherInterface $dispatcher
+        EventDispatcherInterface $dispatcher,
+        ReportService $reportService,
+        RequestStack $requestStack
     ) {
         $this->adminUrlGenerator = $adminUrlGenerator;
         $this->exporter = $exporter;
@@ -75,18 +83,13 @@ class ReportAppCrudController extends AbstractCrudController
         $this->tripDuplicator = $tripDuplicator;
         $this->logger = $logger;
         $this->dispatcher = $dispatcher;
+        $this->reportService = $reportService;
+        $this->requestStack = $requestStack;
     }
 
     public static function getEntityFqcn(): string
     {
         return Report::class;
-    }
-
-    public function configureAssets(Assets $assets): Assets
-    {
-        return $assets->addHtmlContentToBody(
-            '<script src="https://maps.googleapis.com/maps/api/js?key=' . $_ENV['GOOGLE_MAPS_API_KEY'] . '&libraries=places"></script>'
-        );
     }
 
     public function configureResponseParameters(KeyValueStore $parameters): KeyValueStore
@@ -139,23 +142,27 @@ class ReportAppCrudController extends AbstractCrudController
 
     public function configureCrud(Crud $crud): Crud
     {
-        return $crud
+        $request = $this->requestStack->getCurrentRequest();
+
+        $crudAction = $request?->query->get('crudAction')
+            ?? $request?->attributes->get('crudAction')
+            ?? $request?->query->get('action')
+            ?? $request?->attributes->get('action');
+
+        $crud = $crud
             ->setDefaultSort(['start_date' => 'ASC'])
             ->setPageTitle(Crud::PAGE_INDEX, 'Rapports annuels et provisions mensuelles<br /><span class="fs-6 fw-normal">Mode de saisie <i>au mois</i>: chaque rapport contient les trajets effectués le mois concerné. Vous pouvez ajouter/modifier autant de trajets par Rapport que nécessaire, n\'hésitez pas à utiliser l\'assistant pour vous aider.<br />Vous pouvez également opter pour le mode de saisie <i>trajet par trajet</i> depuis le menu Mes trajets.</span>')
             ->setPageTitle(Crud::PAGE_EDIT, fn (Report $r) => sprintf('Modifier le rapport de %s', $r->getPeriod()))
             ->setPageTitle(Crud::PAGE_NEW, 'New report period')
-
             ->overrideTemplate('crud/index', 'App/Report/index.html.twig')
-            ->overrideTemplate('crud/edit', 'App/advanced_edit.html.twig')
-            ->overrideTemplate('crud/new', 'App/advanced_new.html.twig')
             ->overrideTemplate('crud/filters', 'App/Report/filters.html.twig')
+            ->addFormTheme('App/Report/form_theme.html.twig');
 
-            ->addFormTheme('App/Report/form_theme.html.twig')
+        if (in_array($crudAction, [Crud::PAGE_EDIT, Crud::PAGE_NEW], true)) {
+            $crud->setSearchFields(null);
+        }
 
-            ->setFormOptions(
-                ['validation_groups' => ['new','default']],
-                ['validation_groups' => ['default','edit']]
-            );
+        return $crud;
     }
 
     public function configureActions(Actions $actions): Actions
@@ -423,6 +430,8 @@ class ReportAppCrudController extends AbstractCrudController
 
         $entityManager->flush();
 
+        $this->reportService->refreshReport($report);
+
         $this->addFlash('success', 'Les trajets ont été crées avec succès.');
 
         $this->container->get('event_dispatcher')->dispatch(new AfterEntityUpdatedEvent($report));
@@ -454,7 +463,19 @@ class ReportAppCrudController extends AbstractCrudController
             return $this->redirect($url);
         }
 
-        $newReport = $this->tripDuplicator->duplicateReport($report, $targetPeriod, $copyMode);
+        try {
+            $newReport = $this->tripDuplicator->duplicateReport($report, $targetPeriod, $copyMode);
+        } catch (\LogicException $e) {
+            $this->addFlash('danger', $e->getMessage());
+
+            $url = $this->adminUrlGenerator
+                ->setController(self::class)
+                ->setAction(Action::EDIT)
+                ->setEntityId($report->getId())
+                ->generateUrl();
+
+            return $this->redirect($url);
+        }
 
         $this->addFlash('success', 'Rapport dupliqué avec succès !');
 
@@ -710,12 +731,13 @@ class ReportAppCrudController extends AbstractCrudController
                 ->onlyOnForms()
                 ->hideWhenCreating();
 
-            yield CollectionField::new('lines', 'Trajet(s)')
-                ->setEntryType(ReportLineType::class)
-                ->allowDelete(true)
+            yield Field::new('linesReportList', 'Trajet(s)')
+                ->onlyOnForms()
                 ->hideWhenCreating()
-                ->setFormTypeOptions(['attr' => ['class' => 'lines']])
-                ->hideOnIndex();
+                ->setFormTypeOption('mapped', false)
+                ->setFormTypeOption('required', false)
+                ->setFormTypeOption('block_name', 'linesReportList');
+                
         }
 
         if ($pageName === Crud::PAGE_NEW) {
@@ -757,27 +779,9 @@ class ReportAppCrudController extends AbstractCrudController
 
         yield FormField::addRow();
 
-        yield IntegerField::new('km', 'Distance totale (km)')
-            ->setFormTypeOptions(['attr' => [
-                'readonly' => true,
-                'class' => 'km bg-light fw-bold'
-            ]])
-            ->hideWhenCreating()
-            ->hideOnIndex()
-            ->setColumns('col-3');
-
         yield IntegerField::new('km', 'Distance')
             //->setNumberFormat('%s km')
             ->onlyOnIndex();
-
-        yield NumberField::new('total', 'Montant Total (€)')
-            ->setFormTypeOptions(['attr' => [
-                'readonly' => true,
-                'class' => 'total bg-light fw-bold'
-            ]])
-            ->hideWhenCreating()
-            ->hideOnIndex()
-            ->setNumberFormat('%s €');
 
         yield MoneyField::new('total', 'Montant')
             ->setCurrency('EUR')
@@ -854,5 +858,165 @@ class ReportAppCrudController extends AbstractCrudController
 
         ksort($choices);
         return $choices;
+    }
+
+    public function refreshTotals(AdminContext $context): JsonResponse
+    {
+        /** @var Report $report */
+        $report = $context->getEntity()->getInstance();
+
+        if ($report->getUser() !== $this->getUser()) {
+            throw new AccessDeniedHttpException();
+        }
+
+        $this->reportService->refreshReport($report);
+
+        return new JsonResponse([
+            'trips' => count($report->getLines()),
+            'km' => $report->getVehiculesReportsTotalKm(),
+            'amount' => number_format($report->getVehiculesReportsTotalAmount(), 2, '.', ''),
+        ]);
+    }
+
+    private function getReportPeriodFromRequest(Request $request): ?array
+    {
+        $data = $request->request->all('Report');
+
+        if (!$data) {
+            return null;
+        }
+
+        $yearData = $data['Year'] ?? null;
+        $month = $data['Period'] ?? null;
+
+        $year = is_array($yearData) ? ($yearData['year'] ?? null) : null;
+
+        if (!$year || !$month) {
+            return null;
+        }
+
+        $startDate = \DateTime::createFromFormat('!F Y', sprintf('%s %s', $month, $year));
+
+        if (!$startDate instanceof \DateTimeInterface) {
+            return null;
+        }
+
+        $endDate = (clone $startDate)->modify('last day of this month');
+
+        return [
+            'startDate' => $startDate,
+            'endDate' => $endDate,
+        ];
+    }
+
+    private function findExistingReport(EntityManagerInterface $entityManager, \DateTimeInterface $startDate): ?Report
+    {
+        return $entityManager->getRepository(Report::class)->findOneBy([
+            'user' => $this->getUser(),
+            'start_date' => $startDate,
+        ]);
+    }
+
+    public function persistEntity(EntityManagerInterface $entityManager, $entityInstance): void
+    {
+        if (!$entityInstance instanceof Report) {
+            parent::persistEntity($entityManager, $entityInstance);
+            return;
+        }
+
+        $request = $this->requestStack->getCurrentRequest();
+        $period = $this->getReportPeriodFromRequest($request);
+
+        if (!$period) {
+            $this->addFlash('danger', 'La période du rapport est invalide.');
+            return;
+        }
+
+        $existingReport = $this->findExistingReport($entityManager, $period['startDate']);
+
+        if ($existingReport !== null) {
+            $this->addFlash(
+                'danger',
+                sprintf(
+                    'Le rapport pour %s existe déjà.',
+                    $period['startDate']->format('m/Y')
+                )
+            );
+            return;
+        }
+
+        $entityInstance->setUser($this->getUser());
+        $entityInstance->setStartDate($period['startDate']);
+        $entityInstance->setEndDate($period['endDate']);
+
+        parent::persistEntity($entityManager, $entityInstance);
+    }
+
+
+    public function new(AdminContext $context): KeyValueStore|Response    
+    {
+        $request = $context->getRequest();
+
+        if ($request->isMethod('POST')) {
+            $entityManager = $this->container->get('doctrine')->getManagerForClass(Report::class);
+            $period = $this->getReportPeriodFromRequest($request);
+
+            if (!$period) {
+                $this->addFlash('danger', 'La période du rapport est invalide.');
+
+                return $this->redirect(
+                    $this->adminUrlGenerator
+                        ->setController(self::class)
+                        ->setAction(Action::NEW)
+                        ->unset('entityId')
+                        ->unset('referrer')
+                        ->generateUrl()
+                );
+            }
+
+            $existingReport = $this->findExistingReport($entityManager, $period['startDate']);
+
+            if ($existingReport !== null) {
+                $this->addFlash(
+                    'danger',
+                    sprintf(
+                        'Le rapport pour %s existe déjà.',
+                        $period['startDate']->format('m/Y')
+                    )
+                );
+
+                return $this->redirect(
+                    $this->adminUrlGenerator
+                        ->setController(self::class)
+                        ->setAction(Action::NEW)
+                        ->unset('entityId')
+                        ->unset('referrer')
+                        ->generateUrl()
+                );
+            }
+        }
+
+        return parent::new($context);
+    }
+
+    public function refreshLines(AdminContext $context): Response
+    {
+        /** @var Report $report */
+        $report = $context->getEntity()->getInstance();
+
+        if ($report->getUser() !== $this->getUser()) {
+            throw new AccessDeniedHttpException();
+        }
+
+        $this->reportService->refreshReport($report);
+
+        $entityManager = $this->container->get('doctrine')->getManagerForClass(Report::class);
+        $entityManager->refresh($report);
+
+        return new Response(
+            $this->renderView('App/Report/_lines_readonly_content.html.twig', [
+                'report' => $report,
+            ])
+        );
     }
 }

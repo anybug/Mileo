@@ -291,11 +291,31 @@ class TripDuplicationService
         ];
     }
 
+    private function findExistingReportForPeriod(Report $sourceReport, int $targetYear, int $targetMonth): ?Report
+    {
+        $startDate = new \DateTime(sprintf('%04d-%02d-01', $targetYear, $targetMonth));
+
+        return $this->entityManager->getRepository(Report::class)->findOneBy([
+            'user' => $sourceReport->getUser(),
+            'start_date' => $startDate,
+        ]);
+    }
+
     public function duplicateReport(Report $sourceReport, string $targetPeriod, ?string $copyMode = null): Report
     {
         [$year, $month] = explode('-', $targetPeriod);
         $targetYear = (int) $year;
         $targetMonth = (int) $month;
+
+        $existingReport = $this->findExistingReportForPeriod($sourceReport, $targetYear, $targetMonth);
+
+        if ($existingReport !== null) {
+            throw new \LogicException(sprintf(
+                'Un rapport existe déjà pour %02d/%04d.',
+                $targetMonth,
+                $targetYear
+            ));
+        }
 
         $newReport = new Report();
 

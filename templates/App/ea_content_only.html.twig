@@ -1,0 +1,124 @@
+{% extends '@!EasyAdmin/layout.html.twig' %}
+
+{% block head_javascript %}
+
+    {{ parent() }}
+
+    {% set url_vehicule_change_type = ea_url()
+        .setController('App\\Controller\\App\\VehiculeAppCrudController')
+        .setAction('new')
+        .generateUrl() %}
+
+    {% set url_vehicule_change_power = ea_url()
+        .setController('App\\Controller\\App\\VehiculeAppCrudController')
+        .setAction('new')
+        .generateUrl() %}
+
+    {% set url_popup_fav_start = ea_url()
+        .setController('App\\Controller\\App\\ReportLineAppCrudController')
+        .setAction('new')
+        .setEntityId(null)
+        .generateUrl() %}
+
+    {% set url_popup_fav_lines_start = ea_url()
+        .setController('App\\Controller\\App\\ReportLineAppCrudController')
+        .setAction('new')
+        .setEntityId(null)
+        .generateUrl() %}
+
+    {% set url_popup_fav_end = ea_url()
+        .setController('App\\Controller\\App\\ReportLineAppCrudController')
+        .setAction('new')
+        .setEntityId(null)
+        .generateUrl() %}
+
+    {% set url_popup_fav_lines_end = ea_url()
+        .setController('App\\Controller\\App\\ReportLineAppCrudController')
+        .setAction('new')
+        .setEntityId(null)
+        .generateUrl() %}
+
+    {% set url_generateAmountAction = ea_url()
+        .setController('App\\Controller\\App\\ReportLineAppCrudController')
+        .setAction('generateAmountAction')
+        .setEntityId(null)
+        .generateUrl() %}
+
+    <script>
+        window.url_vehicule_change_type = {{ url_vehicule_change_type|json_encode|raw }};
+        window.url_vehicule_change_power = {{ url_vehicule_change_power|json_encode|raw }};
+        window.url_popup_fav_start = {{ url_popup_fav_start|json_encode|raw }};
+        window.url_popup_fav_lines_start = {{ url_popup_fav_lines_start|json_encode|raw }};
+        window.url_popup_fav_end = {{ url_popup_fav_end|json_encode|raw }};
+        window.url_popup_fav_lines_end = {{ url_popup_fav_lines_end|json_encode|raw }};
+        window.url_generateAmountAction = {{ url_generateAmountAction|json_encode|raw }};
+    </script>
+
+    {{ importmap('app') }}
+{% endblock %}
+
+{# On masque au maximum la chrome (sidebar, header) #}
+{% block header %}{% endblock %}
+{% block sidebar %}{% endblock %}
+{% block content_top_header %}{% endblock %}
+{% block responsive_header %}{% endblock %}
+{% block content_footer %}{% endblock %}
+
+{% block content %}
+  <div class="container-fluid p-3">
+    {{ parent() }}
+  </div>
+
+  <script>
+  (function () {
+    let pendingSave = false;   // on n'agit que pour les saves (pas pour delete)
+    let notified   = false;
+
+    function isSaveButton(btn) {
+      if (!btn) return false;
+      const cls = (btn.className || '').toLowerCase();
+      const value = (btn.value || '').toLowerCase();
+      const dataName = (btn.dataset && (btn.dataset.actionName || btn.dataset.eaActionName || '')).toLowerCase();
+      return cls.includes('action-save')
+          || /saveand/.test(cls)
+          || dataName.startsWith('save')
+          || /saveand/.test(value) || value === 'save';
+    }
+
+    function notifyParent() {
+      if (notified) return;
+      try {
+        window.parent?.postMessage({ type: 'ea-modal-action', action: 'save' }, '*');
+        notified = true;
+        // petite atténuation visuelle dans l'iframe
+        document.documentElement.style.opacity = '0';
+      } catch (e) {}
+    }
+
+    // 1) Marquer l'intention "save" au clic sur un bouton save
+    document.addEventListener('click', function (e) {
+      const btn = e.target.closest('button, input[type="submit"]');
+      if (isSaveButton(btn)) pendingSave = true;
+    }, true);
+
+    // 2) Fallback : marque à la soumission
+    document.addEventListener('submit', function (e) {
+      const btn = e.submitter || null;
+      if (!pendingSave && isSaveButton(btn)) pendingSave = true;
+    }, true);
+
+    // 3) Turbo : quand le submit se termine avec succès, on notifie le parent
+    document.addEventListener('turbo:submit-end', function (e) {
+      if (!pendingSave) return;
+      if (e.detail && e.detail.success) {
+        notifyParent();
+      }
+    }, true);
+
+    // 4) Fallback ultime si navigation classique
+    window.addEventListener('beforeunload', function () {
+      if (pendingSave) notifyParent();
+    });
+  })();
+  </script>
+{% endblock %}

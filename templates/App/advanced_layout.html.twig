@@ -1,40 +1,42 @@
 {% extends '@EasyAdminDashboard/Default/index.html.twig' %}
 
 {% block header_custom_menu %}
-     <div class="d-flex align-items-center justify-content-end gap-2">
-     {# TODO: guess who is connected: admin or manager #}
+    {% set currentAction = ea is defined and ea.crud is defined ? ea.crud.currentAction : null %}
+
+    <div class="d-flex align-items-center justify-content-end gap-2">
         {% if is_granted('IS_IMPERSONATOR') %}
-        <a class="btn btn-success"
-            href="{{ path('manager_dashboard', {'_switch_user': '_exit'}) }}">
-            <i class="fa fa-user-check"></i> {{ "Retourner à mon interface manager"|trans }}
-        </a>
+            <a class="btn btn-success"
+               href="{{ path('manager_dashboard', {'_switch_user': '_exit'}) }}">
+                <i class="fa fa-user-check"></i> {{ "Retourner à mon interface manager"|trans }}
+            </a>
 
         {% elseif is_granted('ROLE_ADMIN') %}
-        <a class="btn btn-success"
-            href="{{ path('admin') }}">
-            <i class="fa fa-user-check"></i> {{ "Aller à mon interface administrateur"|trans }}
-        </a>
+            <a class="btn btn-success"
+               href="{{ path('admin') }}">
+                <i class="fa fa-user-check"></i> {{ "Aller à mon interface administrateur"|trans }}
+            </a>
 
         {% elseif is_granted('ROLE_MANAGER') %}
-        <a class="btn btn-success"
-            href="{{ path('manager_dashboard') }}">
-            <i class="fa fa-user-check"></i> {{ "Aller à mon interface manager"|trans }}
-        </a>
+            <a class="btn btn-success"
+               href="{{ path('manager_dashboard') }}">
+                <i class="fa fa-user-check"></i> {{ "Aller à mon interface manager"|trans }}
+            </a>
         {% endif %}
-        
 
-        {{ parent() }}
+        {% if currentAction not in ['edit', 'new'] %}
+            {{ parent() }}
+        {% endif %}
     </div>
-
 {% endblock %}
-
 
 {% block main %}
     {{ parent() }}
 {% endblock %}
+
 {% block body_javascript %}
     {% include 'App/javascript.html.twig' %}
 {% endblock body_javascript %}
+
 {% block javascripts %}
     {% include 'App/Report/index.html.twig' %}
-{% endblock %}    
+{% endblock %}
