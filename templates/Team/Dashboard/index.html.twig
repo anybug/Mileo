@@ -1,25 +1,79 @@
-{% extends 'Team/advanced_layout.html.twig' %}
+{% extends 'App/advanced_layout.html.twig' %}
 
-{% set page_title = 'Tableau de bord Mileo pour les équipes' %}
+{% block page_title %}
+    {% apply spaceless %}
+        {{ dashboard.title|default('Welcome')|trans }}
+    {% endapply %}
+{% endblock %}
 
-{% block page_title %} {{ page_title|trans }}{% endblock %}
 {% block main %}
 
-<article class="content">
-    <section class="">
-        <p class="fs-6">
-        <strong>
-        Cette interface de supervision est une version beta de la version Team de Mileo.</strong><br />
-        Notre équipe travaille à son développement afin de l'agrémenter rapidement. <br /><br />
-        Vous souhaitez nous faire part d'une idée de nouvelle fonctionnalité ou nous signaler un bug ? <br />
-        N'hésitez pas à nous contacter directement par téléphone au 05.46.89.43.44.
-        </p>   
-    </section>
+    {{ parent() }}
 
-    <section class="content-body">
+    <div class="dashboard-content row m-1">
+        <div class="mt-3 pb-3 col-12 border-bottom border-light">
+            <h3 class="text-primary mb-3">{{ 'Statistiques'|trans }}</h3>
 
-    </section>
-</article>
+            {% if years is defined and years|length > 0 %}
+                <form action="{{ ea_url() }}" method="GET" id="yearSelected">
+                    <select class="form-control form-select mb-2 yearSelected d-inline-flex" name="yearSelected" style="width: 100px;">
+                        {% for year in years %}
+                            <option value="{{ year }}" {% if yearSelected == year %}selected="selected"{% endif %}>
+                                {{ year }}
+                            </option>
+                        {% endfor %}
+                    </select>
 
-    
+                    <input type="hidden" name="menuIndex" value="{{ app.request.get('menuIndex') }}">
+                    <input type="hidden" name="submenuIndex" value="{{ app.request.get('submenuIndex') }}">
+                </form>
+
+                <script>
+                    document.addEventListener('DOMContentLoaded', () => {
+                        const select = document.querySelector('.yearSelected');
+                        const form = document.getElementById('yearSelected');
+
+                        if (!select || !form) {
+                            return;
+                        }
+
+                        select.addEventListener('change', () => form.submit());
+                    });
+                </script>
+
+                <div class="row">
+                    {% if chartTripsByMonth is not null %}
+                        <div class="p-4 col-lg-6">
+                            <h5 class="text-primary mb-3">Nombre de trajets par mois</h5>
+                            {{ render_chart(chartTripsByMonth) }}
+                        </div>
+                    {% endif %}
+
+                    {% if chartTripsByYear is not null %}
+                        <div class="p-4 col-lg-6">
+                            <h5 class="text-primary mb-3">Nombre de trajets par année</h5>
+                            {{ render_chart(chartTripsByYear) }}
+                        </div>
+                    {% endif %}
+
+                    {% if chartAmountByMonth is not null %}
+                        <div class="p-4 col-lg-6">
+                            <h5 class="text-primary mb-3">Indemnités par mois</h5>
+                            {{ render_chart(chartAmountByMonth) }}
+                        </div>
+                    {% endif %}
+
+                    {% if chartAmountByYear is not null %}
+                        <div class="p-4 col-lg-6">
+                            <h5 class="text-primary mb-3">Indemnités par année</h5>
+                            {{ render_chart(chartAmountByYear) }}
+                        </div>
+                    {% endif %}
+                </div>
+            {% else %}
+                <p>Vous n'avez pas encore de trajets.</p>
+            {% endif %}
+        </div>
+    </div>
+
 {% endblock %}

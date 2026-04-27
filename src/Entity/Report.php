@@ -155,15 +155,17 @@ class Report
      * @param App\Entity\ReportLine $line
      * @return Report
      */
-    public function addLine(ReportLine $line) : self 
+    public function addLine(ReportLine $line): self
     {
         if (!$this->lines->contains($line)) {
             $this->lines[] = $line;
+        }
+
+        if ($line->getReport() !== $this) {
             $line->setReport($this);
         }
 
         return $this;
-
     }
 
     /**

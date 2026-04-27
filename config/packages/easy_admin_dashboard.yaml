@@ -1,11 +1,12 @@
 easy_admin_dashboard:
     title: "Bienvenue sur votre espace Mileo"
     blocks:
-## ADMIN : TODO: implement hierarchy roles ##    
+## ADMIN ##    
       Bloc1:
         label: Management
         size: 12
         css_class: dark
+        route: admin
         permissions: ['ROLE_ADMIN']
         items:
           User:
@@ -17,6 +18,7 @@ easy_admin_dashboard:
             controller: App\Controller\Admin\UserCrudController
             link_label: "Users list"
             permissions: ['ROLE_ADMIN']
+
           Order:
             label: "Orders"
             size: 3
@@ -44,8 +46,48 @@ easy_admin_dashboard:
             controller: App\Controller\Admin\PlanCrudController
             link_label: "Plans list"
             permissions: ['ROLE_ADMIN']
-## USER ##            
+## Manager ##    
       Bloc2:
+        label: Management
+        size: 12
+        css_class: primary
+        permissions: ['ROLE_MANAGER']
+        route: manager_dashboard
+        items:
+          Vehicule:
+            label: "Flotte de véhicules"
+            size: 3
+            css_class: primary
+            class: App\Entity\Vehicule
+            icon: car
+            controller: App\Controller\Admin\VehiculeCrudController
+            link_label: "Vehicles list"
+            permissions: ['ROLE_MANAGER']
+            query: countVehiculesManagedBy
+          UserAddress:
+            label: "Carnet d'adresses"
+            size: 3
+            css_class: primary
+            class: App\Entity\UserAddress
+            icon: address-book
+            controller: App\Controller\Team\TeamAddressesCrudController
+            link_label: "UserAddress list"
+            permissions: ['ROLE_MANAGER']
+            query: countAddressManagedBy
+          User:
+            label: "Membres collaborateurs"
+            size: 3
+            css_class: primary
+            class: App\Entity\User
+            icon: cog
+            controller: App\Controller\Team\TeamUserCrudController
+            link_label: "Users list"
+            permissions: ['ROLE_MANAGER']
+            query: countManagedByCurrentUser
+
+
+## USER ##            
+      Bloc2z:
         label: Trajets
         size: 12
         css_class: primary

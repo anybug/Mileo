@@ -106,7 +106,14 @@ class ReportAppCrudController extends AbstractCrudController
 
     public function index(AdminContext $context)
     {
-        if (!$this->getUser()->getSubscription()->isValid()) {
+        /** @var \App\Entity\User|null $user */
+        $user = $this->getUser();
+
+        if (!$user) {
+            throw new AccessDeniedHttpException();
+        }
+
+        if (!$user->getSubscription()->isValid()) {
             return $this->redirect(
                 $this->adminUrlGenerator
                     ->setController(UserAppCrudController::class)
@@ -115,8 +122,24 @@ class ReportAppCrudController extends AbstractCrudController
             );
         }
 
-        if (!$this->getUser()->hasCompletedSetup()) {
+        if (!$user->hasCompletedSetup()) {
             return $this->redirectToRoute('app', ['menuIndex' => 0, 'submenuIndex' => -1]);
+        }
+
+        $sort = $context->getRequest()->query->all('sort');
+        $allowedSorts = ['start_date', 'km', 'total', 'end_date'];
+
+        foreach (array_keys($sort) as $field) {
+            if (!in_array($field, $allowedSorts, true)) {
+                return $this->redirect(
+                    $this->adminUrlGenerator
+                        ->setController(self::class)
+                        ->setAction(Action::INDEX)
+                        ->unset('sort')
+                        ->unset('referrer')
+                        ->generateUrl()
+                );
+            }
         }
 
         return parent::index($context);

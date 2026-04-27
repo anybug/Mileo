@@ -33,6 +33,22 @@ class UserRepository extends ServiceEntityRepository
         ;
     }
 
+     public function countManagedByCurrentUser(): int
+    {
+        $me = $this->security->getUser();
+
+        if (!$me instanceof User) {
+            return 0;
+        }
+
+        return (int) $this->createQueryBuilder('entity')
+            ->select('COUNT(entity.id)')
+            ->andWhere('entity.managedBy = :me OR entity = :me')
+            ->setParameter('me', $me)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
     // /**
     //  * @return User[] Returns an array of User objects
     //  */

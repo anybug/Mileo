@@ -6,6 +6,7 @@ use App\Entity\Vehicule;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Component\Security\Core\Security;
+use Doctrine\ORM\QueryBuilder;
 
 /**
  * @method Vehicule|null find($id, $lockMode = null, $lockVersion = null)
@@ -32,6 +33,22 @@ class VehiculeRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult()
         ;
+    }
+
+    public function countVehiculesManagedBy(): int
+    {
+        $me = $this->security->getUser();
+
+        if (!$me instanceof User) {
+            return 0;
+        }
+
+        return (int) $this->createQueryBuilder('entity')
+            ->select('COUNT(entity.id)')
+            ->andWhere('entity.user = :user')
+            ->setParameter('user', $me)
+            ->getQuery()
+            ->getSingleScalarResult();
     }
 
     // /**

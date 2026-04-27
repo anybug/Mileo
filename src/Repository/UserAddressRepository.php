@@ -34,6 +34,22 @@ class UserAddressRepository extends ServiceEntityRepository
         ;
     }
 
+    public function countAddressManagedBy(): int
+    {
+        $me = $this->security->getUser();
+
+        if (!$me instanceof User) {
+            return 0;
+        }
+
+        return (int) $this->createQueryBuilder('entity')
+            ->select('COUNT(entity.id)')
+            ->andWhere('entity.user = :user')
+            ->setParameter('user', $me)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
     // /**
     //  * @return UserAddress[] Returns an array of UserAddress objects
     //  */
