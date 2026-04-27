@@ -12,10 +12,10 @@
 
     <div class="dashboard-content row m-1">
         <div class="mt-3 pb-3 col-12 border-bottom border-light">
-            <h3 class="text-primary mb-3">{{ 'Statistiques'|trans }}</h3>
-
+            <h3 class="text-primary mb-3">{{ 'Statistiques'|trans }} par année</h3>
+            <span>{{ "Afficher"|trans }}</span>
             {% if years is defined and years|length > 0 %}
-                <form action="{{ ea_url() }}" method="GET" id="yearSelected">
+                <form action="{{ ea_url() }}" method="GET" id="yearSelected" class="d-inline-flex">
                     <select class="form-control form-select mb-2 yearSelected d-inline-flex" name="yearSelected" style="width: 100px;">
                         {% for year in years %}
                             <option value="{{ year }}" {% if yearSelected == year %}selected="selected"{% endif %}>
@@ -44,28 +44,36 @@
                 <div class="row">
                     {% if chartTripsByMonth is not null %}
                         <div class="p-4 col-lg-6">
-                            <h5 class="text-primary mb-3">Nombre de trajets par mois</h5>
+                            <h5 class="text-primary mb-3">Nombre de trajets par mois pour l'année {{ yearSelected }}</h5>
                             {{ render_chart(chartTripsByMonth) }}
                         </div>
                     {% endif %}
 
-                    {% if chartTripsByYear is not null %}
-                        <div class="p-4 col-lg-6">
-                            <h5 class="text-primary mb-3">Nombre de trajets par année</h5>
-                            {{ render_chart(chartTripsByYear) }}
-                        </div>
-                    {% endif %}
+                    
 
                     {% if chartAmountByMonth is not null %}
                         <div class="p-4 col-lg-6">
-                            <h5 class="text-primary mb-3">Indemnités par mois</h5>
+                            <h5 class="text-primary mb-3">Indemnités kilométriques par mois pour l'année {{ yearSelected }}</h5>
                             {{ render_chart(chartAmountByMonth) }}
+                        </div>
+                    {% endif %}
+
+                </div>
+                
+                
+                <h3 class="text-primary mb-3">{{ 'Statistiques globales'|trans }}</h3>
+                <div class="row">
+
+                    {% if chartTripsByYear is not null %}
+                        <div class="p-4 col-lg-6">
+                            <h5 class="text-primary mb-3">Nombre total de trajets par année</h5>
+                            {{ render_chart(chartTripsByYear) }}
                         </div>
                     {% endif %}
 
                     {% if chartAmountByYear is not null %}
                         <div class="p-4 col-lg-6">
-                            <h5 class="text-primary mb-3">Indemnités par année</h5>
+                            <h5 class="text-primary mb-3">Indemnités kilométriques totales par année</h5>
                             {{ render_chart(chartAmountByYear) }}
                         </div>
                     {% endif %}

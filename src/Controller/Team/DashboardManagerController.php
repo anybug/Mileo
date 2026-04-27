@@ -178,6 +178,17 @@ class DashboardManagerController extends AbstractDashboardController
             ]],
         ]);
 
+        $chart->setOptions([
+            'responsive' => true,
+            'plugins' => [
+                'legend' => ['display' => false],
+                'title' => [
+                    'display' => false,
+                    'text' => sprintf('Nombre total de trajets par année'),
+                ],
+            ],
+        ]);
+
         return $chart;
     }
 
@@ -257,9 +268,9 @@ class DashboardManagerController extends AbstractDashboardController
         $chart->setOptions([
             'responsive' => true,
             'plugins' => [
-                'legend' => ['display' => true],
+                'legend' => ['display' => false],
                 'title' => [
-                    'display' => true,
+                    'display' => false,
                     'text' => sprintf('Trajets des collaborateurs par mois - %d', $year),
                 ],
             ],
@@ -318,9 +329,9 @@ class DashboardManagerController extends AbstractDashboardController
         $chart->setOptions([
             'responsive' => true,
             'plugins' => [
-                'legend' => ['display' => true],
+                'legend' => ['display' => false],
                 'title' => [
-                    'display' => true,
+                    'display' => false,
                     'text' => 'Évolution annuelle des indemnités des collaborateurs',
                 ],
             ],
@@ -358,6 +369,17 @@ class DashboardManagerController extends AbstractDashboardController
                 'backgroundColor' => 'rgba(13,110,253,0.65)',
                 'borderColor' => 'rgb(13,110,253)',
             ]],
+        ]);
+
+        $chart->setOptions([
+            'responsive' => true,
+            'plugins' => [
+                'legend' => ['display' => false],
+                'title' => [
+                    'display' => false,
+                    'text' => sprintf('Indemnités kilométriques par mois pour l\'année %d', $year),
+                ],
+            ],
         ]);
 
         return $chart;
