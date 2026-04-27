@@ -17,7 +17,6 @@ easy_admin_dashboard:
             icon:  cog
             controller: App\Controller\Admin\UserCrudController
             link_label: "Users list"
-            permissions: ['ROLE_ADMIN']
 
           Order:
             label: "Orders"
@@ -27,7 +26,7 @@ easy_admin_dashboard:
             icon:  layer-group
             controller: App\Controller\Admin\OrderCrudController
             link_label: "Orders list"
-            permissions: ['ROLE_ADMIN']
+ 
           Subscription:
             label: "Subscriptions"
             size: 3
@@ -36,7 +35,7 @@ easy_admin_dashboard:
             icon:  file-invoice-dollar
             controller: App\Controller\Admin\SubscriptionCrudController
             link_label: "Subscriptions list"
-            permissions: ['ROLE_ADMIN']
+
           Plan:
             label: "Plans"
             size: 3
@@ -45,10 +44,10 @@ easy_admin_dashboard:
             icon:  book
             controller: App\Controller\Admin\PlanCrudController
             link_label: "Plans list"
-            permissions: ['ROLE_ADMIN']
+
 ## Manager ##    
       Bloc2:
-        label: Management
+        label: "Gestion d'équipe"
         size: 12
         css_class: primary
         permissions: ['ROLE_MANAGER']
@@ -60,9 +59,8 @@ easy_admin_dashboard:
             css_class: primary
             class: App\Entity\Vehicule
             icon: car
-            controller: App\Controller\Admin\VehiculeCrudController
+            controller: App\Controller\Team\TeamVehiculeCrudController
             link_label: "Vehicles list"
-            permissions: ['ROLE_MANAGER']
             query: countVehiculesManagedBy
           UserAddress:
             label: "Carnet d'adresses"
@@ -72,7 +70,6 @@ easy_admin_dashboard:
             icon: address-book
             controller: App\Controller\Team\TeamAddressesCrudController
             link_label: "UserAddress list"
-            permissions: ['ROLE_MANAGER']
             query: countAddressManagedBy
           User:
             label: "Membres collaborateurs"
@@ -82,9 +79,7 @@ easy_admin_dashboard:
             icon: cog
             controller: App\Controller\Team\TeamUserCrudController
             link_label: "Users list"
-            permissions: ['ROLE_MANAGER']
             query: countManagedByCurrentUser
-
 
 ## USER ##            
       Bloc2z:
@@ -92,6 +87,7 @@ easy_admin_dashboard:
         size: 12
         css_class: primary
         permissions: ['ROLE_USER']
+        route: app
         items:
           Report:
             label: "My reports"
@@ -102,7 +98,6 @@ easy_admin_dashboard:
             controller: App\Controller\App\ReportAppCrudController
             link_label: "Reports list"
             query: getReportsForUser
-            permissions: ['ROLE_USER']
           ReportLine:
             label: "My travels"
             size: 4
@@ -112,12 +107,12 @@ easy_admin_dashboard:
             controller: App\Controller\App\ReportLineAppCrudController
             link_label: "Travels list"
             query: getLineForUser
-            permissions: ['ROLE_USER']
       Bloc3:
         label: Paramètres
         size: 12
         css_class: primary
         permissions: ['ROLE_USER']
+        route: app
         items:
           User:
             label: "Profile"
@@ -128,7 +123,6 @@ easy_admin_dashboard:
             controller: App\Controller\App\UserAppCrudController
             link_label: "View my profile"
             query: dashboardQuery
-            permissions: ['ROLE_USER']
           Vehicule:
             label: "My vehicules"
             size: 4
@@ -138,7 +132,6 @@ easy_admin_dashboard:
             controller: App\Controller\App\VehiculeAppCrudController
             link_label: "Vehicule list"
             query: dashboardQuery
-            permissions: ['ROLE_USER']
           UserAddress:
             label: "My addresses"
             size: 4
@@ -148,4 +141,3 @@ easy_admin_dashboard:
             controller: App\Controller\App\AddressesAppCrudController
             link_label: "UserAddress list"
             query: dashboardQuery
-            permissions: ['ROLE_USER']

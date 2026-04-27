@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\UserAddress;
+use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Component\Security\Core\Security;
@@ -44,11 +45,12 @@ class UserAddressRepository extends ServiceEntityRepository
 
         return (int) $this->createQueryBuilder('entity')
             ->select('COUNT(entity.id)')
-            ->andWhere('entity.user = :user')
-            ->setParameter('user', $me)
+            ->andWhere('entity.user = :me')
+            ->setParameter('me', $me)
             ->getQuery()
             ->getSingleScalarResult();
     }
+
 
     // /**
     //  * @return UserAddress[] Returns an array of UserAddress objects

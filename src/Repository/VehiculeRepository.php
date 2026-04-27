@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\Vehicule;
+use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Component\Security\Core\Security;
@@ -45,8 +46,8 @@ class VehiculeRepository extends ServiceEntityRepository
 
         return (int) $this->createQueryBuilder('entity')
             ->select('COUNT(entity.id)')
-            ->andWhere('entity.user = :user')
-            ->setParameter('user', $me)
+            ->andWhere('entity.user IN (:users)')
+            ->setParameter('users', $me->getMembers())
             ->getQuery()
             ->getSingleScalarResult();
     }
