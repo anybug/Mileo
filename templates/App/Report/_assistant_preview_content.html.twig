@@ -50,20 +50,78 @@
             <th>Motif</th>
         </tr>
     </thead>
+
+    {% set hasCalendarTrips = false %}
+    {% for trip in previewTrips %}
+        {% if trip.is_calendar|default(false) %}
+            {% set hasCalendarTrips = true %}
+        {% endif %}
+    {% endfor %}
     <tbody>
         {% for trip in previewTrips %}
-        <tr>
-            <td class="d-none">{{ trip.date }}</td>
-            <td class="text-nowrap">{{ trip.date|date('l')|trans }} <br /> {{ trip.date|date('d/m/Y') }}</td>
+        {% set isCalendarTrip = trip.is_calendar|default(false) %}
+
+        <tr
+            class="report-line-row tm-trip-item"
+            data-calendar="{{ isCalendarTrip ? '1' : '0' }}"
+            data-vehicule="{{ trip.vehicule_id }}"
+        >
+            <td class="d-none">
+                {{ trip.date }}
+
+                <input type="hidden" class="report_lines_travel_date" value="{{ trip.date }}">
+                <input type="hidden" class="report_lines_start" value="{{ trip.start|e('html_attr') }}">
+                <input type="hidden" class="report_lines_end" value="{{ trip.end|e('html_attr') }}">
+                <input type="hidden" class="report_lines_km" value="{{ trip.km|default(0) }}">
+                <input type="hidden" class="report_lines_km_total" value="{{ trip.km_total|default(0) }}">
+                <input type="hidden" class="report_lines_amount" value="{{ trip.amount|default(0) }}">
+                <input type="hidden" class="report_lines_vehicule" value="{{ trip.vehicule_id }}">
+                <input type="hidden" class="report_lines_comment" value="{{ trip.comment|e('html_attr') }}">
+
+                <input
+                    type="checkbox"
+                    class="report_lines_is_return d-none"
+                    {% if trip.is_return %}checked{% endif %}
+                >
+            </td>
+
+            <td class="text-nowrap">
+                {{ trip.date|date('l')|trans }} <br>
+                {{ trip.date|date('d/m/Y') }}
+            </td>
+
             <td class="d-none">{{ trip.start }}</td>
             <td class="d-none">{{ trip.end }}</td>
-            <td>{{ trip.formattedStart|raw }}</td>
-            <td>{{ trip.formattedEnd|raw }}</td>
-            <td>{{ trip.km }}</td>
+
+            <td class="js-preview-start">
+                {% if isCalendarTrip %}
+                    {{ trip.start }}
+                {% else %}
+                    {{ trip.formattedStart|raw }}
+                {% endif %}
+            </td>
+
+            <td class="js-preview-end">
+                {% if isCalendarTrip %}
+                    {{ trip.end }}
+                {% else %}
+                    {{ trip.formattedEnd|raw }}
+                {% endif %}
+            </td>
+
+            <td class="js-preview-km">
+                {% if isCalendarTrip %}-{% else %}{{ trip.km }}{% endif %}
+            </td>
             <td>{{ trip.is_return ? 'Oui' : 'Non' }}</td>
-            <td>{{ trip.km_total }}</td>
+            <td class="js-preview-km-total">
+                {% if isCalendarTrip %}-{% else %}{{ trip.km_total }}{% endif %}
+            </td>
+
             <td class="d-none">{{ trip.vehicule_id }}</td>
-            <td>{{ trip.amount }} €</td>
+
+            <td class="js-preview-amount text-nowrap">
+                {% if isCalendarTrip %}En cours...{% else %}{{ trip.amount }} €{% endif %}
+            </td>
             <td>{{ trip.comment }}</td>
         </tr>
         {% else %}
@@ -73,12 +131,18 @@
         {% endfor %}
     </tbody>
 </table>
+<div id="calculation-warning" class="alert alert-warning w-75 mt-2 d-none">
+    <strong>Certains trajets ne se sont pas calculés automatiquement.</strong><br>
+    Les lignes affichées en orange correspondent aux trajets pour lesquels Mileo n’a pas pu déterminer la distance ou le montant.
+    Vous ne pouvez pas confirmer la création tant que ces trajets ne sont pas corrigés.
+    Corrigez directement les adresses dans votre calendrier, puis relancez la prévisualisation.
+</div>
 
 {% if previewTrips|length > 0 %}
 {# Formulaire de confirmation #}
 <form method="POST" action="{{ confirmActionUrl }}">
     {# Champ caché pour les données des trajets #}
-    <input type="hidden" name="trips" value="{{ previewTrips|json_encode|e('html_attr') }}">
+    <input type="hidden" name="trips"  id="assistant-trips-json" value="{{ previewTrips|json_encode|e('html_attr') }}">
 
     {% if action == 'duplicate_report' %}
         <input type="hidden" name="target_period" value="{{ targetPeriod }}">
@@ -87,7 +151,10 @@
 
     {# Boutons de confirmation/annulation #}
     <div class="mt-3">
-        <button type="submit" class="btn btn-success js-confirm-dup">
+        <button type="submit" 
+                class="btn btn-success js-confirm-dup {% if isCalendarTrip %}opacity-50{% endif %}" 
+                {% if isCalendarTrip %}disabled{% endif %}
+        >
             <i class="fa fa-check"></i> {{"Confirmer la création des trajets"|trans }}
         </button>
         <a href="{{ backUrl }}" class="btn btn-danger">

@@ -225,4 +225,21 @@ class SecurityController extends AbstractController
                 // 'include_granted_scopes' => 'true', // optionnel
             ]);
     }
+
+    #[Route('/connect/google-calendar', name: 'connect_google_calendar_start')]
+    public function connectGoogleCalendar(ClientRegistry $clientRegistry): RedirectResponse
+    {
+        return $clientRegistry
+            ->getClient('google')
+            ->redirect([
+                'openid',
+                'profile',
+                'email',
+                'https://www.googleapis.com/auth/calendar.readonly',
+            ], [
+                'prompt' => 'consent select_account',
+                'access_type' => 'offline',
+                'include_granted_scopes' => 'true',
+            ]);
+    }
 }    

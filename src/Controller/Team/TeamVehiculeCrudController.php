@@ -24,6 +24,8 @@ use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\ChoiceField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
+use Vich\UploaderBundle\Form\Type\VichFileType;
+use Symfony\Component\Validator\Constraints\File;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
@@ -142,6 +144,27 @@ class TeamVehiculeCrudController extends AbstractCrudController
             ->setFormTypeOptions([
                 'attr' => ['data-placeholder' => ' ', 'class' => 'bg-light vehicule_power', 'disabled' => 'disabled'],
                 'choices' => [],
+            ]);
+
+        yield TextField::new('registrationDocumentFile', 'Carte grise')
+            ->setFormType(VichFileType::class)
+            ->onlyOnForms()
+            ->setFormTypeOptions([
+                'required' => false,
+                'allow_delete' => true,
+                'constraints' => [
+                    new File([
+                        'maxSize' => '2M',
+                        'maxSizeMessage' => 'Le fichier ne doit pas dépasser 2 Mo.',
+                        'extensions' => [
+                            'pdf',
+                            'jpg',
+                            'jpeg',
+                            'png',
+                        ],
+                        'extensionsMessage' => 'Format de fichier non supporté.',
+                    ]),
+                ],
             ]);
 
         yield AssociationField::new('scale', 'Barème : estimation de la distance annuelle parcourue')

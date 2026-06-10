@@ -6,40 +6,32 @@ use Error;
 use App\Entity\Power;
 use App\Entity\Scale;
 use App\Entity\Vehicule;
-use App\Form\Type\PowerType;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\ORM\EntityRepository;
-use App\EasyAdmin\Fields\PowerField;
 use Symfony\Component\Form\FormEvent;
 use Symfony\Component\Form\FormEvents;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Form\FormInterface;
-use App\EasyAdmin\Fields\VehiculeChoiceField;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
 use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
-use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
 use EasyCorp\Bundle\EasyAdminBundle\Dto\EntityDto;
 use EasyCorp\Bundle\EasyAdminBundle\Dto\SearchDto;
-use EasyCorp\Bundle\EasyAdminBundle\Field\IdField;
-
-use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
-use Symfony\Component\Validator\Constraints\NotNull;
+use Vich\UploaderBundle\Form\Type\VichFileType;
+use Symfony\Component\Validator\Constraints\File;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Field\ChoiceField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
 use EasyCorp\Bundle\EasyAdminBundle\Config\KeyValueStore;
 use EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext;
-use EasyCorp\Bundle\EasyAdminBundle\Field\CollectionField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FieldCollection;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FilterCollection;
-use EasyCorp\Bundle\EasyAdminBundle\Provider\AdminContextProvider;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
-use EasyCorp\Bundle\EasyAdminBundle\Orm\EntityRepository as EasyAdminEntityRep;
 
 class VehiculeAppCrudController extends AbstractCrudController
 {
@@ -105,6 +97,29 @@ class VehiculeAppCrudController extends AbstractCrudController
         yield Field::new('model', 'Modèle');
         yield AssociationField::new('power','Puissance Fiscale')
             ->setFormTypeOptions(['attr' => ['data-placeholder' => " ", 'class' => 'bg-light vehicule_power', 'disabled' => 'disabled'], 'choices' => []]);
+        
+        yield TextField::new('registrationDocumentFile', 'Carte grise')
+            ->setFormType(VichFileType::class)
+            ->onlyOnForms()
+            ->setFormTypeOptions([
+                'required' => false,
+                'allow_delete' => true,
+                'constraints' => [
+                    new File([
+                        'maxSize' => '2M',
+                        'maxSizeMessage' => 'Le fichier ne doit pas dépasser 2 Mo.',
+                        'extensions' => [
+                            'pdf',
+                            'jpg',
+                            'jpeg',
+                            'png',
+                        ],
+                        'extensionsMessage' => 'Format de fichier non supporté.',
+                    ]),
+                ],
+            ]);
+
+
         yield AssociationField::new('scale', 'Barème : estimation de la distance annuelle parcourue')
             ->setFormTypeOptions([
                 'required' => true,
@@ -248,4 +263,5 @@ class VehiculeAppCrudController extends AbstractCrudController
 
         parent::deleteEntity($entityManager, $entityInstance);
     }
+
 }

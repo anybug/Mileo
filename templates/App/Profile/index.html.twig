@@ -200,12 +200,141 @@
 
                         </div>
                     </div>
-                </div>    
+                </div>  
+                <div class="col-lg-6">
+                    <div class="card border-secondary text-dark mb-3 me-5">
+                        <div class="card-header d-flex justify-content-between bg-light">
+                            <h5 class="mt-1">
+                                <i class="fa-fw fa-solid fa-calendar-days"></i>
+                                {{ 'Calendrier'|trans }}
+                            </h5>
 
+                            {% set disableCalendarUrl = ea_url()
+                                .setController('App\\Controller\\App\\CalendarUserCrudController')
+                                .setAction('disableCalendar')
+                                .setEntityId(app.user.id)
+                            %}
+
+                            {# --- Bouton suppression compte (index uniquement, dans ce template) --- #}
+                            {% include 'App/Profile/_delete_calendar.html.twig' with {
+                                disableCalendarUrl: disableCalendarUrl,
+                                calendarUserId: app.user.id,
+                                reloadAfterDisable: true
+                            } %}
+
+                            <div class="d-flex align-items-center gap-3">
+                                <button type="button"
+                                        class="btn btn-secondary"
+                                        data-open-calendar-sidepanel
+                                        data-sidepanel-id="calendar-sidepanel-profile-calendar"
+                                        data-backdrop-id="calendar-sidepanel-backdrop-profile-calendar">
+                                    <i class="fa-solid fa-pen-to-square me-1"></i>
+                                    {{ 'Modifier'|trans }}
+                                </button>
+
+                                {% if app.user.calendarUrl %}
+                                    <button type="button"
+                                            class="btn btn-danger"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#disable-calendar-modal">
+                                        <i class="fa-solid fa-ban"></i>
+                                        {{ 'Désactiver'|trans }}
+                                    </button>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="card-body bg-light">
+
+                            {% if not app.user.calendarUrl %}
+                                <div class="row">
+                                    <div class="col-12 text-center py-3">
+                                        <p class="text-muted mb-0">
+                                            <i>{{ 'Vous ne synchronisez pas de calendrier.'|trans }}</i>
+                                        </p>
+                                    </div>
+                                </div>
+                            {% else %}
+
+                                <div class="row">
+                                    <div class="col-sm-4">
+                                        <p class="mb-0">{{ 'Statut'|trans }}</p>
+                                    </div>
+                                    <div class="col-sm-8">
+                                        <p class="mb-0">
+                                            {% if app.user.calendarSynchronized %}
+                                                <span class="badge bg-success text-white">
+                                                    <i class="fa-solid fa-check"></i>
+                                                    {{ 'Synchronisé'|trans }}
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-secondary text-white">
+                                                    <i class="fa-solid fa-xmark"></i>
+                                                    {{ 'Non synchronisé'|trans }}
+                                                </span>
+                                            {% endif %}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <hr>
+
+                                <div class="row">
+                                    <div class="col-sm-4">
+                                        <p class="mb-0">{{ 'URL calendrier'|trans }}</p>
+                                    </div>
+                                    <div class="col-sm-8">
+                                        <p class="text-muted mb-0 text-break">
+                                            {% if app.user.calendarUrl %}
+                                                {{ app.user.calendarUrl }}
+                                            {% else %}
+                                                <i>{{ 'Non renseigné'|trans }}</i>
+                                            {% endif %}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                
+                                {% if app.user.calendarUsername and app.user.calendarEncryptedPassword %}
+                                    <hr>
+
+                                    <div class="row">
+                                        <div class="col-sm-4">
+                                            <p class="mb-0">{{ 'Identifiants renseignés'|trans }}</p>
+                                        </div>
+                                        <div class="col-sm-8">
+                                            <p class="text-muted mb-0">
+                                                <i class="fa-solid fa-check text-success fs-4"></i>
+                                            </p>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
+                </div> 
             </div>
 
-            {# --- Bouton suppression compte (index uniquement, dans ce template) --- #}
-            {% include 'App/Profile/_delete_profile.html.twig' %}
+            {% set hasSavedCalendar = app.user.calendarUrl is not empty %}
+
+            {% form_theme calendarForm '@EasyAdmin/crud/form_theme.html.twig' %}
+
+            {% include 'App/Form/_calendar_connection_sidepanel.html.twig' with {
+                form: calendarForm,
+                uid: 'profile-calendar',
+                showCard: false,
+                useFormTag: true,
+                hasSavedCalendar: hasSavedCalendar,
+                calendarValidationUrl: calendarValidationUrl,
+                calendar_validation_url: calendarValidationUrl,
+                reloadAfterSave: true,
+                titleConnected: 'Calendrier connecté',
+                titleDisconnected: 'Connexion au calendrier',
+                textConnected: 'Le calendrier est déjà configuré. Vous pouvez le modifier si nécessaire.',
+                textDisconnected: 'Renseignez l’URL du calendrier, puis validez-la.',
+                buttonConnected: 'Modifier le calendrier',
+                buttonDisconnected: 'Connecter le calendrier'
+            } %}
 
         </div>
     </div>

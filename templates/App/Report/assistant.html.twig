@@ -1,9 +1,6 @@
-{% extends '@EasyAdmin/page/content.html.twig' %}
-{% form_theme form '@EasyAdmin/crud/form_theme.html.twig' %}
+{% extends '@EasyAdmin/page/content.html.twig' %}{% form_theme form '@EasyAdmin/crud/form_theme.html.twig' %}
 
-{% block page_title %}
-    {{ "Assistant de génération de trajets basé sur le Rapport de"|trans }} {{ report.getPeriod() }}
-{% endblock %}
+{% block page_title %}{{ "Assistant de génération de trajets basé sur le Rapport de"|trans }} {{ report.getPeriod() }}{% endblock %}
 
 {% block page_actions %}
 <a class="btn btn-secondary  action-index" href="{{ backUrl }}" role="button" data-action-name="index">
@@ -14,49 +11,50 @@
 
 {% block main %}
 
-<article class="content">
-    <section class="">
-        <p class="fs-6">
-          Cet assistant va vous permettre de dupliquer plusieurs trajets d'un coup pour compléter votre rapport d'IK mensuel ou pour en garnir un nouveau en quelques secondes.
-        </p>
-        <p class="fs-6">
-          <span class="badge rounded-pill btn btn-primary fs-6">1</span> <span>Sélectionnez la tâche que doit accomplir l'assistant <i class="fa fa-arrow-right"></i></span>
-          <span class="badge rounded-pill btn btn-primary fs-6">2</span> <span>Prévisualisez les trajets <i class="fa fa-arrow-right"></i></span>
-          <span class="badge rounded-pill btn btn-primary fs-6">3</span> <span>Validez ou Modifiez votre saisie.</span>
-        </p>  
-    </section>
-
-    <section class="content-body">
-        <div class="card shadow-sm w-75" >
-            <div class="card-header">
-                <h4><i class="fa-solid fa-wand-magic-sparkles"></i> Assistant</h4>
-            </div>
-
-            <div class="card-body">
-
-            {{ form_start(form, {'attr': {'id': 'assistant-form'}}) }}
-                
-                {{ form_row(form.action) }}
-
-                {{ include('App/Report/_assistant_form.html.twig') }}
-                
-                {# Bouton de soumission avec spinner #}
-                <button type="submit" class="btn btn-primary mt-3" id="preview-button">
-                    <span id="button-text"><i class="fa fa-eye"></i> {{ "Prévisualiser"|trans }}</span>
-                    <span id="button-spinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-                    <span id="button-loading-text" class="d-none">{{ "Génération des trajets en cours..."|trans }}</span>
-                </button>
-
-            {{ form_end(form) }}
-                
-            </div>
+<section class="content-body">
+    <div class="card shadow-sm w-75" >
+        <div class="card-header">
+            <h4><i class="fa-solid fa-wand-magic-sparkles"></i> Assistant</h4>
         </div>
 
-        {# templates/admin/assistant.html.twig #}
-        <div id="preview-zone" style="display: none;"></div>
+        <div class="card-body">
 
-    </section>
-</article>
+        {{ form_start(form, {'attr': {'id': 'assistant-form'}}) }}
+            
+            {{ form_row(form.action) }}
+
+            {{ include('App/Report/_assistant_form.html.twig', {
+                form: form,
+                calendarValidationUrl: calendarValidationUrl,
+                hasSavedCalendar: hasSavedCalendar|default(false)
+            }) }}
+            
+            {# Bouton de soumission avec spinner #}
+            <button type="submit"
+                    class="btn btn-primary mt-3"
+                    id="preview-button"
+                    data-calendar-preview-button>
+                <span id="button-text">
+                    <i class="fa fa-eye"></i> {{ "Prévisualiser"|trans }}
+                </span>
+                <span id="button-spinner"
+                    class="spinner-border spinner-border-sm d-none"
+                    role="status"
+                    aria-hidden="true"></span>
+                <span id="button-loading-text" class="d-none">
+                    {{ "Génération des trajets en cours..."|trans }}
+                </span>
+            </button>
+
+        {{ form_end(form) }}
+            
+        </div>
+    </div>
+
+    {# templates/admin/assistant.html.twig #}
+    <div id="preview-zone" style="display: none;"></div>
+
+</section>
 <script>
 
 document.querySelectorAll('input[name="assistant_ai[action]"]').forEach(function(radio) {
@@ -65,6 +63,8 @@ document.querySelectorAll('input[name="assistant_ai[action]"]').forEach(function
         const form = document.getElementById('assistant-form');
         const formData = new FormData(form);
         const formContainer = document.getElementById('assistant-form-container');
+
+        formData.append('_refresh_form_only', '1');
 
         // Afficher un spinner ou un message de chargement
         formContainer.innerHTML = '<div class="text-center"><div class="spinner-border text-primary" role="status"></div></div>';
@@ -98,14 +98,119 @@ document.querySelectorAll('input[name="assistant_ai[action]"]').forEach(function
             formContainer.innerHTML = '<div class="alert alert-danger">Erreur lors du chargement du formulaire.</div>';
         });
     });
+
 });
+
+function setPreviewAuthWarning(wrapper, title, text) {
+    const authRequiredMessage = wrapper.querySelector(
+        '[data-calendar-auth-required-message], #calendar-auth-required-message'
+    );
+
+    const authRequiredTitle = wrapper.querySelector(
+        '[data-calendar-auth-required-title]'
+    );
+
+    const authRequiredText = wrapper.querySelector(
+        '[data-calendar-auth-required-text]'
+    );
+
+    if (authRequiredTitle) {
+        authRequiredTitle.textContent = title;
+    }
+
+    if (authRequiredText) {
+        authRequiredText.textContent = text;
+    }
+
+    if (authRequiredMessage) {
+        authRequiredMessage.style.display = 'block';
+    }
+}
+
+function canPreviewCalendarForm() {
+    const wrapper = document.querySelector('[data-calendar-url-validator], #calendar-url-field-wrapper');
+
+    if (!wrapper) {
+        return true;
+    }
+
+    const calendarUrlInput = wrapper.querySelector('[name$="[calendarUrl]"]');
+    const message = wrapper.querySelector('[data-calendar-validation-message], #calendar-url-validation-message');
+    const urlValidIcon = wrapper.querySelector('[data-calendar-url-valid-icon], #calendar-url-valid-icon');
+    const authValidIcon = wrapper.querySelector('[data-calendar-auth-valid-icon], #calendar-auth-valid-icon');
+    const caldavFields = wrapper.querySelector('[data-caldav-fields], #caldav-fields-wrapper');
+    const validateUrlButton = wrapper.querySelector('[data-validate-calendar-url], #validate-calendar-url-button');
+    const validateAuthButton = wrapper.querySelector('[data-validate-calendar-auth], #validate-calendar-auth-button');
+    const authCollapse = wrapper.querySelector('[data-calendar-auth-collapse], #calendar-auth-collapse');
+
+    const calendarUrl = calendarUrlInput ? calendarUrlInput.value.trim() : '';
+
+    if (!calendarUrl) {
+        return true;
+    }
+
+    const isUrlValidated =
+        urlValidIcon &&
+        urlValidIcon.style.display !== 'none';
+
+    const isAuthRequired =
+        caldavFields &&
+        caldavFields.dataset.authRequired === '1';
+
+    const isAuthValidated =
+        authValidIcon &&
+        authValidIcon.style.display !== 'none';
+
+    if (!isUrlValidated) {
+        if (message) {
+            message.className = 'mt-2 text-danger';
+            message.textContent = 'Veuillez valider l’URL du calendrier avant de prévisualiser.';
+        }
+
+        validateUrlButton?.focus();
+
+        return false;
+    }
+
+    if (isAuthRequired && !isAuthValidated) {
+        if (authCollapse) {
+            authCollapse.style.display = 'block';
+        }
+
+        setPreviewAuthWarning(
+            wrapper,
+            'Veuillez valider les identifiants du calendrier avant de prévisualiser.',
+            'Ce calendrier nécessite un identifiant et un mot de passe d’application.'
+        );
+
+        if (message) {
+            message.className = 'mt-2';
+            message.textContent = '';
+        }
+
+        validateAuthButton?.focus();
+
+        return false;
+    }
+
+    return true;
+}
 
 document.getElementById('assistant-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    //console.log('submitted');
+
+    console.log('test 1');
+
+    if (!canPreviewCalendarForm()) {
+        return;
+    }
+
+    console.log('test 2');
+    
     const form = e.target;
     const formData = new FormData(form);
     const previewButton = document.getElementById('preview-button');
+
     previewButton.disabled = true;
     document.getElementById('button-text').classList.add('d-none');
     document.getElementById('button-spinner').classList.remove('d-none');
@@ -118,30 +223,94 @@ document.getElementById('assistant-form').addEventListener('submit', function(e)
             'X-Requested-With': 'XMLHttpRequest',
         },
     })
-    .catch(error => {
-        console.error('Erreur:', error);
-        document.getElementById('preview-zone').innerHTML =
-            '<div class="alert alert-danger">Une erreur est survenue. Veuillez réessayer.</div>';
-        document.getElementById('preview-zone').style.display = 'block';
+    .then(async response => {
+        const calendarUrlSaved = response.headers.get('X-Calendar-Url-Saved') === '1';
+        const calendarUrlType = response.headers.get('X-Calendar-Url-Type');
+        const html = await response.text();
+
+        if (!response.ok) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const assistantFormContainer = doc.getElementById('assistant-form-container');
+
+            if (assistantFormContainer) {
+                document.getElementById('assistant-form-container').innerHTML =
+                    assistantFormContainer.innerHTML;
+            }
+
+            const caldavFields = document.getElementById('caldav-fields-wrapper');
+            const calendarDependentFields = document.getElementById('calendar-dependent-fields-wrapper');
+            const previewButton = document.getElementById('preview-button');
+            const message = document.getElementById('calendar-url-validation-message');
+
+            if (caldavFields) {
+                caldavFields.style.display = 'block';
+                caldavFields.dataset.authRequired = '1';
+            }
+
+            if (calendarDependentFields) {
+                calendarDependentFields.style.display = '';
+            }
+
+            if (previewButton) {
+                previewButton.style.display = 'inline-block';
+            }
+
+            if (message) {
+                message.className = 'mt-2 text-danger';
+                message.textContent = 'Les identifiants du calendrier sont incorrects. Corrigez l’identifiant ou le mot de passe d’application, puis prévisualisez à nouveau.';
+            }
+
+            return null;
+        }
+
+        return {
+            html,
+            calendarUrlSaved,
+            calendarUrlType
+        };
     })
-    .then(response => response.text())
-    .then(html => {
+    .then((result) => {
+        if (result === null) {
+            return;
+        }
+
+        const { html, calendarUrlSaved, calendarUrlType } = result;
+
         document.getElementById('preview-zone').innerHTML = html;
         document.getElementById('preview-zone').style.display = 'block';
+
+        if (calendarUrlSaved) {
+            document.getElementById('calendar-url-field-wrapper')?.remove();
+
+            if (calendarUrlType === 'direct') {
+                document.getElementById('caldav-fields-wrapper')?.remove();
+            }
+        }
+
+        document.dispatchEvent(new CustomEvent('assistant:preview-loaded', {
+            detail: {
+                previewZone: document.getElementById('preview-zone')
+            }
+        }));
+    })
+    .catch(error => {
+        console.error('Erreur:', error);
     })
     .finally(() => {
-        // Réactiver le bouton et masquer le spinner
-        previewButton.disabled = false;
-        document.getElementById('button-text').classList.remove('d-none');
-        document.getElementById('button-spinner').classList.add('d-none');
-        document.getElementById('button-loading-text').classList.add('d-none');
+        if (previewButton) {
+            previewButton.disabled = false;
+        }
+
+        document.getElementById('button-text')?.classList.remove('d-none');
+        document.getElementById('button-spinner')?.classList.add('d-none');
+        document.getElementById('button-loading-text')?.classList.add('d-none');
     });
+
 });
 
+
 </script>
-
 {% endblock %}
 
-{% block stylesheets %}
-    {{ parent() }}
-{% endblock %}
+{% block stylesheets %}{{ parent() }}{% endblock %}

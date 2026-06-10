@@ -2,18 +2,19 @@
 // src/Form/AssistantAIType.php
 namespace App\Form;
 
+use App\Dto\CalendarConnectionData;
 use App\Entity\Report;
+use App\Entity\User;
+use App\Form\CalendarConnectionType;
+use App\Service\CalendarReportImporter;
 use App\Service\ReportService;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
-use Symfony\Component\Form\Extension\Core\Type\SubmitType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\Form\FormEvent;
 use Symfony\Component\Form\FormEvents;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Component\Translation\TranslatableMessage;
-use Symfony\Component\Validator\Constraints\Callback;
-use Symfony\Component\Validator\Constraints\Length;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
@@ -36,6 +37,7 @@ class AssistantAIType extends AbstractType
                     'Dupliquer une semaine' => 'duplicate_week',
                     'Dupliquer un trajet' => 'duplicate_trip',
                     'Dupliquer le rapport' => 'duplicate_report',
+                    'Importer des trajets depuis un calendrier' => 'import_calendar',
                 ],
                 'expanded' => true,
                 'multiple' => false,
@@ -48,7 +50,7 @@ class AssistantAIType extends AbstractType
                 ]
             ]);
             
-
+        
         // Champs dynamiques selon l'action
         /*$builder->addEventListener(FormEvents::PRE_SET_DATA, function (FormEvent $event) use ($report): void  {
             $form = $event->getForm();
@@ -82,7 +84,7 @@ class AssistantAIType extends AbstractType
         });*/
 
         // Mise à jour dynamique des champs en fonction de l'action
-        $builder->addEventListener(FormEvents::PRE_SUBMIT, function (FormEvent $event) use ($report) {
+        $builder->addEventListener(FormEvents::PRE_SUBMIT, function (FormEvent $event) use ($report, $options) {
             $data = $event->getData();
             $form = $event->getForm();
 
@@ -91,6 +93,10 @@ class AssistantAIType extends AbstractType
             $form->remove('trip_id');
             $form->remove('destination');
             $form->remove('target_period');
+            $form->remove('copy_mode');
+            $form->remove('type_report_line');
+            $form->remove('calendarConnection');
+            $form->remove('calendar_start_address_choice');
 
             // Récupérer les périodes cibles disponibles (année + mois sans rapport existant)
             $availablePeriods = $this->reportService->getAvailablePeriodsForReportDuplication($report);
@@ -195,18 +201,94 @@ class AssistantAIType extends AbstractType
                             ]
                         ]);
                         break;
+                    
+                    case 'import_calendar':
+                        if ($options['show_calendar_url']) {
+                            /** @var User|null $user */
+                            $user = $options['user'];
 
+                            if (
+                                $user instanceof User
+                                && (
+                                    !isset($data['calendarConnection'])
+                                    || !is_array($data['calendarConnection'])
+                                    || empty($data['calendarConnection']['calendarUrl'])
+                                )
+                            ) {
+                                $data['calendarConnection'] = [
+                                    'calendarUrl' => $user->getCalendarUrl(),
+                                    'calendarUsername' => $user->getCalendarUsername(),
+                                    'plainCalendarPassword' => '',
+                                ];
+
+                                $event->setData($data);
+                            }
+
+                            $form->add('calendarConnection', CalendarConnectionType::class, [
+                                'mapped' => false,
+                                'data' => $this->createCalendarConnectionData($user),
+                                'required' => false,
+                                'show_url' => true,
+                                'calendar_validation_url' => $options['calendar_validation_url'],
+                                'has_saved_password' => $options['has_saved_calendar'],
+                                'credentials_required' => false,
+                            ]);
+                        }
+
+                        $form->add('type_report_line', ChoiceType::class, [
+                            'label' => 'Mode d’importation des trajets',
+                            'choices' => [
+                                'Chaque trajet est un aller-retour depuis l\'adresse de départ' => CalendarReportImporter::MODE_RETURN,
+                                'Chaque trajet débute depuis l’arrivée du trajet précédent' => CalendarReportImporter::MODE_TOUR,
+                            ],
+                            'expanded' => true,
+                            'required' => true,
+                            'mapped' => false,
+                            'data' => CalendarReportImporter::MODE_RETURN,
+                            'constraints' => [
+                                new NotBlank([
+                                    'message' => new TranslatableMessage('Merci de sélectionner un mode d’importation des trajets'),
+                                ]),
+                            ],
+                        ]);
+
+                        $form->add('calendar_start_address_choice', ChoiceType::class, [
+                            'label' => 'Adresse de départ',
+                            'choices' => $this->getAddressChoices($report),
+                            'mapped' => false,
+                            'required' => true,
+                            'placeholder' => '',
+                            'attr' => [
+                                'class' => 'js-calendar-start-address',
+                            ],
+                            'constraints' => [
+                                new NotBlank([
+                                    'message' => new TranslatableMessage('Merci de sélectionner une adresse de départ'),
+                                ]),
+                            ],
+                        ]);
+
+                        break;
                 }
             }
         });
     }
 
-    public function configureOptions(OptionsResolver $resolver)
+    public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
             'report' => null,
-            'validation_groups' => false,
+            'user' => null,
+            'calendar_validation_url' => '',
+            'show_calendar_url' => true,
+            'has_saved_calendar' => false,
         ]);
+
+        $resolver->setRequired('report');
+
+        $resolver->setAllowedTypes('calendar_validation_url', 'string');
+        $resolver->setAllowedTypes('show_calendar_url', 'bool');
+        $resolver->setAllowedTypes('has_saved_calendar', 'bool');
     }
 
     // Méthodes utilitaires pour générer les choix
@@ -266,5 +348,29 @@ class AssistantAIType extends AbstractType
             $trips[$tripLabel] = $line->getId();
         }
         return $trips;
+    }
+
+    private function getAddressChoices(Report $report): array
+    {
+        $user = $report->getUser();
+
+        return !$user->getManagedBy()
+            ? $user->getFormattedUserAddresses()
+            : $user->getFormattedGroupAddresses();
+    }
+
+    private function createCalendarConnectionData(?User $user): CalendarConnectionData
+    {
+        $data = new CalendarConnectionData();
+
+        if ($user instanceof User) {
+            $data->calendarUrl = $user->getCalendarUrl();
+            $data->calendarUsername = $user->getCalendarUsername();
+
+            // Seulement si ton mot de passe est stocké de manière réversible.
+            $data->plainCalendarPassword = $user->getCalendarEncryptedPassword();
+        }
+
+        return $data;
     }
 }

@@ -92,17 +92,23 @@
                     {% else %}
                         <div class="tm-trip-list">
                             {% for line in sorted %}
-                                <div class="tm-trip-item"
-                                     data-trip-item
-                                     data-km="{{ line.kmTotal ?? 0 }}"
-                                     data-amount="{{ line.amount ?? 0 }}"
-                                     data-search="{{ [
-                                         line.travelDate ? line.travelDate|date('d/m/Y') : '',
-                                         line.startAdress ?? '',
-                                         line.endAdress ?? '',
-                                         line.vehicule ? line.vehicule|striptags : '',
-                                         line.comment ?? ''
-                                     ]|join(' ')|lower }}">
+                            <div class="tm-trip-item"
+                                data-trip-item
+                                data-line-id="{{ line.id }}"
+                                data-vehicule="{{ line.vehicule.id }}"
+                                data-start="{{ line.startAdress }}"
+                                data-end="{{ line.endAdress }}"
+                                data-return="{{ line.isReturn ? 1 : 0 }}"
+                                data-ics="{{ '[ICS_AUTO_CALC]' in (line.comment ?? '') ? 1 : 0 }}"
+                                data-km="{{ line.kmTotal ?? 0 }}"
+                                data-amount="{{ line.amount ?? 0 }}"
+                                data-search="{{ [
+                                    line.travelDate ? line.travelDate|date('d/m/Y') : '',
+                                    line.startAdress ?? '',
+                                    line.endAdress ?? '',
+                                    line.vehicule ? line.vehicule|striptags : '',
+                                    line.comment ?? ''
+                                ]|join(' ')|lower }}">
 
                                     <div class="tm-trip-row">
                                         <div class="tm-trip-row__summary">

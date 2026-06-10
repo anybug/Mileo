@@ -95,3 +95,13 @@
 .favorite-choice-address {
     font-weight: 400;
 }
+.pac-container {
+    z-index: 20000 !important;
+}
+
+.form-label.required::after,
+label.required::after {
+    content: " *";
+    color: var(--bs-danger, #dc3545);
+    font-weight: 700;
+}

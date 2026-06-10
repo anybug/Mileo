@@ -1,3 +1,4 @@
+import TomSelect from 'tom-select';
 (function () {
     if (window.__mileoReportAppInstalled) return;
     window.__mileoReportAppInstalled = true;
@@ -6,6 +7,22 @@
         initGlobalApp();
         initReportFeatures();
         initReadonlyReportFeatures();
+    });
+
+    document.addEventListener('assistant:preview-loaded', async () => {
+        waitForGoogleMaps(async () => {
+            const previewZone = document.getElementById('preview-zone');
+
+            if (previewZone) {
+                previewZone.classList.add('loading');
+            }
+
+            await processAssistantPreviewCalendarLines();
+
+            if (previewZone) {
+                previewZone.classList.remove('loading');
+            }
+        });
     });
 
     /* =========================================================
@@ -17,6 +34,10 @@
     }
 
     function initReportFeatures() {
+
+        initAssistantTomSelect(document);
+        observeAssistantFormTomSelect();
+
         hideAndPresetDateFields();
         hideFavoritesField();
 
@@ -213,6 +234,104 @@
         delegate(document, 'focus', '.form_scale', (e, target) => {
             target.dataset.previousValue = target.value;
         });
+
+        delegate(document, 'click', '.js-add-address', () => {
+            doModal(
+                'Ajouter une adresse dans mon carnet d\'adresses',
+                `
+                    <form class="js-new-address-form">
+                        <div class="mb-3">
+                            <label class="form-label required">Nom</label>
+                            <input type="text"
+                                class="form-control js-new-address-name"
+                                placeholder="Maison, Client, Bureau..."
+                                required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label required">Adresse</label>
+                            <input type="text"
+                                class="form-control autocomplete js-new-address-value"
+                                placeholder="Saisir une adresse"
+                                required>
+                        </div>
+                    </form>
+
+                    <div class="text-end">
+                        <button type="button"
+                                class="btn btn-secondary"
+                                data-bs-dismiss="modal">
+                            Annuler
+                        </button>
+
+                        <button type="button"
+                                class="btn btn-primary js-save-new-address">
+                            Enregistrer
+                        </button>
+                    </div>
+                `,
+                null,
+                {
+                    centered: true
+                }
+            );
+
+            setTimeout(() => {
+                waitForGoogleMaps(() => {
+                    initAutocomplete(document.getElementById('dynamicModal'));
+                });
+            }, 100);
+        });
+
+        delegate(document, 'click', '.js-save-new-address', async () => {
+            const form = document.querySelector('.js-new-address-form');
+
+            if (!form.reportValidity()) {
+                return;
+            }
+            const name =
+                document.querySelector('.js-new-address-name')?.value;
+
+            const address =
+                document.querySelector('.js-new-address-value')?.value;
+
+            if (!name || !address) {
+                return;
+            }
+
+            const response = await fetch('/app/address/favorite/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({
+                    name,
+                    address
+                })
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                return;
+            }
+
+            const select = document.querySelector('.js-calendar-start-address');
+
+            if (select?.tomselect) {
+                select.tomselect.addOption({
+                    value: address,
+                    text: `${name} : ${address}`
+                });
+
+                select.tomselect.addItem(address);
+            }
+
+            bootstrap.Modal.getInstance(
+                document.getElementById('dynamicModal')
+            )?.hide();
+        });
     }
 
     function initReadonlyReportFeatures() {
@@ -224,6 +343,56 @@
 
         applyReadonlySearchFilter();
         updateReadonlyStats();
+    }
+
+    function initAssistantTomSelect(root = document) {
+
+        qsa('.js-calendar-start-address', root).forEach((el) => {
+
+            if (el.tomselect) {
+                return;
+            }
+
+            if (typeof TomSelect === 'undefined') {
+                console.warn('TomSelect non chargé');
+                return;
+            }
+
+            new TomSelect(el, {
+                create: false,
+                allowEmptyOption: true,
+                maxOptions: 500,
+                placeholder: 'Rechercher une adresse favorite',
+                searchField: ['text']
+            });
+        });
+    }
+
+    function observeAssistantFormTomSelect() {
+        if (document.body.dataset.tomObserver === '1') {
+            return;
+        }
+
+        document.body.dataset.tomObserver = '1';
+
+        const observer = new MutationObserver(() => {
+            const field = document.querySelector('.js-calendar-start-address');
+
+            if (!field || field.tomselect) {
+                return;
+            }
+
+
+            observer.disconnect();
+            document.body.dataset.tomObserver = '0';
+
+            initAssistantTomSelect(document);
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
     }
 
     /* =========================================================
@@ -543,11 +712,9 @@
     }
 
     function waitForGoogleMaps(callback, tries = 0) {
-        if (!document.querySelector('.autocomplete')) {
-            return;
-        }
 
-        if (window.google && google.maps && google.maps.places) {
+        if (window.google && google.maps) {
+
             callback();
             return;
         }
@@ -639,18 +806,49 @@
     }
 
     function updateReadonlyStats() {
+
         const allItems = getReadonlyTripItems();
+
         let totalKm = 0;
+        let totalAmount = 0;
 
         allItems.forEach((item) => {
-            totalKm += parseNumber(item.dataset.km ?? 0);
+
+            totalKm += parseNumber(
+                item.dataset.km ?? 0
+            );
+
+            totalAmount += parseNumber(
+                item.dataset.amount ?? 0
+            );
         });
 
-        const linesEl = document.querySelector('.js-report-stat-lines');
-        const kmEl = document.querySelector('.js-report-stat-km');
+        const linesEl = document.querySelector(
+            '.js-report-stat-lines'
+        );
 
-        if (linesEl) linesEl.textContent = String(allItems.length);
-        if (kmEl) kmEl.textContent = String(Math.round(totalKm));
+        const kmEl = document.querySelector(
+            '.js-report-stat-km'
+        );
+
+        const totalEl = document.querySelector(
+            '.js-report-stat-total'
+        );
+
+        if (linesEl) {
+            linesEl.textContent = String(allItems.length);
+        }
+
+        if (kmEl) {
+            kmEl.textContent = String(Math.round(totalKm));
+        }
+
+        if (totalEl) {
+
+            totalEl.textContent =
+                parseFloat(totalAmount)
+                    .toFixed(2);
+        }
     }
 
     function applyReadonlySearchFilter() {
@@ -733,6 +931,7 @@
 
             const html = await response.text();
             container.innerHTML = html;
+            document.dispatchEvent(new Event('assistant:form-updated'));
 
             const newSearchInput = getReadonlySearchInput();
             if (newSearchInput) {
@@ -1570,4 +1769,451 @@
             btn.querySelector('.spinner-border')?.remove();
         }
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Calendar IMPORT PIPELINE
+    |--------------------------------------------------------------------------
+    */
+
+    async function processSingleCalendarLine(line) {
+
+        const distanceField = line.querySelector('.report_lines_km');
+
+        const kmTotalField = line.querySelector('.report_lines_km_total');
+
+        const amountField = line.querySelector('.report_lines_amount');
+
+        const startField = line.querySelector('.report_lines_start');
+
+        const endField = line.querySelector('.report_lines_end');
+
+        const isReturnField = line.querySelector('.report_lines_is_return');
+
+        if (
+            !distanceField
+            || !kmTotalField
+            || !amountField
+            || !startField
+            || !endField
+        ) {
+            return;
+        }
+
+        if (
+            !startField.value
+            || !endField.value
+        ) {
+            return;
+        }
+
+        addLoading(distanceField);
+        addLoading(kmTotalField);
+        addLoading(amountField);
+
+        /*
+        |--------------------------------------------------------------------------
+        | 1. DISTANCE GOOGLE
+        |--------------------------------------------------------------------------
+        */
+
+        const km = await calculateGoogleDistance(
+            startField.value,
+            endField.value
+        );
+
+        removeLoading(distanceField);
+
+        distanceField.value = km;
+
+        /*
+        |--------------------------------------------------------------------------
+        | 2. KM TOTAL
+        |--------------------------------------------------------------------------
+        */
+
+        let kmTotal = km;
+
+        if (isReturnField?.checked) {
+            kmTotal = km * 2;
+        }
+
+        removeLoading(kmTotalField);
+
+        kmTotalField.value = Math.round(kmTotal);
+
+        /*
+        |--------------------------------------------------------------------------
+        | 3. AMOUNT
+        |--------------------------------------------------------------------------
+        */
+
+        const amount = await calculateAmountForLine(
+            line,
+            kmTotal
+        );
+
+        removeLoading(amountField);
+
+        amountField.value = parseFloat(amount || 0).toFixed(2);
+
+        const lineId = line.dataset.lineId;
+
+        if (lineId) {
+            try {
+                await fetch(
+                    '/app/report-line/' + lineId + '/update-distance',
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify({
+                            km: km,
+                            kmTotal: kmTotal,
+                            amount: amount
+                        })
+                    }
+                );
+
+            } catch (e) {
+                console.error('SAVE ERROR', e);
+            }
+        }
+    }
+
+    async function processAssistantPreviewCalendarLines() {
+
+        const lines = qsa('#preview-zone .tm-trip-item[data-calendar="1"]');
+
+        if (!lines.length) {
+            return;
+        }
+
+        const confirmBtn = document.querySelector('.js-confirm-dup');
+
+        if (confirmBtn) {
+            confirmBtn.disabled = true;
+            confirmBtn.classList.add('opacity-50');
+        }
+
+        showAssistantPreviewLoader(`Calcul de ${lines.length} trajet(s)...`);
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+
+            updateAssistantPreviewLoader(`Calcul du trajet ${i + 1} / ${lines.length}...`);
+
+            await processSingleCalendarLine(line);
+
+            const km = line.querySelector('.report_lines_km')?.value || 0;
+            const kmTotal = line.querySelector('.report_lines_km_total')?.value || 0;
+            const amount = line.querySelector('.report_lines_amount')?.value || '0.00';
+
+            line.querySelector('.js-preview-km').textContent = km > 0 ? km : 'Non calculé';
+            line.querySelector('.js-preview-km-total').textContent = kmTotal > 0 ? kmTotal : 'Non calculé';
+            line.querySelector('.js-preview-amount').textContent =
+                parseNumber(amount) > 0
+                    ? parseFloat(amount).toFixed(2).replace('.', ',') + ' €'
+                    : 'Non calculé';
+        }
+
+        refreshAssistantTripsJson();
+        refreshAssistantCalculationWarnings();
+
+        if (confirmBtn && !document.querySelector('#preview-zone .js-calculation-error')) {
+            confirmBtn.disabled = false;
+            confirmBtn.classList.remove('opacity-50');
+        }
+
+        updateAssistantPreviewLoader('Calcul terminé');
+
+        setTimeout(() => {
+            hideAssistantPreviewLoader();
+        }, 800);
+    }
+
+    function showAssistantPreviewLoader(message = 'Calcul des trajets en cours...') {
+        doModal(
+            'Calcul des trajets',
+            `
+                <div id="assistant-preview-loader" class="text-center py-4">
+                    <div class="spinner-border mb-3" role="status" aria-hidden="true"></div>
+                    <div>
+                        <strong class="js-assistant-preview-loader-message">${message}</strong>
+                    </div>
+                    <div class="form-text mt-2">
+                        Merci de patienter, les distances et montants sont calculés automatiquement.
+                    </div>
+                </div>
+            `,
+            null,
+            {
+                size: 'md',
+                scrollable: false,
+                centered: true
+            }
+        );
+
+        const modalEl = document.getElementById('dynamicModal');
+
+        if (modalEl) {
+            modalEl.querySelector('.btn-close')?.remove();
+            modalEl.setAttribute('data-bs-backdrop', 'static');
+            modalEl.setAttribute('data-bs-keyboard', 'false');
+        }
+    }
+
+    function updateAssistantPreviewLoader(message) {
+        const messageEl = document.querySelector(
+            '.js-assistant-preview-loader-message'
+        );
+
+        if (messageEl) {
+            messageEl.textContent = message;
+        }
+    }
+
+    function hideAssistantPreviewLoader() {
+        const modalEl = document.getElementById('dynamicModal');
+
+        if (!modalEl) {
+            return;
+        }
+
+        const modal = bootstrap.Modal.getInstance(modalEl);
+
+        if (modal) {
+            modal.hide();
+        } else {
+            modalEl.remove();
+        }
+    }
+
+    function refreshAssistantTripsJson() {
+        const trips = [];
+
+        qsa('#preview-zone .tm-trip-item').forEach((line) => {
+            trips.push({
+                date: line.querySelector('.report_lines_travel_date')?.value || '',
+                start: line.querySelector('.report_lines_start')?.value || '',
+                end: line.querySelector('.report_lines_end')?.value || '',
+                km: line.querySelector('.report_lines_km')?.value || 0,
+                km_total: line.querySelector('.report_lines_km_total')?.value || 0,
+                is_return: line.querySelector('.report_lines_is_return')?.checked || false,
+                vehicule_id: line.querySelector('.report_lines_vehicule')?.value || '',
+                amount: line.querySelector('.report_lines_amount')?.value || 0,
+                comment: line.querySelector('.report_lines_comment')?.value || '',
+            });
+        });
+
+        const input = document.getElementById('assistant-trips-json');
+
+        if (input) {
+            input.value = JSON.stringify(trips);
+        }
+    }
+
+    function refreshAssistantCalculationWarnings() {
+        const previewZone = document.getElementById('preview-zone');
+
+        if (!previewZone) {
+            return;
+        }
+
+        const rows = qsa('.tm-trip-item', previewZone);
+        const warning = document.getElementById('calculation-warning');
+        const confirmBtn = document.querySelector('.js-confirm-dup');
+
+        let hasError = false;
+
+        rows.forEach((line) => {
+            const kmTotal = parseNumber(line.querySelector('.report_lines_km_total')?.value || 0);
+            const amount = parseNumber(line.querySelector('.report_lines_amount')?.value || 0);
+
+            const isCalculated = kmTotal > 0 && amount > 0;
+
+            line.classList.toggle('table-warning', !isCalculated);
+            line.classList.toggle('js-calculation-error', !isCalculated);
+
+            const kmTotalCell = line.querySelector('.js-preview-km-total');
+            const amountCell = line.querySelector('.js-preview-amount');
+
+            if (!isCalculated) {
+                hasError = true;
+
+                if (kmTotalCell && kmTotal <= 0) {
+                    kmTotalCell.innerHTML = '<span class="text-warning fw-bold">Non calculé</span>';
+                }
+
+                if (amountCell && amount <= 0) {
+                    amountCell.innerHTML = '<span class="text-warning fw-bold">Non calculé</span>';
+                }
+            }
+        });
+
+        if (warning) {
+            warning.classList.toggle('d-none', !hasError);
+        }
+
+        if (confirmBtn) {
+            confirmBtn.disabled = hasError;
+            confirmBtn.classList.toggle('opacity-50', hasError);
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | GOOGLE DISTANCE
+    |--------------------------------------------------------------------------
+    */
+
+    async function calculateGoogleDistance(origin, destination) {
+        console.log('GOOGLE DISTANCE START', origin, destination);
+        return new Promise((resolve) => {
+            if (
+                !window.google
+                || !google.maps
+            ) {
+                resolve(0);
+                return;
+            }
+
+            const service =
+                new google.maps.DistanceMatrixService();
+
+            service.getDistanceMatrix(
+                {
+                    origins: [origin],
+                    destinations: [destination],
+                    travelMode: google.maps.TravelMode.DRIVING,
+                    unitSystem: google.maps.UnitSystem.METRIC,
+                    avoidHighways: false,
+                    avoidTolls: false
+                },
+                (response, status) => {
+
+                    if (
+                        status !== google.maps.DistanceMatrixStatus.OK
+                    ) {
+                        console.error(status);
+
+                        resolve(0);
+
+                        return;
+                    }
+
+                    try {
+
+                        const element =
+                            response.rows?.[0]?.elements?.[0];
+
+                        if (
+                            !element
+                            || !element.distance
+                        ) {
+                            resolve(0);
+                            return;
+                        }
+
+                        const km = Math.round(
+                            element.distance.value / 1000
+                        );
+
+                        resolve(km);
+
+                    } catch (e) {
+
+                        console.error(e);
+
+                        resolve(0);
+                    }
+                }
+            );
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | CALCULATE AMOUNT
+    |--------------------------------------------------------------------------
+    */
+
+    async function calculateAmountForLine(line, distance) {
+
+        return new Promise(async (resolve) => {
+
+            try {
+
+                const params =
+                    new URLSearchParams(window.location.search);
+
+                const reportId =
+                    params.get('entityId');
+
+                const vehiculeValue =
+                    line.dataset.vehicule;
+
+                if (
+                    !distance
+                    || !vehiculeValue
+                ) {
+                    resolve(0);
+                    return;
+                }
+
+                const requestUrl =
+                    new URL(
+                        url_generateAmountAction,
+                        window.location.origin
+                    );
+
+                requestUrl.searchParams.set(
+                    'report_id',
+                    reportId
+                );
+
+                requestUrl.searchParams.set(
+                    'distance',
+                    distance
+                );
+
+                requestUrl.searchParams.set(
+                    'vehicule',
+                    vehiculeValue
+                );
+
+                const response = await fetch(
+                    requestUrl.toString(),
+                    {
+                        method: 'GET',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        credentials: 'same-origin'
+                    }
+                );
+
+                if (!response.ok) {
+
+                    resolve(0);
+
+                    return;
+                }
+
+                const data = await response.json();
+
+                resolve(data.amount || 0);
+
+            } catch (e) {
+
+                console.error(e);
+
+                resolve(0);
+            }
+        });
+    }
+
+
 })();

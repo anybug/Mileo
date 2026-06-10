@@ -1,22 +1,143 @@
-{% form_theme form '@EasyAdmin/crud/form_theme.html.twig' %} 
+{% form_theme form '@EasyAdmin/crud/form_theme.html.twig' %}
 
 <div id="assistant-form-container">
+
+    {{ form_errors(form) }}
+
     {% if form.source_week is defined %}
         {{ form_row(form.source_week) }}
     {% endif %}
+
     {% if form.trip_id is defined %}
         {{ form_row(form.trip_id) }}
-    {% endif %}        
+    {% endif %}
 
-    {% if form.destination is defined %}    
+    {% if form.destination is defined %}
         {{ form_row(form.destination) }}
-    {% endif %}   
+    {% endif %}
 
-    {% if form.target_period is defined %}    
+    {% if form.target_period is defined %}
         {{ form_row(form.target_period) }}
-    {% endif %}  
+    {% endif %}
 
-    {% if form.copy_mode is defined %}    
+    {% if form.copy_mode is defined %}
         {{ form_row(form.copy_mode) }}
-    {% endif %}    
+    {% endif %}
+
+    {% set hasSavedCalendar = hasSavedCalendar|default(false) %}
+    {% set selectedAction = form.action is defined ? form.action.vars.data : null %}
+    {% set isImportCalendar = selectedAction == 'import_calendar' %}
+
+    {% set hasCalendarConnection = isImportCalendar and (
+        hasSavedCalendar
+        or form.calendarConnection is defined
+        or form.calendarUrl is defined
+    ) %}
+
+    {% if hasCalendarConnection %}
+        {% set calendarSidepanelUid = 'assistant-calendar-connection' %}
+        {% set calendarDisableModalId = 'disable-calendar-modal-assistant' %}
+
+        {% set disableCalendarUrl = path('app_calendar_disable', {
+            entityId: app.user.id
+        }) %}
+
+        {% include 'App/Profile/_delete_calendar.html.twig' with {
+            disableCalendarUrl: disableCalendarUrl,
+            calendarUserId: app.user.id,
+            hasSavedCalendar: hasSavedCalendar,
+            disableModalId: calendarDisableModalId
+        } %}
+
+        {% if form.calendarConnection is defined %}
+            {{ include('App/Form/_calendar_connection_sidepanel.html.twig', {
+                form: form.calendarConnection,
+                uid: calendarSidepanelUid,
+                showCard: true,
+                calendarValidationUrl: calendarValidationUrl|default(''),
+                calendar_validation_url: calendarValidationUrl|default(''),
+                hasSavedCalendar: hasSavedCalendar,
+                useFormTag: false,
+                disableModalId: calendarDisableModalId,
+                titleConnected: 'Calendrier connecté',
+                titleDisconnected: 'Connexion au calendrier',
+                textConnected: 'Le calendrier est déjà configuré. Vous pouvez le modifier si nécessaire.',
+                textDisconnected: 'Renseignez l’URL du calendrier, puis validez-la avant de générer les trajets.',
+                buttonConnected: 'Modifier le calendrier',
+                buttonDisconnected: 'Connecter le calendrier',
+                buttonDisable: 'Désactiver'
+            }) }}
+        {% elseif form.calendarUrl is defined %}
+            {{ include('App/Form/_calendar_connection_sidepanel.html.twig', {
+                form: form,
+                uid: calendarSidepanelUid,
+                showCard: true,
+                calendarValidationUrl: calendarValidationUrl|default(''),
+                calendar_validation_url: calendarValidationUrl|default(''),
+                hasSavedCalendar: hasSavedCalendar,
+                useFormTag: false,
+                disableModalId: calendarDisableModalId,
+                titleConnected: 'Calendrier connecté',
+                titleDisconnected: 'Connexion au calendrier',
+                textConnected: 'Le calendrier est déjà configuré. Vous pouvez le modifier si nécessaire.',
+                textDisconnected: 'Renseignez l’URL du calendrier, puis validez-la avant de générer les trajets.',
+                buttonConnected: 'Modifier le calendrier',
+                buttonDisconnected: 'Connecter le calendrier',
+                buttonDisable: 'Désactiver'
+            }) }}
+        {% endif %}
+    {% endif %}
+
+    {% if isImportCalendar %}
+        <div id="calendar-dependent-fields-wrapper"
+            data-calendar-dependent-fields
+            style="{% if hasCalendarConnection and not hasSavedCalendar %}display: none;{% endif %}">
+
+            <div class="card border-0 bg-light mb-3">
+                <div class="card-body">
+                    {#<div class="d-flex align-items-start gap-3 mb-3">
+                        <div class="text-primary fs-5">
+                            <i class="fa-solid fa-route"></i>
+                        </div>
+
+                        <div class="flex-grow-1">
+                            <h5 class="mb-1">
+                                Paramètres d’importation
+                            </h5>
+                            <div class="text-muted small">
+                                Choisissez comment les trajets doivent être générés depuis les événements du calendrier.
+                            </div>
+                        </div>
+                    </div>#}
+
+                    {% if form.type_report_line is defined %}
+                        <div class="mb-3">
+                            {{ form_row(form.type_report_line) }}
+                        </div>
+                    {% endif %}
+
+                    {% if form.calendar_start_address_choice is defined %}
+                        <div class="mb-3">
+                            {{ form_label(form.calendar_start_address_choice) }}
+
+                            <div class="row g-2 align-items-start">
+                                <div class="col">
+                                    {{ form_widget(form.calendar_start_address_choice) }}
+                                    {{ form_errors(form.calendar_start_address_choice) }}
+                                </div>
+
+                                <div class="col-auto">
+                                    <button type="button"
+                                            class="btn btn-primary js-add-address"
+                                            title="Ajouter une adresse favorite">
+                                        <i class="fa-solid fa-plus"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    {% endif %}
 </div>
