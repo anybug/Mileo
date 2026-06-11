@@ -1,0 +1,857 @@
+(function () {
+    function findInputByNameSuffix(root, suffix) {
+        return root.querySelector('[name$="[' + suffix + ']"]');
+    }
+
+    function getElements(wrapper) {
+        return {
+            validationUrl: wrapper.dataset.calendarValidationUrl || '',
+
+            message: wrapper.querySelector('[data-calendar-validation-message], #calendar-url-validation-message'),
+
+            connectionCard: document.querySelector('[data-calendar-connection-card]'),
+            connectionTitle: document.querySelector('[data-calendar-connection-title]'),
+            connectionText: document.querySelector('[data-calendar-connection-text]'),
+            connectionIconWrapper: document.querySelector('[data-calendar-connection-icon-wrapper]'),
+            connectionIcon: document.querySelector('[data-calendar-connection-icon]'),
+
+            urlButton: wrapper.querySelector('[data-validate-calendar-url], #validate-calendar-url-button'),
+            editUrlButton: wrapper.querySelector('[data-edit-calendar-url], #edit-calendar-url-button'),
+            urlValidIcon: wrapper.querySelector('[data-calendar-url-valid-icon], #calendar-url-valid-icon'),
+
+            authButton: wrapper.querySelector('[data-validate-calendar-auth], #validate-calendar-auth-button'),
+            authValidIcon: wrapper.querySelector('[data-calendar-auth-valid-icon], #calendar-auth-valid-icon'),
+
+            authContainer: wrapper.querySelector('[data-calendar-auth-container], #calendar-auth-container'),
+            authCollapse: wrapper.querySelector('[data-calendar-auth-collapse], #calendar-auth-collapse'),
+            authRequiredMessage: wrapper.querySelector('[data-calendar-auth-required-message], #calendar-auth-required-message'),
+            authRequiredTitle: wrapper.querySelector('[data-calendar-auth-required-title]'),
+            authRequiredText: wrapper.querySelector('[data-calendar-auth-required-text]'),
+            authToggleButton: wrapper.querySelector('[data-toggle-calendar-auth], #toggle-calendar-auth-button'),
+            caldavFields: wrapper.querySelector('[data-caldav-fields], #caldav-fields-wrapper'),
+
+            calendarUrlInput: findInputByNameSuffix(wrapper, 'calendarUrl'),
+            usernameInput: findInputByNameSuffix(wrapper, 'calendarUsername'),
+            passwordInput: findInputByNameSuffix(wrapper, 'plainCalendarPassword'),
+
+            dependentFields: document.querySelector('[data-calendar-dependent-fields], #calendar-dependent-fields-wrapper'),
+            previewButton: document.querySelector('[data-calendar-preview-button], #preview-button')
+        };
+    }
+
+    function setMessage(message, type, text) {
+        if (!message) {
+            return;
+        }
+
+        message.className = 'mt-2';
+
+        if (type) {
+            message.classList.add('text-' + type);
+        }
+
+        message.textContent = text || '';
+    }
+
+    function setCalendarConnectionStatus(elements, isConnected) {
+        if (elements.connectionCard) {
+            elements.connectionCard.classList.toggle('bg-light', !isConnected);
+            elements.connectionCard.classList.toggle('bg-success-subtle', isConnected);
+            elements.connectionCard.classList.toggle('border', isConnected);
+            elements.connectionCard.classList.toggle('border-success', isConnected);
+        }
+
+        if (elements.connectionIconWrapper) {
+            elements.connectionIconWrapper.classList.toggle('text-primary', !isConnected);
+            elements.connectionIconWrapper.classList.toggle('text-success', isConnected);
+        }
+
+        if (elements.connectionIcon) {
+            elements.connectionIcon.className = isConnected
+                ? 'fa-solid fa-circle-check'
+                : 'fa-solid fa-calendar-days';
+        }
+
+        if (elements.connectionTitle) {
+            elements.connectionTitle.textContent = isConnected
+                ? 'Calendrier connecté'
+                : 'Connexion au calendrier';
+        }
+
+        if (elements.connectionText) {
+            elements.connectionText.classList.toggle('text-muted', !isConnected);
+            elements.connectionText.classList.toggle('text-success', isConnected);
+
+            elements.connectionText.textContent = isConnected
+                ? 'Le calendrier est validé. Vous pouvez maintenant générer les trajets.'
+                : 'Renseignez l’URL du calendrier, puis validez-la avant de générer les trajets.';
+        }
+    }
+
+    function setAuthRequiredMessage(elements, title, text) {
+        if (elements.authRequiredTitle) {
+            elements.authRequiredTitle.textContent = title || 'Authentification requise.';
+        }
+
+        if (elements.authRequiredText) {
+            elements.authRequiredText.textContent = text || 'Ce calendrier nécessite un identifiant et un mot de passe d’application.';
+        }
+
+        if (elements.authRequiredMessage) {
+            elements.authRequiredMessage.style.display = 'block';
+        }
+    }
+
+    function setAuthButtonState(button, isOpen) {
+        if (!button) {
+            return;
+        }
+
+        button.innerHTML = isOpen
+            ? '<i class="fa-solid fa-lock-open"></i> Masquer les identifiants du calendrier'
+            : '<i class="fa-solid fa-lock"></i> Afficher les identifiants du calendrier';
+    }
+
+    function openAuthBlock(elements) {
+        if (elements.authContainer) {
+            elements.authContainer.style.display = 'block';
+        }
+
+        if (elements.authCollapse) {
+            elements.authCollapse.style.display = 'block';
+        }
+
+        setAuthButtonState(elements.authToggleButton, true);
+    }
+
+    function closeAuthBlock(elements) {
+        if (elements.authCollapse) {
+            elements.authCollapse.style.display = 'none';
+        }
+
+        setAuthButtonState(elements.authToggleButton, false);
+    }
+
+    function showNextStep(elements) {
+        if (elements.dependentFields) {
+            elements.dependentFields.style.display = '';
+            setRequiredStateForContainer(elements.dependentFields, true);
+        }
+    }
+
+    function hideNextStep(elements) {
+        if (elements.dependentFields) {
+            setRequiredStateForContainer(elements.dependentFields, false);
+            elements.dependentFields.style.display = 'none';
+        }
+    }
+
+    function setRequiredStateForContainer(container, isRequiredEnabled) {
+        if (!container) {
+            return;
+        }
+
+        container
+            .querySelectorAll('input, select, textarea')
+            .forEach(function (field) {
+                if (!field.dataset.originalRequired) {
+                    field.dataset.originalRequired = field.required ? '1' : '0';
+                }
+
+                if (isRequiredEnabled) {
+                    if (field.dataset.originalRequired === '1') {
+                        field.required = true;
+                    }
+                } else {
+                    field.required = false;
+                }
+            });
+    }
+
+    function setCalendarUrlReadonly(elements, isReadonly) {
+        if (!elements.calendarUrlInput) {
+            return;
+        }
+
+        elements.calendarUrlInput.readOnly = isReadonly;
+        elements.calendarUrlInput.classList.toggle('bg-body-secondary', isReadonly);
+    }
+
+    function setCalendarCredentialsReadonly(elements, isReadonly) {
+        [elements.usernameInput, elements.passwordInput].forEach(function (input) {
+            if (!input) {
+                return;
+            }
+
+            input.readOnly = isReadonly;
+            input.classList.toggle('bg-body-secondary', isReadonly);
+        });
+    }
+
+    function setCalDavCredentialsRequired(wrapper, isRequired) {
+        const usernameInput = findInputByNameSuffix(wrapper, 'calendarUsername');
+        const passwordInput = findInputByNameSuffix(wrapper, 'plainCalendarPassword');
+
+        [usernameInput, passwordInput].forEach(function (input) {
+            if (!input) {
+                return;
+            }
+
+            const label = wrapper.querySelector('label[for="' + input.id + '"]');
+
+            input.required = false;
+
+            if (isRequired) {
+                input.setAttribute('aria-required', 'true');
+                input.dataset.calendarAuthRequired = '1';
+                label?.classList.add('required');
+            } else {
+                input.removeAttribute('aria-required');
+                input.dataset.calendarAuthRequired = '0';
+                label?.classList.remove('required');
+            }
+        });
+    }
+
+    function setUrlValidated(elements, isValidated) {
+        if (elements.urlValidIcon) {
+            elements.urlValidIcon.style.display = isValidated ? 'inline-block' : 'none';
+        }
+    }
+
+    function setAuthValidated(elements, isValidated) {
+        if (elements.authValidIcon) {
+            elements.authValidIcon.style.display = isValidated ? 'inline-block' : 'none';
+        }
+    }
+
+    function hideUrlValidationButton(elements) {
+        if (elements.urlButton) {
+            elements.urlButton.style.display = 'none';
+        }
+    }
+
+    function showUrlValidationButton(elements) {
+        if (elements.urlButton) {
+            elements.urlButton.style.display = 'inline-block';
+        }
+    }
+
+    function hideEditUrlButton(elements) {
+        if (elements.editUrlButton) {
+            elements.editUrlButton.style.display = 'none';
+        }
+    }
+
+    function showEditUrlButton(elements) {
+        if (elements.editUrlButton) {
+            elements.editUrlButton.style.display = 'inline-block';
+        }
+    }
+
+    function resetValidationState(elements) {
+        setUrlValidated(elements, false);
+        setAuthValidated(elements, false);
+        setCalendarConnectionStatus(elements, false);
+
+        setCalendarUrlReadonly(elements, false);
+        setCalendarCredentialsReadonly(elements, false);
+
+        showUrlValidationButton(elements);
+        hideEditUrlButton(elements);
+
+        if (elements.authButton) {
+            elements.authButton.style.display = 'none';
+        }
+
+        if (elements.authRequiredMessage) {
+            elements.authRequiredMessage.style.display = 'none';
+        }
+
+        if (elements.caldavFields) {
+            elements.caldavFields.dataset.authRequired = '0';
+        }
+
+        hideNextStep(elements);
+    }
+
+    function getCalendarUrl(elements) {
+        return elements.calendarUrlInput ? elements.calendarUrlInput.value.trim() : '';
+    }
+
+    function getCalendarUsername(elements) {
+        return elements.usernameInput ? elements.usernameInput.value.trim() : '';
+    }
+
+    function getCalendarPassword(elements) {
+        return elements.passwordInput ? elements.passwordInput.value.trim() : '';
+    }
+
+    async function callValidationEndpoint(elements, withCredentials) {
+        const formData = new FormData();
+
+        formData.append('calendarUrl', getCalendarUrl(elements));
+
+        if (withCredentials) {
+            formData.append('calendarUsername', getCalendarUsername(elements));
+            formData.append('plainCalendarPassword', getCalendarPassword(elements));
+        } else {
+            formData.append('calendarUsername', '');
+            formData.append('plainCalendarPassword', '');
+        }
+
+        formData.append('withCredentials', withCredentials ? '1' : '0');
+
+        const response = await fetch(elements.validationUrl, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+
+        let result;
+
+        try {
+            result = await response.json();
+        } catch (e) {
+            throw new Error('Réponse invalide du serveur lors de la validation du calendrier.');
+        }
+
+        return {
+            response,
+            result
+        };
+    }
+
+    function clearFieldErrors(wrapper) {
+        wrapper
+            .querySelectorAll('.invalid-feedback, .form-error-message, .form-error-icon')
+            .forEach(function (errorElement) {
+                errorElement.remove();
+            });
+
+        wrapper
+            .querySelectorAll('.is-invalid')
+            .forEach(function (field) {
+                field.classList.remove('is-invalid');
+            });
+    }
+
+    async function validateUrl(button) {
+        const wrapper = button.closest('[data-calendar-url-validator], #calendar-url-field-wrapper');
+
+        if (!wrapper) {
+            return;
+        }
+
+        const elements = getElements(wrapper);
+
+        setMessage(elements.message, null, '');
+        resetValidationState(elements);
+
+        if (!elements.validationUrl) {
+            setMessage(elements.message, 'danger', 'URL de validation calendrier manquante.');
+            return;
+        }
+
+        if (!getCalendarUrl(elements)) {
+            setMessage(elements.message, 'danger', "Veuillez renseigner l'adresse de votre calendrier.");
+            return;
+        }
+
+        const originalButtonHtml = button.innerHTML;
+
+        button.disabled = true;
+        button.innerHTML = 'Validation en cours...';
+
+        try {
+            const { response, result } = await callValidationEndpoint(elements, false);
+
+            if (!response.ok && !result.auth_required) {
+                setMessage(
+                    elements.message,
+                    'danger',
+                    result.message || 'Erreur lors de la validation du calendrier.'
+                );
+                return;
+            }
+
+            if (result.auth_required) {
+                wrapper.dataset.calendarUrlValidated = '1';
+                wrapper.dataset.calendarAuthValidated = '0';
+
+                setUrlValidated(elements, true);
+                hideUrlValidationButton(elements);
+                showEditUrlButton(elements);
+                openAuthBlock(elements);
+
+                setCalendarUrlReadonly(elements, true);
+                setCalendarCredentialsReadonly(elements, false);
+
+                setAuthRequiredMessage(
+                    elements,
+                    'Authentification requise.',
+                    'Ce calendrier nécessite un identifiant et un mot de passe d’application.'
+                );
+
+                if (elements.authButton) {
+                    elements.authButton.style.display = 'inline-block';
+                }
+
+                if (elements.caldavFields) {
+                    elements.caldavFields.dataset.authRequired = '1';
+                }
+
+                setCalDavCredentialsRequired(wrapper, true);
+                hideNextStep(elements);
+
+                setMessage(elements.message, null, '');
+
+                return;
+            }
+
+            if (result.valid) {
+                wrapper.dataset.calendarUrlValidated = '1';
+                wrapper.dataset.calendarAuthValidated = '1';
+
+                setUrlValidated(elements, true);
+                setAuthValidated(elements, true);
+                hideUrlValidationButton(elements);
+                showEditUrlButton(elements);
+
+                setCalendarUrlReadonly(elements, true);
+                setCalendarCredentialsReadonly(elements, false);
+
+                if (elements.authButton) {
+                    elements.authButton.style.display = 'none';
+                }
+
+                if (elements.caldavFields) {
+                    elements.caldavFields.dataset.authRequired = '0';
+                }
+
+                setCalDavCredentialsRequired(wrapper, false);
+                showNextStep(elements);
+                setCalendarConnectionStatus(elements, true);
+
+                setMessage(elements.message, 'success', '');
+
+                return;
+            }
+
+            setMessage(
+                elements.message,
+                'danger',
+                result.message || 'URL de calendrier invalide.'
+            );
+        } catch (e) {
+            setMessage(
+                elements.message,
+                'danger',
+                e.message || 'Impossible de valider l’URL du calendrier.'
+            );
+        } finally {
+            button.disabled = false;
+            button.innerHTML = originalButtonHtml;
+        }
+    }
+
+    async function validateAuth(button) {
+        const wrapper = button.closest('[data-calendar-url-validator], #calendar-url-field-wrapper');
+
+        if (!wrapper) {
+            return;
+        }
+
+        const elements = getElements(wrapper);
+
+        setMessage(elements.message, null, '');
+        setAuthValidated(elements, false);
+
+        if (!getCalendarUrl(elements)) {
+            setMessage(elements.message, 'danger', "Veuillez renseigner l'adresse de votre calendrier.");
+            return;
+        }
+
+        if (!getCalendarUsername(elements) || !getCalendarPassword(elements)) {
+            openAuthBlock(elements);
+            setCalDavCredentialsRequired(wrapper, true);
+
+            setMessage(elements.message, null, '');
+
+            if (elements.authRequiredMessage) {
+                elements.authRequiredMessage.style.display = 'block';
+            }
+
+            if (!getCalendarUsername(elements) && elements.usernameInput) {
+                elements.usernameInput.reportValidity();
+            } else if (!getCalendarPassword(elements) && elements.passwordInput) {
+                elements.passwordInput.reportValidity();
+            }
+
+            return;
+        }
+
+        const originalButtonHtml = button.innerHTML;
+
+        button.disabled = true;
+        button.innerHTML = 'Validation des identifiants...';
+
+        try {
+            const { response, result } = await callValidationEndpoint(elements, true);
+
+            if (!response.ok) {
+                openAuthBlock(elements);
+
+                setAuthRequiredMessage(
+                    elements,
+                    result.message || 'Identifiant ou mot de passe calendrier incorrect.',
+                    'Ce calendrier nécessite un identifiant et un mot de passe d’application.'
+                );
+
+                setMessage(elements.message, null, '');
+
+                return;
+            }
+
+            if (result.valid) {
+                clearFieldErrors(wrapper);
+
+                wrapper.dataset.calendarAuthValidated = '1';
+
+                setUrlValidated(elements, true);
+                setAuthValidated(elements, true);
+
+                hideUrlValidationButton(elements);
+                showEditUrlButton(elements);
+
+                setCalendarUrlReadonly(elements, true);
+                setCalendarCredentialsReadonly(elements, true);
+
+
+                if (elements.authButton) {
+                    elements.authButton.style.display = 'none';
+                }
+
+                if (elements.authRequiredMessage) {
+                    elements.authRequiredMessage.style.display = 'none';
+                }
+
+                if (elements.caldavFields) {
+                    elements.caldavFields.dataset.authRequired = '1';
+                }
+
+                setCalDavCredentialsRequired(wrapper, true);
+                showNextStep(elements);
+                setCalendarConnectionStatus(elements, true);
+
+                setMessage(elements.message, 'success', '');
+
+                return;
+            }
+
+            openAuthBlock(elements);
+
+            setAuthRequiredMessage(
+                elements,
+                result.message || 'Identifiant ou mot de passe calendrier incorrect.',
+                'Ce calendrier nécessite un identifiant et un mot de passe d’application.'
+            );
+
+            setMessage(elements.message, null, '');
+        } catch (e) {
+            setMessage(
+                elements.message,
+                'danger',
+                e.message || 'Impossible de valider les identifiants du calendrier.'
+            );
+        } finally {
+            button.disabled = false;
+            button.innerHTML = originalButtonHtml;
+        }
+    }
+
+    function isAuthValidationRequired(wrapper) {
+        if (!wrapper) {
+            return false;
+        }
+
+        const credentialsRequiredOnLoad =
+            wrapper.dataset.calendarCredentialsRequiredOnLoad === '1';
+
+        const caldavFields = wrapper.querySelector('[data-caldav-fields], #caldav-fields-wrapper');
+
+        const authRequiredByValidation =
+            caldavFields && caldavFields.dataset.authRequired === '1';
+
+        return credentialsRequiredOnLoad || authRequiredByValidation;
+    }
+
+    function isAuthValidated(elements) {
+        const wrapper = elements.authContainer
+            ? elements.authContainer.closest('[data-calendar-url-validator], #calendar-url-field-wrapper')
+            : null;
+
+        return (
+            wrapper &&
+            wrapper.dataset.calendarAuthValidated === '1'
+        ) || (
+            elements.authValidIcon &&
+            elements.authValidIcon.style.display !== 'none'
+        );
+    }
+
+    function blockSubmitUntilCalendarValidated(event) {
+        const form = event.target;
+
+        if (!(form instanceof HTMLFormElement)) {
+            return;
+        }
+
+        const wrapper = form.querySelector('[data-calendar-url-validator], #calendar-url-field-wrapper');
+
+        if (!wrapper) {
+            return;
+        }
+
+        const elements = getElements(wrapper);
+        const calendarUrl = getCalendarUrl(elements);
+
+        if (!calendarUrl) {
+            return;
+        }
+
+        const urlValidated =
+            wrapper.dataset.calendarUrlValidated === '1'
+            || (
+                elements.urlValidIcon &&
+                elements.urlValidIcon.style.display !== 'none'
+            );
+
+        if (!urlValidated) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            setMessage(
+                elements.message,
+                'danger',
+                'Veuillez valider l’URL du calendrier avant de sauvegarder.'
+            );
+
+            elements.urlButton?.focus();
+
+            return;
+        }
+
+        const authRequired =
+            elements.caldavFields &&
+            elements.caldavFields.dataset.authRequired === '1';
+
+        const authValidated =
+            wrapper.dataset.calendarAuthValidated === '1'
+            || (
+                elements.authValidIcon &&
+                elements.authValidIcon.style.display !== 'none'
+            );
+
+        if (authRequired && !authValidated) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            openAuthBlock(elements);
+            setCalDavCredentialsRequired(wrapper, true);
+
+            if (elements.authButton) {
+                elements.authButton.style.display = 'inline-block';
+                elements.authButton.focus();
+            }
+
+            setAuthRequiredMessage(
+                elements,
+                'Veuillez valider les identifiants du calendrier avant de sauvegarder.',
+                'Cliquez sur “Valider les identifiants” pour vérifier l’identifiant et le mot de passe d’application.'
+            );
+
+            setMessage(elements.message, null, '');
+        }
+    }
+
+    document.addEventListener('input', function (event) {
+        const wrapper = event.target.closest('[data-calendar-url-validator], #calendar-url-field-wrapper');
+
+        if (!wrapper) {
+            return;
+        }
+
+        const elements = getElements(wrapper);
+
+        if (event.target === elements.calendarUrlInput) {
+            wrapper.dataset.calendarUrlValidated = '0';
+            wrapper.dataset.calendarAuthValidated = '0';
+
+            resetValidationState(elements);
+            setMessage(elements.message, null, '');
+            return;
+        }
+
+        if (
+            event.target === elements.usernameInput ||
+            event.target === elements.passwordInput
+        ) {
+
+            wrapper.dataset.calendarAuthValidated = '0';
+            setAuthValidated(elements, false);
+
+            if (elements.caldavFields) {
+                elements.caldavFields.dataset.authRequired = '1';
+            }
+
+            if (elements.authButton) {
+                elements.authButton.style.display = 'inline-block';
+            }
+
+            if (elements.authRequiredMessage) {
+                elements.authRequiredMessage.style.display = 'block';
+            }
+
+            hideNextStep(elements);
+
+            return;
+        }
+    });
+
+    document.addEventListener('click', function (event) {
+
+        const editUrlButton = event.target.closest('[data-edit-calendar-url], #edit-calendar-url-button');
+
+        if (editUrlButton) {
+            const wrapper = editUrlButton.closest('[data-calendar-url-validator], #calendar-url-field-wrapper');
+
+            if (!wrapper) {
+                return;
+            }
+
+            const elements = getElements(wrapper);
+
+            wrapper.dataset.calendarUrlValidated = '0';
+            wrapper.dataset.calendarAuthValidated = '0';
+
+            setUrlValidated(elements, false);
+            setAuthValidated(elements, false);
+
+            setCalendarUrlReadonly(elements, false);
+            setCalendarCredentialsReadonly(elements, false);
+
+            showUrlValidationButton(elements);
+            hideEditUrlButton(elements);
+
+            if (elements.authButton) {
+                elements.authButton.style.display = 'none';
+            }
+
+            if (elements.authRequiredMessage) {
+                elements.authRequiredMessage.style.display = 'none';
+            }
+
+            if (elements.caldavFields) {
+                elements.caldavFields.dataset.authRequired = '0';
+            }
+
+            closeAuthBlock(elements);
+            hideNextStep(elements);
+
+            setCalDavCredentialsRequired(wrapper, false);
+            setCalendarConnectionStatus(elements, false);
+            setMessage(elements.message, 'warning', 'Vous pouvez modifier l’URL. Une nouvelle validation sera nécessaire avant sauvegarde.');
+
+            elements.calendarUrlInput?.focus();
+
+            return;
+        }
+
+        const validateUrlButton = event.target.closest('[data-validate-calendar-url], #validate-calendar-url-button');
+
+        if (validateUrlButton) {
+            validateUrl(validateUrlButton);
+            return;
+        }
+
+        const validateAuthButton = event.target.closest('[data-validate-calendar-auth], #validate-calendar-auth-button');
+
+        if (validateAuthButton) {
+            validateAuth(validateAuthButton);
+            return;
+        }
+
+        const toggleButton = event.target.closest('[data-toggle-calendar-auth], #toggle-calendar-auth-button');
+
+        if (!toggleButton) {
+            return;
+        }
+
+        const wrapper = toggleButton.closest('[data-calendar-url-validator], #calendar-url-field-wrapper');
+
+        if (!wrapper) {
+            return;
+        }
+
+        const elements = getElements(wrapper);
+
+        if (!elements.authCollapse) {
+            return;
+        }
+
+        const isOpen = elements.authCollapse.style.display === 'block';
+
+        if (isOpen) {
+            closeAuthBlock(elements);
+        } else {
+            openAuthBlock(elements);
+        }
+    });
+
+    document.addEventListener('submit', function (event) {
+        blockSubmitUntilCalendarValidated(event);
+    }, true);
+
+    document.addEventListener('DOMContentLoaded', function () {
+        document
+            .querySelectorAll('[data-calendar-dependent-fields], #calendar-dependent-fields-wrapper')
+            .forEach(function (container) {
+                if (container.offsetParent === null || container.style.display === 'none') {
+                    setRequiredStateForContainer(container, false);
+                }
+            });
+
+        document
+            .querySelectorAll('[data-calendar-url-validator], #calendar-url-field-wrapper')
+            .forEach(function (wrapper) {
+                const credentialsRequiredOnLoad =
+                    wrapper.dataset.calendarCredentialsRequiredOnLoad === '1';
+
+                if (!credentialsRequiredOnLoad) {
+                    return;
+                }
+
+                const elements = getElements(wrapper);
+
+                if (elements.caldavFields) {
+                    elements.caldavFields.dataset.authRequired = '1';
+                }
+
+                setCalDavCredentialsRequired(wrapper, true);
+                openAuthBlock(elements);
+
+                if (elements.authButton) {
+                    elements.authButton.style.display = 'inline-block';
+                }
+
+                setAuthRequiredMessage(
+                    elements,
+                    'Authentification requise.',
+                    'Veuillez renseigner l’identifiant et le mot de passe d’application du calendrier.'
+                );
+            });
+    });
+})();

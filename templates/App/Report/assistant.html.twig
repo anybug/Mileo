@@ -1,6 +1,6 @@
 {% extends '@EasyAdmin/page/content.html.twig' %}{% form_theme form '@EasyAdmin/crud/form_theme.html.twig' %}
 
-{% block page_title %}{{ "Assistant de génération de trajets basé sur le Rapport de"|trans }} {{ report.getPeriod() }}{% endblock %}
+{% block page_title %}{{ "Assistant de génération de trajets pour le Rapport de"|trans }} {{ report.getPeriod() }}{% endblock %}
 
 {% block page_actions %}
 <a class="btn btn-secondary  action-index" href="{{ backUrl }}" role="button" data-action-name="index">

@@ -2,36 +2,37 @@
 
 namespace App\Controller\App;
 
-use Error;
 use App\Entity\Power;
 use App\Entity\Scale;
 use App\Entity\Vehicule;
-use Doctrine\ORM\QueryBuilder;
-use Doctrine\ORM\EntityRepository;
-use Symfony\Component\Form\FormEvent;
-use Symfony\Component\Form\FormEvents;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Component\Form\FormInterface;
-use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
-use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
-use Symfony\Bridge\Doctrine\Form\Type\EntityType;
-use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
-use EasyCorp\Bundle\EasyAdminBundle\Dto\EntityDto;
-use EasyCorp\Bundle\EasyAdminBundle\Dto\SearchDto;
-use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
-use Vich\UploaderBundle\Form\Type\VichFileType;
-use Symfony\Component\Validator\Constraints\File;
-use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
-use EasyCorp\Bundle\EasyAdminBundle\Field\ChoiceField;
-use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
-use EasyCorp\Bundle\EasyAdminBundle\Config\KeyValueStore;
-use EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext;
-use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
+use Doctrine\ORM\EntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FieldCollection;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FilterCollection;
-use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
+use EasyCorp\Bundle\EasyAdminBundle\Config\KeyValueStore;
+use EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
+use EasyCorp\Bundle\EasyAdminBundle\Dto\EntityDto;
+use EasyCorp\Bundle\EasyAdminBundle\Dto\SearchDto;
+use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\ChoiceField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
+use EasyCorp\Bundle\EasyAdminBundle\Field\FormField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
+use Error;
+use Symfony\Bridge\Doctrine\Form\Type\EntityType;
+use Symfony\Component\Form\FormEvent;
+use Symfony\Component\Form\FormEvents;
+use Symfony\Component\Form\FormInterface;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\Validator\Constraints\File;
+use Vich\UploaderBundle\Form\Type\VichFileType;
 
 class VehiculeAppCrudController extends AbstractCrudController
 {
@@ -81,6 +82,25 @@ class VehiculeAppCrudController extends AbstractCrudController
     public function configureFields(string $pageName): iterable
     {
 
+        if (Crud::PAGE_INDEX === $pageName) {
+            yield ChoiceField::new('type', 'Type')->setChoices([
+                'Voiture' => 'Car',
+                'Moto/Cyclo' => 'Cyclo',
+            ]);
+            yield AssociationField::new('brand','Marque');
+            yield TextField::new('model', 'Modèle');
+            yield AssociationField::new('power', 'Puissance Fiscale')->onlyOnIndex();
+            yield TextField::new('scale', 'Barème : estimation de la distance annuelle parcourue')->hideOnForm();    
+            yield Field::new('hasLatestScale', 'Barème à jour')->onlyOnIndex()->setTemplatePath('App/Fields/boolean.html.twig');  
+            yield BooleanField::new('is_electric', 'Ce véhicule est électrique')->setHelp("Le montant des frais de déplacement est majoré de 20 % pour les véhicules électriques.")->renderAsSwitch(Crud::PAGE_INDEX != $pageName);
+            yield BooleanField::new('is_default','Véhicule par défaut')->renderAsSwitch(false)->hideOnForm();
+            
+            return;
+        }
+
+        yield FormField::addColumn(6);
+        yield FormField::addFieldset('Fiche véhicule et barème')->setIcon('fa fa-car');
+
         yield ChoiceField::new('type','Type')->setChoices([
             'Voiture' => 'Car',
             'Moto/Cyclo' => 'Cyclo',
@@ -91,23 +111,43 @@ class VehiculeAppCrudController extends AbstractCrudController
             'required' => true,
             'choice_attr' => function($choice, $key, $value) {
                 return ['class' => 'vehicule_type'];
-            }
+            },
+            'attr' => ['class' => 'd-flex align-items-end gap-4']
         ]);
         yield AssociationField::new('brand','Marque')->setFormTypeOptions(['required' => false, 'attr' => ['data-placeholder' => " ", 'required' => 'required'], 'label_attr' => ['class' => 'required']]);
         yield Field::new('model', 'Modèle');
         yield AssociationField::new('power','Puissance Fiscale')
             ->setFormTypeOptions(['attr' => ['data-placeholder' => " ", 'class' => 'bg-light vehicule_power', 'disabled' => 'disabled'], 'choices' => []]);
         
-        yield TextField::new('registrationDocumentFile', 'Carte grise')
+        yield AssociationField::new('scale', 'Barème : estimation de la distance annuelle parcourue')
+            ->setFormTypeOptions([
+                'required' => true,
+                'attr' => ['data-placeholder' => " ",'class' => 'bg-light vehicule_scale', 'disabled' => 'disabled'], 
+                'choices' => [], 
+                'help' => "Ce barème sera utilisé pour estimer les indemnités en temps réel, il vous sera demandé de le réajuster lors de l'édition du rapport annuel si besoin. Si vous changez le barème en cours d'année fiscale, vous pourrez l'appliquer aux rapports de toute l'année depuis le module Rapports."
+            ])
+            ->setRequired(true)
+            ->onlyOnForms(); 
+        
+        yield BooleanField::new('is_electric', 'Ce véhicule est électrique')->setHelp("Le montant des frais de déplacement est majoré de 20 % pour les véhicules électriques.")->renderAsSwitch(Crud::PAGE_INDEX != $pageName);
+
+        yield FormField::addColumn(6);
+        yield FormField::addFieldset('Informations complémentaires')->setIcon('fa-regular fa-file-lines');
+
+        yield IntegerField::new('kilometres', 'Kilométrage')->setHelp("Facultatif: indiquez ici le kilométrage du véhicule si vous souhaitez qu'il apparaisse sur les rapports.")->hideOnIndex();
+
+        yield TextField::new('registrationDocumentFile', "Certificat d'immatriculation")
             ->setFormType(VichFileType::class)
             ->onlyOnForms()
             ->setFormTypeOptions([
                 'required' => false,
                 'allow_delete' => true,
+                'delete_label' => 'delete_file',
+                'download_label' => 'download_file',
                 'constraints' => [
                     new File([
-                        'maxSize' => '2M',
-                        'maxSizeMessage' => 'Le fichier ne doit pas dépasser 2 Mo.',
+                        'maxSize' => '3M',
+                        'maxSizeMessage' => 'Le poids du fichier ne doit pas dépasser 3Mo.',
                         'extensions' => [
                             'pdf',
                             'jpg',
@@ -117,35 +157,14 @@ class VehiculeAppCrudController extends AbstractCrudController
                         'extensionsMessage' => 'Format de fichier non supporté.',
                     ]),
                 ],
-            ]);
-
-
-        yield AssociationField::new('scale', 'Barème : estimation de la distance annuelle parcourue')
-            ->setFormTypeOptions([
-                'required' => true,
-                'attr' => ['data-placeholder' => " ",'class' => 'bg-light vehicule_scale', 'disabled' => 'disabled'], 
-                'choices' => [], 
-                'help' => "Ce barème sera utilisé pour estimer les indemnités en temps réel, il vous sera demandé de le réajuster lors de l'édition du rapport annuel si besoin. Si vous changez le barème en cours d'année fiscale, vous pourrez l'appliquer aux rapports de toute l'année depuis le module Rapports."
             ])
-            ->setRequired(true)
-            ->onlyOnForms();
-        yield TextField::new('scale', 'Barème : estimation de la distance annuelle parcourue')->hideOnForm();    
-        yield Field::new('hasLatestScale', 'Barème à jour')->onlyOnIndex()->setTemplatePath('App/Fields/boolean.html.twig');  
-        
-        yield BooleanField::new('is_electric', 'Ce véhicule est électrique')->setHelp("Le montant des frais de déplacement est majoré de 20 % pour les véhicules électriques.")->renderAsSwitch(Crud::PAGE_INDEX != $pageName);
+            ->setHelp("Facultatif: permet de sauvegarder ici la carte grise du véhicule (3Mo max.). <br />Formats supportés: pdf, jpg, png.")
+        ;
 
-        yield IntegerField::new('kilometres', 'Kilométrage')->setHelp("Facultatif: indiquez ici le kilométrage du véhicule si vous souhaitez qu'il apparaisse sur les rapports.")->hideOnIndex();
-
-        if(Crud::PAGE_EDIT == $pageName){
-            yield BooleanField::new('is_default','Définir comme véhicule par défaut')->onlyOnForms()->setHelp("Vous ne pouvez pas supprimer un véhicule s'il est défini par défaut ou s'il a déjà été utilisé dans des rapports.");
-        }elseif(Crud::PAGE_NEW == $pageName){
-            yield BooleanField::new('is_default','Définir comme véhicule par défaut')->onlyOnForms();
-        }else{
-            yield BooleanField::new('is_default','Véhicule par défaut')
-            ->renderAsSwitch(false)
-            ->hideOnForm()
-            ;
-        }
+        $helpMore = Crud::PAGE_EDIT ? '<br /><i class="fa-solid fa-circle-info"></i> un véhicule ne pas être supprimé s\'il est défini par défaut ou s\'il a déjà été utilisé dans des rapports.' : '';
+        yield BooleanField::new('is_default','Définir comme véhicule par défaut')->onlyOnForms()
+                ->setHelp("Si coché, ce véhicule sera sélectionné par défaut lors de la création des trajets.".$helpMore);
+                
     }
 
     public function createEntity(string $entityFqcn)

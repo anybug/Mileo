@@ -1,0 +1,14 @@
+# config/packages/vich_uploader.yaml
+vich_uploader:
+    db_driver: orm
+
+    metadata:
+        type: attribute
+        auto_detection: true
+        cache: file
+
+    mappings:
+        vehicule_registration_document:
+            uri_prefix: /uploads/vehicules/certificates
+            upload_destination: '%kernel.project_dir%/public/uploads/vehicules/certificates'
+            namer: Vich\UploaderBundle\Naming\SmartUniqueNamer

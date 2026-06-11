@@ -123,6 +123,7 @@ easy_admin_dashboard:
             controller: App\Controller\App\UserAppCrudController
             link_label: "View my profile"
             query: dashboardQuery
+            showCount: false
           Vehicule:
             label: "My vehicules"
             size: 4

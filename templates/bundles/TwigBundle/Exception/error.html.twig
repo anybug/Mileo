@@ -1,0 +1,14 @@
+{# templates/bundles/TwigBundle/Exception/error.html.twig #}
+{% extends 'base_error.html.twig' %}
+
+{% block title %}Erreur {{ status_code }} - Mileo{% endblock %}
+
+{% block content_title %}
+    {{ status_code }}: {{ status_text }}
+{% endblock %}
+
+{% block main %}
+    <p class="text-muted mb-0">
+        Une erreur est survenue pendant le traitement de votre demande.
+    </p>
+{% endblock %}

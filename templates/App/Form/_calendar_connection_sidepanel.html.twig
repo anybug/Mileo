@@ -1,0 +1,115 @@
+{% set hasSavedCalendar = hasSavedCalendar|default(false) %}
+{% set validationUrl = calendarValidationUrl|default(calendar_validation_url|default('')) %}
+{% set titleConnected = titleConnected|default('Calendrier connecté') %}
+{% set titleDisconnected = titleDisconnected|default('Connexion au calendrier') %}
+{% set textConnected = textConnected|default('Le calendrier est configuré et prêt pour l’importation de trajets.') %}
+{% set textDisconnected = textDisconnected|default('Renseigner l’adresse (URL) du calendrier puis valider.') %}
+{% set buttonConnected = buttonConnected|default('Modifier le calendrier') %}
+{% set buttonDisconnected = buttonDisconnected|default('Connecter le calendrier') %}
+{% set buttonDisable = buttonDisable|default('Désactiver') %}
+
+{% set uid = uid|default(form.vars.id) %}
+{% set sidepanelId = 'calendar-sidepanel-' ~ uid %}
+{% set backdropId = 'calendar-sidepanel-backdrop-' ~ uid %}
+{% set disableModalId = disableModalId|default(null) %}
+
+{% if showCard|default(false) %}
+    <div class="card border-0 bg-light mb-3"
+         data-calendar-connection-card
+         data-calendar-sidepanel-target="{{ sidepanelId }}"
+         data-calendar-backdrop-target="{{ backdropId }}">
+        <div class="card-body">
+            <div class="d-flex align-items-start justify-content-between gap-3">
+                <div class="d-flex align-items-start gap-3">
+                    <div class="{{ hasSavedCalendar ? 'text-success' : 'text-primary' }} fs-5"
+                         data-calendar-connection-icon-wrapper>
+                        <i class="fa-solid {{ hasSavedCalendar ? 'fa-circle-check' : 'fa-calendar-days' }}"
+                           data-calendar-connection-icon></i>
+                    </div>
+
+                    <div class="flex-grow-1">
+                        <h5 class="mb-1"
+                            data-calendar-connection-title>
+                            {{ hasSavedCalendar ? titleConnected|trans : titleDisconnected|trans }}
+                        </h5>
+
+                        <div class="{{ hasSavedCalendar ? 'text-success' : 'text-muted' }} small"
+                             data-calendar-connection-text>
+                            {{ hasSavedCalendar ? textConnected|trans : textDisconnected|trans }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button"
+                            class="btn {{ hasSavedCalendar ? 'btn-success' : 'btn-secondary' }}"
+                            data-open-calendar-sidepanel
+                            data-sidepanel-id="{{ sidepanelId }}"
+                            data-backdrop-id="{{ backdropId }}"
+                            data-calendar-connection-button>
+                        <i class="fa-solid {{ hasSavedCalendar ? 'fa-pen' : 'fa-link' }} me-1"
+                           data-calendar-connection-button-icon></i>
+
+                        <span data-calendar-connection-button-label>
+                            {{ hasSavedCalendar ? buttonConnected|trans : buttonDisconnected|trans }}
+                        </span>
+                    </button>
+
+                    {% if disableModalId %}
+                        <button type="button"
+                                class="btn btn-danger"
+                                class="btn btn-danger {{ hasSavedCalendar ? 'd-none' : '' }}"
+                                data-calendar-disable-button
+                                data-bs-toggle="modal"
+                                data-bs-target="#{{ disableModalId }}"
+                                >
+                            <i class="fa-solid fa-ban me-1"></i>
+                            {{ buttonDisable|trans }}
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+<div id="{{ backdropId }}"
+     class="tm-sidepanel-backdrop"
+     data-calendar-sidepanel-backdrop></div>
+
+<aside id="{{ sidepanelId }}"
+       class="tm-sidepanel"
+       data-calendar-sidepanel
+       aria-hidden="true">
+    <div class="tm-sidepanel__header">
+        <h5 class="tm-sidepanel__title">
+            <i class="fa-solid fa-calendar-days me-2"></i>
+            {{ hasSavedCalendar ? titleConnected|trans : titleDisconnected|trans }}
+        </h5>
+
+        <button type="button"
+                class="btn-close"
+                data-close-calendar-sidepanel
+                aria-label="{{ 'Fermer'|trans }}"></button>
+    </div>
+
+    <div class="tm-sidepanel__body">
+        <div class="p-3">
+            {% if useFormTag|default(false) %}
+                {{ form_start(form) }}
+            {% endif %}
+
+            {{ include('App/Form/_calendar_connection_fields.html.twig', {
+                form: form,
+                calendarValidationUrl: validationUrl,
+                calendar_validation_url: validationUrl,
+                hasSavedCalendar: hasSavedCalendar,
+                reloadAfterSave: reloadAfterSave
+            }) }}
+
+            {% if useFormTag|default(false) %}
+                {{ form_end(form) }}
+            {% endif %}
+        </div>
+    </div>
+</aside>
