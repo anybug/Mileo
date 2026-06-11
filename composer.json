@@ -17,6 +17,7 @@
         "easycorp/easyadmin-bundle": "^4.0",
         "flux-se/payum-stripe-bundle": "^2.0",
         "gedmo/doctrine-extensions": "^3.13",
+        "google/apiclient": "^2.19",
         "google/recaptcha": "^1.2",
         "gregwar/captcha-bundle": "^2.2",
         "knplabs/knp-snappy-bundle": "^1.8",
@@ -32,6 +33,7 @@
         "php-http/message-factory": "^1.1",
         "phpdocumentor/reflection-docblock": "^5.2",
         "phpoffice/phpspreadsheet": "^5.2",
+        "sabre/vobject": "^4.5",
         "sensiolabs/minify-bundle": "^1.2",
         "stof/doctrine-extensions-bundle": "^1.10",
         "stripe/stripe-php": "^7.80",
@@ -67,7 +69,8 @@
         "tecnickcom/tcpdf": "^6.4",
         "twig/extra-bundle": "^2.12|^3.0",
         "twig/intl-extra": "*",
-        "twig/twig": "^2.12|^3.0"
+        "twig/twig": "^2.12|^3.0",
+        "vich/uploader-bundle": "^2.9"
     },
     "require-dev": {
         "rector/rector": "^2.2",

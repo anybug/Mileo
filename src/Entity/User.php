@@ -14,6 +14,7 @@ use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Doctrine\Common\Collections\Criteria;
 use Doctrine\ORM\EntityNotFoundException;
+use App\Enum\CalendarSyncMode;
 use Gedmo\Timestampable\Traits\TimestampableEntity;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
@@ -100,6 +101,20 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeImmutable $deleteTokenRequestedAt = null;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $calendarUrl = null;
+
+    #[ORM\Column(options: ['default' => false])]
+    private bool $calendarSynchronized = false;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $calendarUsername = null;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $calendarEncryptedPassword = null;
+
+    private ?string $plainCalendarPassword = null;
 
     const PERIOD_JANUARY = 'January';
     const PERIOD_FEBRUARY = 'February';
@@ -814,6 +829,100 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         }
 
         return null;
+    }
+    
+    public function getCalendarUrl(): ?string
+    {
+        return $this->calendarUrl;
+    }
+
+    public function setCalendarUrl(?string $calendarUrl): static
+    {
+        $this->calendarUrl = $calendarUrl;
+
+        return $this;
+    }
+
+    public function getCalendarUsername(): ?string
+    {
+        return $this->calendarUsername;
+    }
+
+    public function setCalendarUsername(?string $calendarUsername): static
+    {
+        $this->calendarUsername = $calendarUsername;
+
+        return $this;
+    }
+
+    public function getCalendarEncryptedPassword(): ?string
+    {
+        return $this->calendarEncryptedPassword;
+    }
+
+    public function setCalendarEncryptedPassword(?string $calendarEncryptedPassword): static
+    {
+        $this->calendarEncryptedPassword = $calendarEncryptedPassword;
+
+        return $this;
+    }
+
+    public function getPlainCalendarPassword(): ?string
+    {
+        return $this->plainCalendarPassword;
+    }
+
+    public function setPlainCalendarPassword(?string $plainCalendarPassword): static
+    {
+        $this->plainCalendarPassword = $plainCalendarPassword;
+
+        return $this;
+    }
+
+    public function hasCalendarSync(): bool
+    {
+        return !empty($this->calendarUrl);
+    }
+
+    public function usesCaldavSync(): bool
+    {
+        return !empty($this->calendarUrl)
+            && (
+                !empty($this->calendarUsername)
+                || !empty($this->calendarEncryptedPassword)
+                || !empty($this->plainCalendarPassword)
+            );
+    }
+
+    public function usesIcsSync(): bool
+    {
+        return !empty($this->calendarUrl)
+            && !$this->usesCaldavSync();
+    }
+
+    public function getCalendarSyncTypeLabel(): string
+    {
+        if (!$this->hasCalendarSync()) {
+            return 'Aucune synchronisation';
+        }
+
+        if ($this->usesCaldavSync()) {
+            return 'CalDAV';
+        }
+
+        return 'URL ICS';
+    }
+
+    public function isCalendarSynchronized(): ?bool
+    {
+        return $this->calendarSynchronized;
+    }
+
+    public function setCalendarSynchronized(bool $calendarSynchronized): static
+    {
+        $this->calendarSynchronized = $calendarSynchronized;
+
+        return $this;
     }
 
 }

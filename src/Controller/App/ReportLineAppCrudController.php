@@ -432,7 +432,12 @@ class ReportLineAppCrudController extends AbstractCrudController
         yield FormField::addRow();
 
         yield TextareaField::new('comment','Motif du déplacement')
-                ->setFormTypeOptions(['required' => true, 'attr' => ['placeholder' => "Saisissez une courte description qui justifie ce trajet"]])
+                ->setFormTypeOptions([
+                    'required' => true, 
+                    'attr' => [
+                        'placeholder' => "Saisissez une courte description qui justifie ce trajet",
+                        'class' => 'report_lines_comment',
+                    ]])
                 ->setColumns('col-12')
                 ->onlyOnForms()
         ;

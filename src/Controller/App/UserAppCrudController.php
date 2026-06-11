@@ -2,53 +2,61 @@
 
 namespace App\Controller\App;
 
+use App\Entity\Order;
 use App\Entity\Plan;
 use App\Entity\User;
-use App\Entity\Order;
 use App\Form\OrderType;
-use Doctrine\ORM\QueryBuilder;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
-use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
-use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
-use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
-use EasyCorp\Bundle\EasyAdminBundle\Dto\EntityDto;
-use EasyCorp\Bundle\EasyAdminBundle\Dto\SearchDto;
-use EasyCorp\Bundle\EasyAdminBundle\Field\IdField;
-use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
-use EasyCorp\Bundle\EasyAdminBundle\Field\FormField;
-use EasyCorp\Bundle\EasyAdminBundle\Field\ChoiceField;
-use EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext;
-use Symfony\Component\Form\Extension\Core\Type\PasswordType;
-use Symfony\Component\Form\Extension\Core\Type\RepeatedType;
-use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
+use Doctrine\ORM\QueryBuilder;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FieldCollection;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FilterCollection;
-use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
+use EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use EasyCorp\Bundle\EasyAdminBundle\Dto\EntityDto;
+use EasyCorp\Bundle\EasyAdminBundle\Dto\SearchDto;
+use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\ChoiceField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
+use EasyCorp\Bundle\EasyAdminBundle\Field\FormField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\IdField;
 use EasyCorp\Bundle\EasyAdminBundle\Orm\EntityRepository as EasyAdminEntityRep;
-use Symfony\Component\HttpFoundation\RedirectResponse;
-use Symfony\Component\Security\Core\Exception\AccessDeniedException;
-use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
-use Symfony\Component\HttpFoundation\Session\SessionInterface;
-use Symfony\Component\Mailer\MailerInterface;
+use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
-use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
-use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
-use Symfony\Component\Security\Csrf\CsrfToken;
+use Symfony\Component\Form\Extension\Core\Type\PasswordType;
+use Symfony\Component\Form\Extension\Core\Type\RepeatedType;
+use App\Dto\CalendarConnectionData;
+use App\Form\CalendarConnectionType;
+use EasyCorp\Bundle\EasyAdminBundle\Config\KeyValueStore;
+use Symfony\Component\HttpFoundation\RedirectResponse;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Session\SessionInterface;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\Mailer\MailerInterface;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+use App\Controller\App\CalendarUserCrudController;
+use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
+use Symfony\Component\Security\Csrf\CsrfToken;
+use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
+use Symfony\Component\Validator\Constraints\Callback;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 
 class UserAppCrudController extends AbstractCrudController
 {
     private $passwordHasher;
-    private $entityManager;
     private AdminUrlGenerator $adminUrlGenerator;
 
-    public function __construct(UserPasswordHasherInterface $passwordHasher, AdminUrlGenerator $adminUrlGenerator)
-    {
+    public function __construct(
+        UserPasswordHasherInterface $passwordHasher, 
+        AdminUrlGenerator $adminUrlGenerator,
+    ) {
         $this->passwordHasher = $passwordHasher;
         $this->adminUrlGenerator = $adminUrlGenerator;
     }
@@ -70,6 +78,7 @@ class UserAppCrudController extends AbstractCrudController
         ->setPageTitle(Crud::PAGE_EDIT, 'Modifier mon profil')
         ->overrideTemplate('crud/edit', 'App/advanced_edit.html.twig')
         ->overrideTemplate('crud/new', 'App/advanced_new.html.twig')
+        ->addFormTheme('@EasyAdmin/crud/form_theme.html.twig')
         ;
     }
 
@@ -107,7 +116,13 @@ class UserAppCrudController extends AbstractCrudController
     
     public function updateEntity(EntityManagerInterface $entityManager, $entityInstance): void
     {
+        if (!$entityInstance instanceof User) {
+            parent::updateEntity($entityManager, $entityInstance);
+            return;
+        }
+
         $this->encodePassword($entityInstance);
+
         parent::updateEntity($entityManager, $entityInstance);
     }
     
@@ -144,32 +159,31 @@ class UserAppCrudController extends AbstractCrudController
             ->setHelp($this->getUser()->getReports() ? 'Attention: vous avez déjà créé des rapports ! Les calculs étant basés sur une année fiscale, modifier la période rendra le montant des rapports annuels passés invalide.' : '')
             ;
 
-            yield FormField::addColumn(6);
-            yield FormField::addFieldset('Identifiants')->setIcon('fa fa fa-user');
-            if($this->getUser()->getGoogleId())
-            {
-                yield Field::new('email', 'E-mail address')->setFormTypeOptions([
-                    'attr' => ['readonly' => true],
-                    'mapped' => false,
-                    'data' => $this->getUser()->getUserIdentifier(),
-                    'help' => 'Vous ne pouvez pas modifier votre adresse e-mail car vous êtes connecté via Google'
-                ]);
-            }else{
-                yield Field::new('email', 'E-mail address');  
-            }
-            yield Field::new('plainPassword')
-                ->setFormType(RepeatedType::class)
-                ->setFormTypeOptions([
-                    'required' =>  false,
-                    'options' => [
-                        'attr' => ['autocomplete' => 'off']
-                    ],
-                    'type' => PasswordType::class,
-                    'first_options' => ['label' => 'Password'],
-                    'second_options' => ['label' => 'Password (confirmation)'],
-                    'invalid_message' => 'Les mots de passe ne correspondent pas.'
-                ]);
-        
+        yield FormField::addColumn(6);
+        yield FormField::addFieldset('Identifiants')->setIcon('fa fa fa-user');
+        if($this->getUser()->getGoogleId())
+        {
+            yield Field::new('email', 'E-mail address')->setFormTypeOptions([
+                'attr' => ['readonly' => true],
+                'mapped' => false,
+                'data' => $this->getUser()->getUserIdentifier(),
+                'help' => 'Vous ne pouvez pas modifier votre adresse e-mail car vous êtes connecté via Google'
+            ]);
+        }else{
+            yield Field::new('email', 'E-mail address');  
+        }
+        yield Field::new('plainPassword')
+            ->setFormType(RepeatedType::class)
+            ->setFormTypeOptions([
+                'required' =>  false,
+                'options' => [
+                    'attr' => ['autocomplete' => 'off']
+                ],
+                'type' => PasswordType::class,
+                'first_options' => ['label' => 'Password'],
+                'second_options' => ['label' => 'Password (confirmation)'],
+                'invalid_message' => 'Les mots de passe ne correspondent pas.'
+            ]); 
     }
     
     public function subscriptionForm(Request $request, EntityManagerInterface $manager)
@@ -308,4 +322,42 @@ class UserAppCrudController extends AbstractCrudController
         return $this->redirectToRoute('security_login');
     }
 
+    public function configureResponseParameters(KeyValueStore $parameters): KeyValueStore
+    {
+        $parameters = parent::configureResponseParameters($parameters);
+
+        if ($parameters->get('pageName') !== Crud::PAGE_INDEX) {
+            return $parameters;
+        }
+
+        /** @var User|null $user */
+        $user = $this->getUser();
+
+        if (!$user instanceof User) {
+            return $parameters;
+        }
+
+        $calendarData = new CalendarConnectionData();
+        $calendarData->calendarUrl = $user->getCalendarUrl();
+        $calendarData->calendarUsername = $user->getCalendarUsername();
+
+        $calendarValidationUrl = $this->adminUrlGenerator
+            ->setController(CalendarUserCrudController::class)
+            ->setAction('validateCalendarUrl')
+            ->setEntityId($user->getId())
+            ->generateUrl();
+
+        $calendarForm = $this->createForm(CalendarConnectionType::class, $calendarData, [
+            'show_url' => true,
+            'calendar_validation_url' => $calendarValidationUrl,
+            'has_saved_password' => !empty($user->getCalendarEncryptedPassword()),
+            'credentials_required' => false,
+        ]);
+
+        $parameters->set('calendarForm', $calendarForm->createView());
+        $parameters->set('calendarValidationUrl', $calendarValidationUrl);
+        $parameters->set('hasSavedCalendar', !empty($user->getCalendarUrl()));
+
+        return $parameters;
+    }
 }

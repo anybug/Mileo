@@ -1,6 +1,26 @@
 {% extends '@!EasyAdmin/crud/edit.html.twig' %}
 
-{% block body_javascript %}
+{% block main %}
     {{ parent() }}
 
+    {% set editedUser = entity.instance|default(null) %}
+
+    {% if editedUser and editedUser.id is defined %}
+        {% set disableModalId = 'disable-calendar-modal-' ~ editedUser.id %}
+
+        {% set disableCalendarUrl = ea_url()
+            .unsetAll()
+            .setController('App\\Controller\\App\\CalendarUserCrudController')
+            .setAction('disableCalendar')
+            .setEntityId(editedUser.id)
+        %}
+
+        {% include 'App/Profile/_delete_calendar.html.twig' with {
+            disableCalendarUrl: disableCalendarUrl,
+            calendarUserId: app.user.id,
+            hasSavedCalendar: hasSavedCalendar,
+            disableModalId: calendarDisableModalId,
+            reloadAfterDisable: false
+        } %}
+    {% endif %}
 {% endblock %}

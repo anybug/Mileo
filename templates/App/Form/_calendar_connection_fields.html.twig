@@ -1,0 +1,157 @@
+{% set validationUrl = calendarValidationUrl|default(calendar_validation_url|default('')) %}
+{% set reloadAfterSave = reloadAfterSave|default(false) %}
+
+<div id="calendar-url-field-wrapper"
+     data-calendar-url-validator
+     data-calendar-validation-url="{{ validationUrl }}"
+     data-calendar-reload-after-save="{{ reloadAfterSave ? '1' : '0' }}"
+     data-calendar-credentials-required-on-load="{{ form.vars.credentials_required|default(false) ? '1' : '0' }}"
+     data-calendar-url-validated="{{ hasSavedCalendar|default(false) ? '1' : '0' }}"
+     data-calendar-auth-validated="{{ hasSavedCalendar|default(false) ? '1' : '0' }}">
+
+    {% if form.calendarUrl is defined %}
+        <div class="mb-3">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+                {{ form_label(form.calendarUrl, null, {
+                    label_attr: {
+                        class: 'form-label mb-0'
+                    }
+                }) }}
+
+            </div>
+
+            <div class="row g-2 align-items-start">
+                <div class="col">
+                    {{ form_widget(form.calendarUrl, {
+                        attr: {
+                            readonly: hasSavedCalendar|default(false) ? 'readonly' : false,
+                            class: hasSavedCalendar|default(false) ? 'bg-body-secondary' : ''
+                        }
+                    }) }}
+                    {{ form_errors(form.calendarUrl) }}
+
+                    <div id="calendar-url-validation-message"
+                         data-calendar-validation-message
+                         class="mt-2 small"></div>
+                </div>
+
+                <div class="col-auto d-flex gap-2">
+                    <button type="button"
+                            class="btn btn-success {{ hasSavedCalendar|default(false) ? 'd-none' : '' }}"
+                            id="validate-calendar-url-button"
+                            data-validate-calendar-url
+                            >
+                        <i class="fa-solid fa-link me-1"></i>
+                        Valider l’URL
+                    </button>
+
+                    <span id="calendar-url-valid-icon"
+                        data-calendar-url-valid-icon
+                        class="text-success fs-5 {{ hasSavedCalendar|default(false) ? 'd-inline-block' : 'd-none' }}"
+                        title="Adresse URL de calendrier validée">
+                        <i class="fa-solid fa-check"></i>
+                    </span>
+
+                    <button type="button"
+                            class="btn btn-secondary {{ hasSavedCalendar|default(false) ? '' : 'd-none' }}"
+                            id="edit-calendar-url-button"
+                            data-edit-calendar-url
+                            >
+                        <i class="fa-solid fa-pen me-1"></i>
+                        Modifier
+                    </button>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if form.calendarUsername is defined or form.plainCalendarPassword is defined %}
+        <div id="calendar-auth-container"
+             data-calendar-auth-container>
+
+            <div class="d-flex align-items-center justify-content-between gap-2">
+                <button type="button"
+                        class="btn btn-secondary {{ hasSavedCalendar|default(false) ? 'd-inline-block' : 'd-none' }}"
+                        id="toggle-calendar-auth-button"
+                        data-toggle-calendar-auth>
+                    <i class="fa-solid fa-lock me-1"></i>
+                    Identifiants du calendrier
+                </button>
+
+                <span id="calendar-auth-valid-icon"
+                    data-calendar-auth-valid-icon
+                    class="text-success fs-5 {{ hasSavedCalendar|default(false) ? 'd-inline-block' : 'd-none' }}"
+                    title="Identifiants validés">
+                    <i class="fa-solid fa-check"></i>
+                </span>
+            </div>
+
+            <div id="calendar-auth-required-message"
+                 data-calendar-auth-required-message
+                 class="alert alert-warning mt-3 mb-0 py-2 d-none"
+                 >
+                <div class="d-flex align-items-start gap-2">
+                    <i class="fa-solid fa-triangle-exclamation mt-1"></i>
+
+                    <div>
+                        <strong data-calendar-auth-required-title>
+                            Authentification requise.
+                        </strong><br>
+
+                        <span class="small" data-calendar-auth-required-text>
+                            Ce calendrier nécessite un identifiant et un mot de passe d’application.
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="calendar-auth-collapse"
+                 data-calendar-auth-collapse
+                 class="bg-body border rounded p-3 mt-3 d-none">
+
+                <div class="row g-3"
+                     id="caldav-fields-wrapper"
+                     data-caldav-fields
+                     data-auth-required="0">
+
+                    {% if form.calendarUsername is defined %}
+                        <div class="col-md-6">
+                            {{ form_row(form.calendarUsername, {
+                                attr: {
+                                    readonly: hasSavedCalendar|default(false) ? 'readonly' : false,
+                                    class: hasSavedCalendar|default(false) ? 'bg-body-secondary' : '',
+                                    'data-caldav-required': '1',
+                                    autocomplete: 'username'
+                                }
+                            }) }}
+                        </div>
+                    {% endif %}
+
+                    {% if form.plainCalendarPassword is defined %}
+                        <div class="col-md-6">
+                            {{ form_row(form.plainCalendarPassword, {
+                                attr: {
+                                    readonly: hasSavedCalendar|default(false) ? 'readonly' : false,
+                                    class: hasSavedCalendar|default(false) ? 'bg-body-secondary' : '',
+                                    'data-caldav-required': '1',
+                                    autocomplete: 'current-password'
+                                }
+                            }) }}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="d-flex align-items-center justify-content-end mt-2">
+                    <button type="button"
+                            class="btn btn-success"
+                            id="validate-calendar-auth-button"
+                            data-validate-calendar-auth
+                            >
+                        <i class="fa-solid fa-key me-1"></i>
+                        {{ "Valider les identifiants"|trans }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>

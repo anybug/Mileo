@@ -12,7 +12,7 @@ import './styles/edit-report.css';
 // start the Stimulus application
 import 'chart.js';
 import './script.js';
-
+import './js/calendar.js';
 
 import { startStimulusApp } from '@symfony/stimulus-bundle';
 

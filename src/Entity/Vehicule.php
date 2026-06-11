@@ -3,12 +3,14 @@
 namespace App\Entity;
 
 use App\Repository\VehiculeRepository;
+use Symfony\Component\HttpFoundation\File\File;
+use Vich\UploaderBundle\Mapping\Attribute as Vich;
+use Symfony\Component\Validator\Constraints as Assert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
-use Symfony\Component\Validator\Constraints as Assert;
-use App\Validator\Constraints as AppAssert;
 
+#[Vich\Uploadable]
 #[ORM\Entity(repositoryClass: VehiculeRepository::class)]
 class Vehicule
 {
@@ -53,8 +55,29 @@ class Vehicule
     #[ORM\Column(type: 'integer', nullable: true)]
     private $kilometres;
 
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    private ?string $registrationDocumentName = null;
+
+    #[Vich\UploadableField(
+        mapping: 'vehicule_registration_document',
+        fileNameProperty: 'registrationDocumentName'
+    )]
+    private ?File $registrationDocumentFile = null;
+
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $updatedAt = null;
+
     const TYPE_CAR = 'Car';
     const TYPE_CYCLO = 'Cyclo';
+
+    public function __serialize(): array
+    {
+        return [
+            'id' => $this->id,
+            'registrationDocumentName' => $this->registrationDocumentName,
+            'updatedAt' => $this->updatedAt,
+        ];
+    }
     
     public static function getTypes()
     {
@@ -260,6 +283,46 @@ class Vehicule
     public function setIsElectric(?bool $is_electric): static
     {
         $this->is_electric = $is_electric;
+
+        return $this;
+    }
+
+    public function getRegistrationDocumentName(): ?string
+    {
+        return $this->registrationDocumentName;
+    }
+
+    public function setRegistrationDocumentName(?string $registrationDocumentName): self
+    {
+        $this->registrationDocumentName = $registrationDocumentName;
+
+        return $this;
+    }
+
+    public function getRegistrationDocumentFile(): ?File
+    {
+        return $this->registrationDocumentFile;
+    }
+
+    public function setRegistrationDocumentFile(?File $registrationDocumentFile = null): self
+    {
+        $this->registrationDocumentFile = $registrationDocumentFile;
+
+        if ($registrationDocumentFile !== null) {
+            $this->updatedAt = new \DateTimeImmutable();
+        }
+
+        return $this;
+    }
+
+    public function getUpdatedAt(): ?\DateTimeImmutable
+    {
+        return $this->updatedAt;
+    }
+
+    public function setUpdatedAt(?\DateTimeImmutable $updatedAt): self
+    {
+        $this->updatedAt = $updatedAt;
 
         return $this;
     }
