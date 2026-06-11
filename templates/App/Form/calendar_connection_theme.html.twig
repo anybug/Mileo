@@ -1,0 +1,42 @@
+{% block calendar_connection_widget %}
+    {% set hasSavedCalendar = form.vars.has_saved_calendar|default(false) %}
+    {% set calendarData = form.vars.data|default(null) %}
+
+    {% if not hasSavedCalendar and calendarData and calendarData.calendarUrl is defined and calendarData.calendarUrl %}
+        {% set hasSavedCalendar = true %}
+    {% endif %}
+
+    {% set validationUrl = form.vars.calendar_validation_url|default('') %}
+    {% set calendarUserId = form.vars.calendar_user_id|default(null) %}
+    {% set disableCalendarUrl = form.vars.disable_calendar_url|default(null) %}
+    {% set reloadAfterDisable = form.vars.reload_after_disable|default(false) %}
+    {% set disableModalId = 'disable-calendar-modal-' ~ id %}
+
+    {% if disableCalendarUrl %}
+        {% include 'App/Profile/_delete_calendar.html.twig' with {
+            disableCalendarUrl: disableCalendarUrl,
+            calendarUserId: calendarUserId,
+            disableModalId: disableModalId,
+            reloadAfterDisable: reloadAfterDisable
+        } %}
+    {% endif %}
+
+    {% include 'App/Form/_calendar_connection_sidepanel.html.twig' with {
+        form: form,
+        uid: id,
+        showCard: true,
+        useFormTag: false,
+        hasSavedCalendar: hasSavedCalendar,
+        calendarValidationUrl: validationUrl,
+        calendar_validation_url: validationUrl,
+        disableModalId: disableModalId,
+        titleConnected: 'Calendrier connecté',
+        titleDisconnected: 'Connexion au calendrier',
+        textConnected: 'Le calendrier est configuré et prêt pour l’importation de trajets.',
+        textDisconnected: 'Renseigner l’adresse (URL) du calendrier puis valider.',
+        buttonConnected: 'Modifier le calendrier',
+        buttonDisconnected: 'Connecter le calendrier',
+        buttonDisable: 'Désactiver',
+        reloadAfterSave: true
+    } %}
+{% endblock %}

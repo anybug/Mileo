@@ -2,8 +2,11 @@
 
 namespace App\Controller\Team;
 
+use App\Controller\App\CalendarUserCrudController;
+use App\Dto\CalendarConnectionData;
 use App\Entity\Subscription;
 use App\Entity\User;
+use App\Form\CalendarConnectionType;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\QueryBuilder;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FieldCollection;
@@ -22,6 +25,7 @@ use EasyCorp\Bundle\EasyAdminBundle\Field\DateTimeField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\EmailField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
 use EasyCorp\Bundle\EasyAdminBundle\Field\FormField;
+use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
 use Symfony\Component\Form\Extension\Core\Type\PasswordType;
 use Symfony\Component\Form\Extension\Core\Type\RepeatedType;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -33,8 +37,10 @@ class TeamUserCrudController extends AbstractCrudController
 {
     private UserPasswordHasherInterface $passwordHasher;
 
-    public function __construct(UserPasswordHasherInterface $passwordHasher)
-    {
+    public function __construct(
+        UserPasswordHasherInterface $passwordHasher,
+        private readonly AdminUrlGenerator $adminUrlGenerator,
+    ) {
         $this->passwordHasher = $passwordHasher;
     }
 
@@ -50,7 +56,12 @@ class TeamUserCrudController extends AbstractCrudController
             ->setEntityLabelInPlural('Membres')
             ->setPageTitle(Crud::PAGE_INDEX, 'Membres collaborateurs de l\'équipe <br /><span class="fs-6 fw-normal">Gestion de l\'effectif de votre équipe: chacun des membres peut se connecter à la plateforme indépendamment afin d\'effectuer sa saisie en toute autonomie. <br />Vous pouvez aussi vous connecter à leur compte à des fins de saisie ou de vérification.</span>')
             ->setDefaultSort(['last_name' => 'ASC', 'first_name' => 'ASC'])
-            ->setSearchFields(['first_name', 'last_name', 'email']);
+            ->setSearchFields(['first_name', 'last_name', 'email'])
+            ->overrideTemplate('crud/edit', 'App/advanced_edit.html.twig')
+            ->setFormThemes([
+                '@EasyAdmin/crud/form_theme.html.twig',
+                'App/Form/calendar_connection_theme.html.twig',
+            ]);
     }
 
     public function configureActions(Actions $actions): Actions
@@ -142,7 +153,7 @@ class TeamUserCrudController extends AbstractCrudController
         return parent::delete($context);
     }
 
-   public function persistEntity(EntityManagerInterface $entityManager, $entityInstance): void
+    public function persistEntity(EntityManagerInterface $entityManager, $entityInstance): void
     {
         if ($entityInstance instanceof User) {
             /** @var User $me */
@@ -154,6 +165,9 @@ class TeamUserCrudController extends AbstractCrudController
             $this->copySubscriptionFromManager($entityInstance, $me);
 
             $this->encodePassword($entityInstance);
+
+            $this->applyCalendarConnectionData($entityInstance);
+            $this->encodeCalendarPassword($entityInstance);
         }
 
         parent::persistEntity($entityManager, $entityInstance);
@@ -164,6 +178,9 @@ class TeamUserCrudController extends AbstractCrudController
     {
         if ($entityInstance instanceof User) {
             $this->encodePassword($entityInstance);
+
+            $this->applyCalendarConnectionData($entityInstance);
+            $this->encodeCalendarPassword($entityInstance);
         }
 
         parent::updateEntity($entityManager, $entityInstance);
@@ -239,17 +256,160 @@ class TeamUserCrudController extends AbstractCrudController
             yield Field::new('email', 'Adresse e-mail')->setHelp('L\'adresse e-mail est utilisée comme nom d\'utilisateur pour se connecter à la plateforme');
             yield Field::new('plainPassword')
                 ->setFormType(RepeatedType::class)
+                ->setRequired($pageName === Crud::PAGE_NEW)
                 ->setFormTypeOptions([
-                    'required' => true,
+                    'required' => $pageName === Crud::PAGE_NEW,
+                    'options' => [
+                        'attr' => [
+                            'autocomplete' => 'new-password',
+                        ],
+                    ],
                     'type' => PasswordType::class,
-                    'first_options' => ['label' => 'Password'],
-                    'second_options' => ['label' => 'Password (confirmation)'],
+                    'first_options' => [
+                        'label' => 'Mot de passe',
+                        'required' => $pageName === Crud::PAGE_NEW,
+                    ],
+                    'second_options' => [
+                        'label' => 'Confirmation du mot de passe',
+                        'required' => $pageName === Crud::PAGE_NEW,
+                    ],
                     'invalid_message' => 'Les mots de passe ne correspondent pas.',
-            ]);
+                ])
+                ->setHelp(
+                    $pageName === Crud::PAGE_EDIT
+                        ? 'Laissez vide pour conserver le mot de passe actuel.'
+                        : null
+                );
             yield BooleanField::new('is_active', 'Profil activé')->setHelp("Si désactivé, l'utilisateur ne peut pas se connecter à la plateforme");
+
+            $context = $this->getContext();
+            $editedUser = $context?->getEntity()?->getInstance();
+
+            if ($editedUser instanceof User) {
+                $calendarValidationUrl = $this->adminUrlGenerator
+                    ->unsetAll()
+                    ->setController(CalendarUserCrudController::class)
+                    ->setAction('validateCalendarUrl')
+                    ->setEntityId($editedUser->getId())
+                    ->generateUrl();
+
+                yield FormField::addColumn(12);
+                yield FormField::addFieldset('Calendrier du membre')
+                    ->setIcon('fa fa-calendar-days');
+
+                yield $this->getCalendarConnectionField(
+                    $editedUser,
+                    $calendarValidationUrl
+                );
+            }
 
             return;
         }
 
+    }
+
+    private function getCalendarConnectionData(User $user): CalendarConnectionData
+    {
+        $data = new CalendarConnectionData();
+        $data->calendarUrl = $user->getCalendarUrl();
+        $data->calendarUsername = $user->getCalendarUsername();
+
+        return $data;
+    }
+
+    private function getCalendarConnectionField(User $user, string $calendarValidationUrl): Field
+    {
+        return Field::new('calendarConnection', 'Calendrier')
+            ->onlyOnForms()
+            ->setFormType(CalendarConnectionType::class)
+            ->setFormTypeOptions([
+                'mapped' => false,
+                'data' => $this->getCalendarConnectionData($user),
+                'show_url' => true,
+                'has_saved_password' => !empty($user->getCalendarEncryptedPassword()),
+                'calendar_validation_url' => $calendarValidationUrl,
+                'calendar_user_id' => $user->getId(),
+                'disable_calendar_url' => $this->adminUrlGenerator
+                    ->unsetAll()
+                    ->setController(CalendarUserCrudController::class)
+                    ->setAction('disableCalendar')
+                    ->setEntityId($user->getId())
+                    ->generateUrl(),
+                'reload_after_disable' => true,
+            ])
+            /* Si on souhaite désactiver les champs de connexion au calendrier lorsque l'URL est déjà renseignée
+            Si plus tard option pour supprimer le calendrier synchronisé
+            ->setFormTypeOptions([
+                'mapped' => false,
+                'data' => $this->getCalendarConnectionData($user),
+                'show_url' => true,
+                'has_saved_password' => !empty($user->getCalendarEncryptedPassword()),
+                'calendar_validation_url' => $calendarValidationUrl,
+                'disabled' => !empty($user->getCalendarUrl()),
+            ])*/
+            ->setColumns(12);
+    }
+
+    private function applyCalendarConnectionData(User $user): void
+    {
+        $request = $this->getContext()?->getRequest();
+
+        if (!$request) {
+            return;
+        }
+
+        $calendarConnection = null;
+
+        foreach ($request->request->all() as $formData) {
+            if (!is_array($formData)) {
+                continue;
+            }
+
+            if (
+                isset($formData['calendarConnection'])
+                && is_array($formData['calendarConnection'])
+            ) {
+                $calendarConnection = $formData['calendarConnection'];
+                break;
+            }
+        }
+
+        if (!is_array($calendarConnection)) {
+            return;
+        }
+
+        $calendarUrl = trim((string) ($calendarConnection['calendarUrl'] ?? ''));
+        $calendarUsername = trim((string) ($calendarConnection['calendarUsername'] ?? ''));
+        $plainCalendarPassword = trim((string) ($calendarConnection['plainCalendarPassword'] ?? ''));
+
+        if ($calendarUrl === '') {
+            $user->setCalendarUrl(null);
+            $user->setCalendarUsername(null);
+            $user->setPlainCalendarPassword(null);
+            $user->setCalendarEncryptedPassword(null);
+            $user->setCalendarSynchronized(false);
+
+            return;
+        }
+
+        $user->setCalendarUrl($calendarUrl);
+        $user->setCalendarUsername($calendarUsername !== '' ? $calendarUsername : null);
+
+        if ($plainCalendarPassword !== '') {
+            $user->setPlainCalendarPassword($plainCalendarPassword);
+        }
+
+        $user->setCalendarSynchronized(true);
+    }
+
+    private function encodeCalendarPassword(User $user): void
+    {
+        if (!$user->getPlainCalendarPassword()) {
+            return;
+        }
+
+        // Temporaire : stocke en clair, à remplacer par un vrai chiffrement.
+        $user->setCalendarEncryptedPassword($user->getPlainCalendarPassword());
+        $user->setPlainCalendarPassword(null);
     }
 }

@@ -1,0 +1,57 @@
+{% set hasSavedCalendar = hasSavedCalendar|default(app.user.calendarUrl is not empty) %}
+{% set calendarUserId = calendarUserId|default(app.user.id) %}
+{% set disableModalId = disableModalId|default('disable-calendar-modal') %}
+
+{% if disableModalId is defined and disableModalId %}
+    <div class="modal fade"
+         id="{{ disableModalId }}"
+         tabindex="-1"
+         aria-labelledby="{{ disableModalId }}-label"
+         aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+
+                <div class="modal-header">
+                    <h5 class="modal-title" id="{{ disableModalId }}-label">
+                        <i class="fa-solid fa-calendar-xmark text-danger me-2"></i>
+                        {{ 'Déconnecter le calendrier'|trans }}
+                    </h5>
+
+                    <button type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="{{ 'Fermer'|trans }}"></button>
+                </div>
+
+                <div class="modal-body">
+                    <p class="mb-2">
+                        {{ 'Voulez-vous vraiment déconnecter ce calendrier ?'|trans }}
+                    </p>
+
+                    <p class="text-muted small mb-0">
+                        {{ 'L’URL du calendrier et ses identifiants seront retirés du profil.'|trans }}
+                    </p>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-secondary"
+                            data-bs-dismiss="modal">
+                        {{ 'Annuler'|trans }}
+                    </button>
+
+                    <button type="button"
+                            class="btn btn-danger"
+                            data-disable-calendar-submit
+                            data-disable-calendar-url="{{ disableCalendarUrl }}"
+                            data-disable-calendar-token="{{ csrf_token('disable_calendar_' ~ calendarUserId) }}"
+                            data-disable-calendar-reload="{{ reloadAfterDisable|default(false) ? '1' : '0' }}">
+                        <i class="fa-solid fa-link-slash me-1"></i>
+                        {{ 'Confirmer la déconnexion'|trans }}
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+{% endif %}

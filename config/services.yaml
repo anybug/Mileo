@@ -85,4 +85,3 @@ services:
               event: 'postPersist'
             - name: 'doctrine.event_listener'
               event: 'postUpdate'
-  

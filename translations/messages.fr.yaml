@@ -129,3 +129,7 @@ Invoice: Facture
 ## Manager ##
 Members : Membres
 Team : Équipe
+
+## Vehicule ##
+delete_file: Supprimer le fichier
+download_file: Télécharger le fichier

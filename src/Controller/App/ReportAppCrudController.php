@@ -4,27 +4,28 @@ namespace App\Controller\App;
 
 use App\Entity\Report;
 use App\Entity\ReportLine;
+use App\Entity\User;
+use App\Entity\UserAddress;
 use App\Entity\Vehicule;
 use App\Entity\VehiculesReport;
 use App\Form\AssistantAIType;
-use App\Service\ReportService;
-use App\Form\ReportDuplicateType;
-use App\Form\ReportLineType;
 use App\Form\ReportTotalScaleType;
+use App\Service\CalendarReportImporter;
 use App\Service\MistralApiService;
+use App\Service\ReportService;
 use App\Service\TripDuplicationService;
 use App\Service\XlsxExporter;
 use App\Utils\ReportPdf;
 use App\Validator\Constraints\NewReport;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\QueryBuilder;
+use Symfony\Component\Form\FormError;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FieldCollection;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FilterCollection;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Assets;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
-use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Filters;
 use EasyCorp\Bundle\EasyAdminBundle\Config\KeyValueStore;
 use EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext;
@@ -35,23 +36,26 @@ use EasyCorp\Bundle\EasyAdminBundle\Event\AfterEntityUpdatedEvent;
 use EasyCorp\Bundle\EasyAdminBundle\Field\ChoiceField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\CollectionField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\DateField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
 use EasyCorp\Bundle\EasyAdminBundle\Field\FormField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\MoneyField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\NumberField;
 use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Form\FormFactoryInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\String\Slugger\SluggerInterface;
-use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
-
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\Form\Extension\Core\Type\TextType;
+use Symfony\Component\Form\Extension\Core\Type\PasswordType;
 
 class ReportAppCrudController extends AbstractCrudController
 {
@@ -64,6 +68,7 @@ class ReportAppCrudController extends AbstractCrudController
     private $dispatcher;
     private $reportService;
     private RequestStack $requestStack;
+    private CalendarReportImporter $calendarReportImporter;
 
     public function __construct(
         AdminUrlGenerator $adminUrlGenerator,
@@ -74,7 +79,9 @@ class ReportAppCrudController extends AbstractCrudController
         LoggerInterface $logger,
         EventDispatcherInterface $dispatcher,
         ReportService $reportService,
-        RequestStack $requestStack
+        RequestStack $requestStack,
+        CalendarReportImporter $calendarReportImporter,
+        private EntityManagerInterface $entityManager,
     ) {
         $this->adminUrlGenerator = $adminUrlGenerator;
         $this->exporter = $exporter;
@@ -85,6 +92,14 @@ class ReportAppCrudController extends AbstractCrudController
         $this->dispatcher = $dispatcher;
         $this->reportService = $reportService;
         $this->requestStack = $requestStack;
+        $this->calendarReportImporter = $calendarReportImporter;
+    }
+
+    public function configureAssets(Assets $assets): Assets
+    {
+        return $assets
+            ->addHtmlContentToBody('<script src="https://maps.googleapis.com/maps/api/js?key=' . $_ENV['GOOGLE_MAPS_API_KEY'] . '&libraries=places"></script>')
+        ;
     }
 
     public static function getEntityFqcn(): string
@@ -106,7 +121,7 @@ class ReportAppCrudController extends AbstractCrudController
 
     public function index(AdminContext $context)
     {
-        /** @var \App\Entity\User|null $user */
+        /** @var User|null $user */
         $user = $this->getUser();
 
         if (!$user) {
@@ -205,7 +220,12 @@ class ReportAppCrudController extends AbstractCrudController
             ->setIcon('fa-solid fa-wand-magic-sparkles')
             ->linkToCrudAction('assistant')
             ->setCssClass('btn btn-secondary')
-        ;    
+        ;
+
+        /*$generateFromGoogleCalendar = Action::new('generateFromGoogleCalendar', 'Google Calendar')
+            ->setIcon('fa-brands fa-google')
+            ->linkToCrudAction('generateFromGoogleCalendar')
+            ->setCssClass('btn btn-primary'); */
 
         // Assistant visible si abonnement ≠ FREE -> tout le monde pour l'instant
         /*$subscription = $this->getUser()->getSubscription();
@@ -240,6 +260,7 @@ class ReportAppCrudController extends AbstractCrudController
             ->add(Crud::PAGE_INDEX, $generatePdf)
             ->add(Crud::PAGE_INDEX, $exportXls)
 			->add(Crud::PAGE_INDEX, $assistantAI)
+            //->add(Crud::PAGE_INDEX, $generateFromGoogleCalendar)
             ->add(Crud::PAGE_EDIT, $assistantAI)
             ->reorder(Crud::PAGE_INDEX, ['assistant', Action::EDIT, 'generatePdf', 'exportXls', Action::DELETE])
             ->reorder(Crud::PAGE_NEW, [Action::SAVE_AND_CONTINUE, Action::INDEX])
@@ -258,7 +279,29 @@ class ReportAppCrudController extends AbstractCrudController
             throw new AccessDeniedHttpException();
         }
 
-        $form = $this->createForm(AssistantAIType::class, null, ['report' => $report]);
+        $calendarValidationUrl = $this->adminUrlGenerator
+            ->setController(self::class)
+            ->setAction('validateCalendarUrl')
+            ->setEntityId($report->getId())
+            ->generateUrl();
+
+        $isRefreshOnly = $request->request->getBoolean('_refresh_form_only');
+
+        /** @var User|null $user */
+        $user = $this->getUser();
+
+        $hasSavedCalendar = $user instanceof User
+            && trim((string) $user->getCalendarUrl()) !== ''
+            && $user->isCalendarSynchronized();
+
+        $form = $this->createForm(AssistantAIType::class, null, [
+            'report' => $report,
+            'user' => $user,
+            'calendar_validation_url' => $calendarValidationUrl,
+            'show_calendar_url' => true,
+            'has_saved_calendar' => $hasSavedCalendar,
+            'validation_groups' => $isRefreshOnly ? false : null,
+        ]);
 
         // Soumission classique du formulaire
         $form->handleRequest($request);
@@ -313,7 +356,114 @@ class ReportAppCrudController extends AbstractCrudController
                         return new JsonResponse(['erreur' => 'Saisie invalide'], 400);
                     }
                     $previewTrips = $this->tripDuplicator->generatePreviewTrips($report, $action, '', $destination, $copyMode);  
-                    break;     
+                    break; 
+                case 'import_calendar':
+                    try {
+                        $tripMode = $form->get('type_report_line')->getData();
+
+                        $startAddress = trim((string) $form->get('calendar_start_address_choice')->getData());
+
+                        $user = $report->getUser();
+
+                        $calendarConnection = $form->has('calendarConnection')
+                            ? $form->get('calendarConnection')->getData()
+                            : null;
+
+                        $calendarUrl = $calendarConnection?->calendarUrl
+                            ? trim((string) $calendarConnection->calendarUrl)
+                            : trim((string) $user?->getCalendarUrl());
+
+                        $calendarUsername = $calendarConnection?->calendarUsername
+                            ? trim((string) $calendarConnection->calendarUsername)
+                            : trim((string) $user?->getCalendarUsername());
+
+                        $plainCalendarPassword = $calendarConnection?->plainCalendarPassword
+                            ? trim((string) $calendarConnection->plainCalendarPassword)
+                            : '';
+
+                        $calendarPassword = $plainCalendarPassword ?: $user?->getCalendarEncryptedPassword();
+
+                        $result = $this->calendarReportImporter->testCalendarUrl(
+                            $calendarUrl,
+                            $calendarUsername ?: null,
+                            $calendarPassword ?: null
+                        );
+
+                        if (!$result['valid']) {
+                            $field = $result['field'] ?? 'calendarUrl';
+
+                            if (($result['field'] ?? null) === 'plainCalendarPassword') {
+                                if (!$form->has('calendarUsername')) {
+                                    $form->add('calendarUsername', TextType::class, [
+                                        'label' => 'Identifiant calendrier',
+                                        'mapped' => false,
+                                        'required' => false,
+                                        'data' => $calendarUsername,
+                                        'help' => 'Vérifiez votre identifiant CalDAV.',
+                                    ]);
+                                }
+
+                                if (!$form->has('plainCalendarPassword')) {
+                                    $form->add('plainCalendarPassword', PasswordType::class, [
+                                        'label' => 'Mot de passe d’application',
+                                        'mapped' => false,
+                                        'required' => false,
+                                        'help' => 'Le mot de passe enregistré semble incorrect. Saisissez un nouveau mot de passe d’application.',
+                                        'attr' => [
+                                            'autocomplete' => 'new-password',
+                                        ],
+                                    ]);
+                                }
+                            }
+
+                            if ($form->has($field)) {
+                                $form->get($field)->addError(new FormError($result['message']));
+                            } elseif ($form->has('calendarUrl')) {
+                                $form->get('calendarUrl')->addError(new FormError($result['message']));
+                            } else {
+                                $form->addError(new FormError($result['message']));
+                            }
+
+                            return new Response(
+                                $this->renderView('App/Report/_assistant_form.html.twig', [
+                                    'form' => $form->createView(),
+                                ]),
+                                400
+                            );
+                        }
+
+                        if ($this->isIcsCalendarUrl($calendarUrl)) {
+                            $calendarUsername = null;
+                            $calendarPassword = null;
+                        }
+
+                        $previewTrips = $this->calendarReportImporter->previewTrips(
+                            $report,
+                            $tripMode,
+                            $startAddress,
+                            $calendarUrl,
+                            $calendarUsername ?: null,
+                            $calendarPassword ?: null
+                        );
+
+                    } catch (\Throwable $e) {
+                        $this->logger->error('Erreur import calendrier', [
+                            'exception' => $e,
+                        ]);
+
+                        $form->addError(new FormError(
+                            'Impossible de prévisualiser le calendrier. Vérifiez l’URL, les identifiants et le format du calendrier.'
+                        ));
+
+                        return new Response(
+                            $this->renderView('App/Report/_assistant_form.html.twig', [
+                                'form' => $form->createView(),
+                            ]),
+                            400
+                        );
+                    }
+
+                    break;
                 case '':
                     $previewTrips = [];
                     break;    
@@ -353,21 +503,38 @@ class ReportAppCrudController extends AbstractCrudController
 				}
 				
 
-                return new Response(
+                $response = new Response(
                     $this->renderView('App/Report/_assistant_preview_content.html.twig', $tplVariables)
                 );
+                
+                return $response;
             }
 
             return new JsonResponse(['error' => 'Formulaire invalide'], 400);
 
         }    
 
+        $actionAjaxUrl = $this->adminUrlGenerator
+            ->setController(self::class)
+            ->setAction('assistantAjaxForm')
+            ->setEntityId($report->getId())
+            ->generateUrl();
+
+        $calendarValidationUrl = $this->adminUrlGenerator
+            ->setController(self::class)
+            ->setAction('validateCalendarUrl')
+            ->setEntityId($report->getId())
+            ->generateUrl();
+
+
         return $this->render('App/Report/assistant.html.twig', [
             'form' => $form->createView(),
             'report' => $report,
             'actionUrl' => $actionUrl,
             'backUrl' => $backUrl,
-            'actionAjaxUrl' => $actionAjaxUrl
+            'actionAjaxUrl' => $actionAjaxUrl,
+            'calendarValidationUrl' => $calendarValidationUrl,
+            'hasSavedCalendar' => $hasSavedCalendar,
         ]);
     }
 
@@ -383,32 +550,44 @@ class ReportAppCrudController extends AbstractCrudController
         return true;
     }
 
-    public function assistantAjaxForm(AdminContext $context, Request $request): Response
-    {
+    public function assistantAjaxForm(
+        AdminContext $context,
+        Request $request
+    ): Response {
+        /** @var Report $report */
         $report = $context->getEntity()->getInstance();
 
-        if ($report->getUser() !== $this->getUser()) {
-            throw new AccessDeniedHttpException();
-        }
+        $calendarValidationUrl = $this->adminUrlGenerator
+            ->setController(self::class)
+            ->setAction('validateCalendarUrl')
+            ->setEntityId($report->getId())
+            ->generateUrl();
 
-        $form = $this->createForm(AssistantAIType::class, null, ['report' => $report]);
+        /** @var User|null $user */
+        $user = $this->getUser();
 
-        // Soumission classique du formulaire
-        $form->handleRequest($request);
+        $hasSavedCalendar = $user instanceof User
+            && trim((string) $user->getCalendarUrl()) !== ''
+            && $user->isCalendarSynchronized();
 
-        if ($form->isSubmitted() && $form->isValid() && $request->isXmlHttpRequest()) 
-        {
-            return new Response(
-                $this->renderView('App/Report/_assistant_form.html.twig', [
-                    'form' => $form->createView(),
-                ])
-            );
-        }
+        $isRefreshOnly = $request->request->getBoolean('_refresh_form_only');
 
-        return $this->render('App/Report/_assistant_form.html.twig', [
-            'form' => $form->createView()
+        $form = $this->createForm(AssistantAIType::class, null, [
+            'report' => $report,
+            'user' => $user,
+            'calendar_validation_url' => $calendarValidationUrl,
+            'show_calendar_url' => true,
+            'has_saved_calendar' => $hasSavedCalendar,
+            'validation_groups' => $isRefreshOnly ? false : null,
         ]);
 
+        $form->handleRequest($request);
+
+        return $this->render('App/Report/_assistant_form.html.twig', [
+            'form' => $form->createView(),
+            'calendarValidationUrl' => $calendarValidationUrl,
+            'hasSavedCalendar' => $hasSavedCalendar,
+        ]);
     }
 
     public function bulkCreateLines(AdminContext $context): RedirectResponse
@@ -736,6 +915,17 @@ class ReportAppCrudController extends AbstractCrudController
 
     public function configureFields(string $pageName): iterable
     {
+
+        $me = $this->getUser();
+
+        $addresses = !$me->getManagedBy()
+            ? $me->getFormattedUserAddresses()
+            : $me->getFormattedGroupAddresses();
+
+        $addresses = count($addresses) > 0
+            ? $addresses
+            : ["Vous n'avez pas d'adresse favorite" => ""];
+
         yield FormField::addRow();
 
         yield DateField::new('start_date', 'Period')
@@ -973,6 +1163,55 @@ class ReportAppCrudController extends AbstractCrudController
         $entityInstance->setEndDate($period['endDate']);
 
         parent::persistEntity($entityManager, $entityInstance);
+
+        $data = $request->request->all('Report');
+
+        $creationMode = $data['creationMode'] ?? 'manual';
+
+        if ($creationMode === 'ics') {
+            $tripMode = $data['icsTripMode'] ?? 'return';
+
+            $user = $entityInstance->getUser();
+
+            $user = $entityInstance->getUser();
+
+            $defaultAddress = null;
+
+            foreach ($user->getUserAddresses() as $userAddress) {
+                if ($userAddress->isIsDefault()) {
+                    $defaultAddress = $userAddress->getAddress();
+                    break;
+                }
+            }
+
+            $startAddress = trim($data['icsCustomStartAddress'] ?? '');
+
+            if ($startAddress === '') {
+                $startAddress = trim($data['icsStartAddressChoice'] ?? '');
+            }
+
+            if ($startAddress === '' && $defaultAddress) {
+                $startAddress = $defaultAddress;
+            }
+
+            try {
+                $count = $this->calendarReportImporter->importIntoReport(
+                    $entityInstance,
+                    $tripMode,
+                    $startAddress,
+                    $data['calendarUrl'] ?? null
+                );
+
+                $this->reportService->refreshReport($entityInstance);
+
+                $this->addFlash('success', sprintf(
+                    '%d trajet(s) importé(s) depuis l’ICS.',
+                    $count
+                ));
+            } catch (\Throwable $e) {
+                $this->addFlash('danger', $e->getMessage());
+            }
+        }
     }
 
 
@@ -1041,5 +1280,168 @@ class ReportAppCrudController extends AbstractCrudController
                 'report' => $report,
             ])
         );
+    }
+
+    #[Route('/app/report-line/{id}/update-distance', name: 'app_report_line_update_distance', methods: ['POST'])]
+    public function updateDistance(
+        Request $request,
+        ReportLine $line,
+        EntityManagerInterface $em
+    ): JsonResponse {
+
+        $data = json_decode($request->getContent(), true);
+
+        $line->setKm($data['km'] ?? 0);
+        $line->setKmTotal($data['kmTotal'] ?? 0);
+        $line->setAmount($data['amount'] ?? 0);
+
+        $em->flush();
+
+        return $this->json([
+            'success' => true
+        ]);
+    }
+
+    #[Route('/app/address/favorite/create', name: 'app_favorite_address_create', methods: ['POST'])]
+    public function createFavoriteAddress(
+        Request $request,
+        EntityManagerInterface $em
+    ): JsonResponse {
+        $data = json_decode($request->getContent(), true);
+
+        $favorite = new UserAddress();
+        $favorite->setUser($this->getUser());
+        $favorite->setName($data['name']);
+        $favorite->setAddress($data['address']);
+
+        $em->persist($favorite);
+        $em->flush();
+
+        return $this->json([
+            'success' => true
+        ]);
+    }
+
+    private function isIcsCalendarUrl(?string $url): bool
+    {
+        $url = trim((string) $url);
+
+        if ($url === '') {
+            return false;
+        }
+
+        if (str_starts_with(strtolower($url), 'webcal://')) {
+            return true;
+        }
+
+        $path = parse_url($url, PHP_URL_PATH);
+
+        return is_string($path) && str_ends_with(strtolower($path), '.ics');
+    }
+
+    public function validateCalendarUrl(AdminContext $context, Request $request): JsonResponse
+    {
+        /** @var Report $report */
+        $report = $context->getEntity()->getInstance();
+
+        if ($report->getUser() !== $this->getUser()) {
+            throw new AccessDeniedHttpException();
+        }
+
+        /** @var User|null $user */
+        $user = $this->getUser();
+
+        if (!$user instanceof User) {
+            return new JsonResponse([
+                'valid' => false,
+                'auth_required' => false,
+                'saved' => false,
+                'message' => 'Utilisateur non connecté.',
+            ], 403);
+        }
+
+        $calendarUrl = trim((string) $request->request->get('calendarUrl', ''));
+        $calendarUsername = trim((string) $request->request->get('calendarUsername', ''));
+        $plainCalendarPassword = trim((string) $request->request->get('plainCalendarPassword', ''));
+
+        $withCredentials = $request->request->getBoolean('withCredentials');
+        $saveCalendar = $request->request->getBoolean('saveCalendar');
+
+        if ($calendarUrl === '') {
+            return new JsonResponse([
+                'valid' => false,
+                'auth_required' => false,
+                'saved' => false,
+                'message' => 'Veuillez renseigner une URL de calendrier.',
+            ], 400);
+        }
+
+        $usernameToTest = $withCredentials ? ($calendarUsername ?: null) : null;
+        $passwordToTest = $withCredentials ? ($plainCalendarPassword ?: null) : null;
+
+        $result = $this->calendarReportImporter->testCalendarUrl(
+            $calendarUrl,
+            $usernameToTest,
+            $passwordToTest
+        );
+
+        if (($result['auth_required'] ?? false) === true && !$withCredentials) {
+            return new JsonResponse([
+                'valid' => false,
+                'auth_required' => true,
+                'saved' => false,
+                'message' => $result['message'] ?? 'Ce calendrier nécessite une authentification.',
+            ]);
+        }
+
+        if (($result['valid'] ?? false) !== true) {
+            return new JsonResponse([
+                'valid' => false,
+                'auth_required' => $result['auth_required'] ?? false,
+                'saved' => false,
+                'message' => $result['message'] ?? 'URL de calendrier invalide.',
+            ], 400);
+        }
+
+        if ($saveCalendar) {
+            $this->saveCalendarConnection(
+                $user,
+                $calendarUrl,
+                $withCredentials ? $calendarUsername : null,
+                $withCredentials ? $plainCalendarPassword : null
+            );
+
+            $result['saved'] = true;
+        } else {
+            $result['saved'] = false;
+        }
+
+        return new JsonResponse($result);
+    }
+
+    private function saveCalendarConnection(
+        User $user,
+        string $calendarUrl,
+        ?string $calendarUsername,
+        ?string $plainCalendarPassword
+    ): void {
+        $isIcsUrl = $this->isIcsCalendarUrl($calendarUrl);
+
+        $user->setCalendarUrl($calendarUrl);
+        $user->setCalendarSynchronized(true);
+
+        if ($isIcsUrl) {
+            $user->setCalendarUsername(null);
+            $user->setCalendarEncryptedPassword(null);
+        } else {
+            $user->setCalendarUsername($calendarUsername ?: null);
+
+            if ($plainCalendarPassword !== null && $plainCalendarPassword !== '') {
+                $user->setCalendarEncryptedPassword($plainCalendarPassword);
+            }
+        }
+
+        $this->entityManager->persist($user);
+        $this->entityManager->flush();
     }
 }

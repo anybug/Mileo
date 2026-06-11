@@ -48,30 +48,15 @@ use EasyAdminFriends\EasyAdminDashboardBundle\Service\EasyAdminDashboard;
 
 class DashboardAppController extends AbstractDashboardController
 {
-    private $easyAdminDashboard;
-    private $chartBuilder;
-    private $entityManager;
-    private $adminUrlGenerator;
-
-    private Packages $assets;
-
-
     public function __construct(
-        AdminUrlGenerator $adminUrlGenerator, 
-        EasyAdminDashboard $easyAdminDashboard,
-        ChartBuilderInterface $chartBuilder,
-        EntityManagerInterface $entityManager, 
-        FormFactoryInterface $formFactory,
-        Packages $assets
+        private readonly AdminUrlGenerator $adminUrlGenerator, 
+        private readonly EasyAdminDashboard $easyAdminDashboard,
+        private readonly ChartBuilderInterface $chartBuilder,
+        private readonly EntityManagerInterface $entityManager, 
+        private readonly FormFactoryInterface $formFactory,
+        private readonly Packages $assets
     )
-    {
-        $this->adminUrlGenerator = $adminUrlGenerator;
-        $this->easyAdminDashboard = $easyAdminDashboard;
-        $this->chartBuilder = $chartBuilder;
-        $this->entityManager = $entityManager;
-        $this->formFactory = $formFactory;
-        $this->assets = $assets;
-    }
+    {}
 
     public function configureCrud(): Crud
     {
