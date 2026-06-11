@@ -1,0 +1,5 @@
+{% if field.value is not null %}
+    <span><a href="{{ asset('uploads/vehicules/certificates/' ~ field.value) }}" target="_blank" rel="noopener"><i class="fa fa-download"></i> {{ field.value }}</a></span>
+{% else %}
+    <span class="badge bg-secondary text-white">{{ "Aucun fichier"|trans }}</span>
+{% endif %}

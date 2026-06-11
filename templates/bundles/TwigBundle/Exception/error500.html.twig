@@ -1,0 +1,27 @@
+{# templates/bundles/TwigBundle/Exception/error500.html.twig #}
+{% extends 'base_error.html.twig' %}
+
+{% block title %}500 - Erreur serveur{% endblock %}
+
+{% block content_title %}
+    500: Internal Server Error
+{% endblock %}
+
+{% block main %}
+    <p class="text-muted mb-4">
+        Le serveur n’est actuellement pas en mesure de traiter cette demande. Notre équipe en a été informée.
+        Merci de réessayer ultérieurement.
+    </p>
+
+    <div class="d-flex flex-column flex-sm-row gap-2">
+        <button type="button"
+                class="btn btn-outline-secondary"
+                onclick="window.history.back();">
+            Page précédente
+        </button>
+
+        <a href="/" class="btn btn-primary">
+            Retour à l’accueil
+        </a>
+    </div>
+{% endblock %}

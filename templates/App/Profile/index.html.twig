@@ -49,7 +49,7 @@
                                 .setController('App\\Controller\\App\\UserAppCrudController')
                                 .setAction('edit') 
                                 .setEntityId(app.user.id)%}
-                            <div class="fs-5"><a href="{{ editUrl }}"><i class="fa-solid fa-pen-to-square"></i> Modifier</a></div>
+                            <div class="fs-5"><a href="{{ editUrl }}" class="btn btn-primary"><i class="fa-solid fa-pen-to-square"></i> {{ "Mettre à jour"|trans }}</a></div>
                         </div>
                         <div class="card-body bg-light">
                             <div class="row">
@@ -143,7 +143,7 @@
                             {% set renewUrl = ea_url()
                                 .setAction('subscriptionForm')
                             %}
-                            <div class="fs-5"><a href="{{ renewUrl }}" class="fs-5"><i class="fa-solid fa-arrows-rotate"></i> {{ 'Renouveler'|trans }}</a></div>
+                            <div class="fs-5"><a href="{{ renewUrl }}" class="btn btn-success"><i class="fa-solid fa-arrows-rotate fs-5"></i> {{ 'Renouveler'|trans }}</a></div>
                         </div>
                         <div class="card-body bg-light">
                             <div class="row">
@@ -224,12 +224,16 @@
 
                             <div class="d-flex align-items-center gap-3">
                                 <button type="button"
-                                        class="btn btn-secondary"
+                                        class="btn btn-primary"
                                         data-open-calendar-sidepanel
                                         data-sidepanel-id="calendar-sidepanel-profile-calendar"
                                         data-backdrop-id="calendar-sidepanel-backdrop-profile-calendar">
-                                    <i class="fa-solid fa-pen-to-square me-1"></i>
-                                    {{ 'Modifier'|trans }}
+                                    <i class="fa-solid fa-link"></i>
+                                    {% if app.user.calendarSynchronized %}
+                                        {{ 'Modifier la connexion'|trans }}
+                                    {% else %}
+                                        {{ 'Connecter mon calendrier'|trans }}
+                                    {% endif %}
                                 </button>
 
                                 {% if app.user.calendarUrl %}
@@ -237,8 +241,8 @@
                                             class="btn btn-danger"
                                             data-bs-toggle="modal"
                                             data-bs-target="#disable-calendar-modal">
-                                        <i class="fa-solid fa-ban"></i>
-                                        {{ 'Désactiver'|trans }}
+                                        <i class="fa-solid fa-link-slash"></i>
+                                        {{ 'Déconnecter'|trans }}
                                     </button>
                                 {% endif %}
                             </div>
@@ -246,11 +250,17 @@
 
                         <div class="card-body bg-light">
 
+                            <p class="card-text">
+                                {{ "Connecter un calendrier permet à l'assistant intelligent d'importer automatiquement vos rendez-vous pour lesquels l'adresse a été renseignée. "|trans }}
+                                <br />
+                                {{ "Formats supportés: ics, iCal, calDav (Nextcloud, Google, Apple, Microsoft, etc)"|trans }}
+                            </p>
+
                             {% if not app.user.calendarUrl %}
                                 <div class="row">
                                     <div class="col-12 text-center py-3">
                                         <p class="text-muted mb-0">
-                                            <i>{{ 'Vous ne synchronisez pas de calendrier.'|trans }}</i>
+                                            <i>{{ 'Pas de calendrier connecté pour le moment.'|trans }}</i>
                                         </p>
                                     </div>
                                 </div>
@@ -265,7 +275,7 @@
                                             {% if app.user.calendarSynchronized %}
                                                 <span class="badge bg-success text-white">
                                                     <i class="fa-solid fa-check"></i>
-                                                    {{ 'Synchronisé'|trans }}
+                                                    {{ 'Connecté'|trans }}
                                                 </span>
                                             {% else %}
                                                 <span class="badge bg-secondary text-white">
@@ -330,8 +340,8 @@
                 reloadAfterSave: true,
                 titleConnected: 'Calendrier connecté',
                 titleDisconnected: 'Connexion au calendrier',
-                textConnected: 'Le calendrier est déjà configuré. Vous pouvez le modifier si nécessaire.',
-                textDisconnected: 'Renseignez l’URL du calendrier, puis validez-la.',
+                textConnected: 'Le calendrier est configuré et prêt pour l’importation de trajets.',
+                textDisconnected: 'Renseigner l’adresse (URL) du calendrier puis valider.',
                 buttonConnected: 'Modifier le calendrier',
                 buttonDisconnected: 'Connecter le calendrier'
             } %}

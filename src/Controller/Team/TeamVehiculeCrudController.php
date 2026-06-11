@@ -2,14 +2,13 @@
 
 namespace App\Controller\Team;
 
-use Error;
 use App\Entity\Power;
 use App\Entity\Scale;
 use App\Entity\User;
 use App\Entity\Vehicule;
-use Doctrine\ORM\QueryBuilder;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FieldCollection;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FilterCollection;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
@@ -24,19 +23,21 @@ use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\ChoiceField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
-use Vich\UploaderBundle\Form\Type\VichFileType;
-use Symfony\Component\Validator\Constraints\File;
+use EasyCorp\Bundle\EasyAdminBundle\Field\FormField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
+use Error;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\FormEvent;
 use Symfony\Component\Form\FormEvents;
 use Symfony\Component\Form\FormInterface;
-use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Component\Validator\Constraints\File;
+use Vich\UploaderBundle\Form\Type\VichFileType;
 
 #[IsGranted('ROLE_MANAGER')]
 class TeamVehiculeCrudController extends AbstractCrudController
@@ -101,9 +102,12 @@ class TeamVehiculeCrudController extends AbstractCrudController
             yield TextField::new('scale', 'Barème : estimation de la distance annuelle parcourue')->hideOnForm();    
             yield Field::new('hasLatestScale', 'Barème à jour')->onlyOnIndex()->setTemplatePath('App/Fields/boolean.html.twig');  
             yield BooleanField::new('is_electric', 'Ce véhicule est électrique')->setHelp("Le montant des frais de déplacement est majoré de 20 % pour les véhicules électriques.")->renderAsSwitch(Crud::PAGE_INDEX != $pageName);
-        
+            yield TextField::new('registrationDocumentName', 'Carte grise')->setTemplatePath('Team/Vehicule/registration_document.html.twig');
             return;
         }
+
+        yield FormField::addColumn(6);
+        yield FormField::addFieldset('Fiche véhicule et barème')->setIcon('fa fa-car');
 
         yield AssociationField::new('user', 'Propriétaire')
             ->setFormType(EntityType::class)
@@ -129,6 +133,7 @@ class TeamVehiculeCrudController extends AbstractCrudController
                 'choice_attr' => function () {
                     return ['class' => 'vehicule_type'];
                 },
+                'attr' => ['class' => 'd-flex align-items-end gap-4']
             ]);
 
         yield AssociationField::new('brand', 'Marque')
@@ -144,27 +149,6 @@ class TeamVehiculeCrudController extends AbstractCrudController
             ->setFormTypeOptions([
                 'attr' => ['data-placeholder' => ' ', 'class' => 'bg-light vehicule_power', 'disabled' => 'disabled'],
                 'choices' => [],
-            ]);
-
-        yield TextField::new('registrationDocumentFile', 'Carte grise')
-            ->setFormType(VichFileType::class)
-            ->onlyOnForms()
-            ->setFormTypeOptions([
-                'required' => false,
-                'allow_delete' => true,
-                'constraints' => [
-                    new File([
-                        'maxSize' => '2M',
-                        'maxSizeMessage' => 'Le fichier ne doit pas dépasser 2 Mo.',
-                        'extensions' => [
-                            'pdf',
-                            'jpg',
-                            'jpeg',
-                            'png',
-                        ],
-                        'extensionsMessage' => 'Format de fichier non supporté.',
-                    ]),
-                ],
             ]);
 
         yield AssociationField::new('scale', 'Barème : estimation de la distance annuelle parcourue')
@@ -183,21 +167,41 @@ class TeamVehiculeCrudController extends AbstractCrudController
             ->setHelp("Le montant des frais de déplacement est majoré de 20 % pour les véhicules électriques.")
             ->renderAsSwitch(Crud::PAGE_INDEX !== $pageName);
 
+        yield FormField::addColumn(6);
+        yield FormField::addFieldset('Informations complémentaires')->setIcon('fa fa-info');
+
         yield IntegerField::new('kilometres', 'Kilométrage')
             ->setHelp("Facultatif: indiquez ici le kilométrage du véhicule si vous souhaitez qu'il apparaisse sur les rapports.")
             ->hideOnIndex();
 
-        if (Crud::PAGE_EDIT === $pageName) {
-            yield BooleanField::new('is_default', 'Définir comme véhicule par défaut')
-                ->onlyOnForms()
-                ->setHelp("Vous ne pouvez pas supprimer un véhicule s'il est défini par défaut ou s'il a déjà été utilisé dans des rapports.");
-        } elseif (Crud::PAGE_NEW === $pageName) {
-            yield BooleanField::new('is_default', 'Définir comme véhicule par défaut')->onlyOnForms();
-        } else {
-            yield BooleanField::new('is_default', 'Véhicule par défaut')
-                ->renderAsSwitch(false)
-                ->hideOnForm();
-        }
+        yield TextField::new('registrationDocumentFile', "Certificat d'immatriculation")
+            ->setFormType(VichFileType::class)
+            ->onlyOnForms()
+            ->setFormTypeOptions([
+                'required' => false,
+                'allow_delete' => true,
+                'delete_label' => 'delete_file',
+                'download_label' => 'download_file',
+                'constraints' => [
+                    new File([
+                        'maxSize' => '3M',
+                        'maxSizeMessage' => 'Le poids du fichier ne doit pas dépasser 3Mo.',
+                        'extensions' => [
+                            'pdf',
+                            'jpg',
+                            'jpeg',
+                            'png',
+                        ],
+                        'extensionsMessage' => 'Format de fichier non supporté.',
+                    ]),
+                ],
+            ])
+            ->setHelp("Facultatif: permet de sauvegarder ici la carte grise du véhicule (3Mo max.).<br />Formats supportés: pdf, jpg, png.")
+        ;
+
+        $helpMore = Crud::PAGE_EDIT ? '<br /><i class="fa-solid fa-circle-info"></i> un véhicule ne pas être supprimé s\'il est défini par défaut ou s\'il a déjà été utilisé dans des rapports.' : '';
+        yield BooleanField::new('is_default','Définir comme véhicule par défaut')->onlyOnForms()
+                ->setHelp("Si coché, ce véhicule sera sélectionné par défaut lors de la création des trajets.".$helpMore);
     }
 
     public function createEntity(string $entityFqcn)

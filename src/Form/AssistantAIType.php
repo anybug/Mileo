@@ -236,10 +236,10 @@ class AssistantAIType extends AbstractType
                         }
 
                         $form->add('type_report_line', ChoiceType::class, [
-                            'label' => 'Mode d’importation des trajets',
+                            'label' => 'Mode d’importation des rendez-vous du calendrier',
                             'choices' => [
-                                'Chaque trajet est un aller-retour depuis l\'adresse de départ' => CalendarReportImporter::MODE_RETURN,
-                                'Chaque trajet débute depuis l’arrivée du trajet précédent' => CalendarReportImporter::MODE_TOUR,
+                                'Classique: chaque trajet est un aller-retour depuis l’adresse de départ' => CalendarReportImporter::MODE_RETURN,
+                                'Tournée: chaque trajet débute depuis l’arrivée du trajet précédent' => CalendarReportImporter::MODE_TOUR,
                             ],
                             'expanded' => true,
                             'required' => true,

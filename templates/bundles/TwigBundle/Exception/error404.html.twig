@@ -1,0 +1,31 @@
+{# templates/bundles/TwigBundle/Exception/error404.html.twig #}
+{% extends 'base_error.html.twig' %}
+
+{% block title %}404 - Page introuvable{% endblock %}
+
+{% block content_title %}
+    404: Page introuvable
+{% endblock %}
+
+{% block main %}
+    <p class="text-muted mb-2">
+        La page demandée est introuvable. Elle a peut-être été déplacée, supprimée,
+        ou l’adresse saisie est incorrecte.
+    </p>
+
+    <p class="text-muted mb-4">
+        Vérifiez l’adresse URL ou revenez à la page précédente.
+    </p>
+
+    <div class="d-flex flex-column flex-sm-row gap-2">
+        <button type="button"
+                class="btn btn-outline-secondary"
+                onclick="window.history.back();">
+            Page précédente
+        </button>
+
+        <a href="/" class="btn btn-primary">
+            Retour à l’accueil
+        </a>
+    </div>
+{% endblock %}
