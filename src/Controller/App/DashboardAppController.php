@@ -238,7 +238,7 @@ class DashboardAppController extends AbstractDashboardController
             'labels' => $labels,
             'datasets' => [
                 [
-                    'label' => 'Indemnité kilométrique par année',
+                    'label' => 'Kilomètres par année',
                     'backgroundColor' => '#0d6efd',
                     'borderColor' => '#0d6efd',
                     'data' => $data,
