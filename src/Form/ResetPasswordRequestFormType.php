@@ -13,9 +13,9 @@ class ResetPasswordRequestFormType extends AbstractType
     {
         $builder
             ->add('email', EmailType::class, [
-                'label' => 'Entrez votre e-mail',
+                'label' => 'Adresse e-mail de votre compte Mileo',
                 'attr' => [
-                    'placeholder' => 'exemple@sgc.fr',
+                    'placeholder' => 'exemple@domaine.fr',
                     'class' => 'form-control'
                 ]
             ])
