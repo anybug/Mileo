@@ -34,7 +34,10 @@
           <div class="col-4 fw-bold">Montant HT</div>
         </div>
         <div class="row p-2">
-          <div class="col-8">{{ order.getPlan() }}</div>
+          <div class="col-8">
+            {{ order.getPlan() }}
+            <p>Valide jusqu'au {{ order.getSubscriptionEnd()|format_datetime(locale='fr',pattern="EEEE dd MMMM YYYY") }}</p>
+          </div>
           <div class="col-4 text-nowrap">{{ order.getTotalHt()|format_currency('EUR') }}</div>
         </div>
       </div>
@@ -60,7 +63,7 @@
 
   <div class="row">
   <p class="pt-2">
-    Vous pourrez retrouver votre facture dans votre compte.
+    Vous pourrez télécharger votre facture depuis le menu <a href="{{ path('app_order_app_index') }}">Mes factures</a>.
   </p>
   
 </div>
