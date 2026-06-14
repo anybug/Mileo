@@ -2,9 +2,12 @@
 
 namespace App\Entity;
 
+use App\Enum\PlanCode;
+use App\Enum\PricingModel;
 use App\Repository\PlanRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: PlanRepository::class)]
@@ -15,41 +18,57 @@ class Plan
     #[ORM\Column(type: 'integer')]
     private $id;
 
-    #[ORM\Column(type: 'string', length: 255)]
-    private $name;
+    #[ORM\Column(length: 100)]
+    private string $name;
 
-    #[ORM\Column(type: 'float', nullable: true)]
-    private $price_per_month;
+    /** Clé stable pour brancher la logique applicative (ne JAMAIS s'appuyer sur le name). */
+    #[ORM\Column(length: 50, enumType: PlanCode::class, unique: true)]
+    private PlanCode $code;
 
-    #[ORM\Column(type: 'float', nullable: true)]
-    private $price_per_year;
+    /** Indique au calculateur s'il multiplie le prix par la quantité (PER_UNIT) ou non (FLAT). */
+    #[ORM\Column(enumType: PricingModel::class)]
+    private PricingModel $pricingModel;
 
-    #[ORM\Column(type: 'integer', length: 5)]
-    private $plan_period;
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $description = null;
+
+    /** Libellé de l'unité facturée, pour l'affichage : "compte", "siège", "client". */
+    #[ORM\Column(length: 30, nullable: true)]
+    private ?string $unitLabel = null;
+
+    #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2, nullable: true)]
+    private ?string $price_per_year = null;
+
+    /** Prix barré promo (override d'affichage manuel), en euros (DECIMAL). */
+    #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2, nullable: true)]
+    private ?string $old_price_per_year = null;
+
+    #[ORM\Column(type: Types::INTEGER, length: 5)]
+    private int $plan_period;
+
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $billingDetails = null;
+
+    #[ORM\Column]
+    private int $displayOrder = 0;
+
+    #[ORM\Column]
+    private bool $isPublished = true;
+
+    /** @var Collection<int, PlanPriceTier> */
+    #[ORM\OneToMany(mappedBy: 'plan', targetEntity: PlanPriceTier::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\OrderBy(['minQuantity' => 'ASC'])]
+    private Collection $priceTiers;
 
     #[ORM\OneToMany(targetEntity: Subscription::class, mappedBy: 'plan')]
-    private $subscriptions;
+    private Collection $subscriptions;
 
-    #[ORM\Column(type: 'float')]
-    private $totalCost;
-
-    #[ORM\Column(type: 'string', length: 255)]
-    private $billingDetails;
-
-    #[ORM\Column(type: 'float', nullable: true)]
-    private $oldPrice;
-
-    #[ORM\Column(type: 'string', length: 255, nullable: true)]
-    private $savingPercentage;
-
-    #[ORM\OneToMany(targetEntity: Order::class, mappedBy: 'Plan')]
-    private $orders;
-
-    #[ORM\Column(type: 'string', length: 255)]
-    private $plan_description;
+    #[ORM\OneToMany(targetEntity: Order::class, mappedBy: 'plan')]
+    private Collection $orders;
 
     public function __construct()
     {
+        $this->priceTiers = new ArrayCollection();
         $this->subscriptions = new ArrayCollection();
         $this->orders = new ArrayCollection();
     }
@@ -59,61 +78,168 @@ class Plan
         return $this->id;
     }
 
+    public function __toString()
+    {
+        return $this->getBillingDetails();
+    }
+
     public function getName(): ?string
     {
         return $this->name;
     }
 
-    public function setName(string $name): self
+    public function setName(string $name): static
     {
         $this->name = $name;
 
         return $this;
     }
 
-    public function getPricePerMonth(): ?float
+    public function getDescription(): ?string
     {
-        return $this->price_per_month;
+        return $this->description;
     }
 
-    public function setPricePerMonth(?float $price_per_month): self
+    public function setDescription(?string $description): static
     {
-        $this->price_per_month = $price_per_month;
+        $this->description = $description;
 
         return $this;
     }
 
-    public function getPricePerYear(): ?float
+    public function getUnitLabel(): ?string
+    {
+        return $this->unitLabel;
+    }
+
+    public function setUnitLabel(?string $unitLabel): static
+    {
+        $this->unitLabel = $unitLabel;
+
+        return $this;
+    }
+
+    public function getPricePerYear(): ?string
     {
         return $this->price_per_year;
     }
 
-    public function setPricePerYear(?float $price_per_year): self
+    public function setPricePerYear(?string $price_per_year): static
     {
         $this->price_per_year = $price_per_year;
 
         return $this;
     }
 
+    public function getOldPricePerYear(): ?string
+    {
+        return $this->old_price_per_year;
+    }
+
+    public function setOldPricePerYear(?string $old_price_per_year): static
+    {
+        $this->old_price_per_year = $old_price_per_year;
+
+        return $this;
+    }
+
+    public function getPlanPeriod(): ?int
+    {
+        return $this->plan_period;
+    }
+
+    public function setPlanPeriod(int $plan_period): static
+    {
+        $this->plan_period = $plan_period;
+
+        return $this;
+    }
+
+    public function getBillingDetails(): ?string
+    {
+        return $this->billingDetails;
+    }
+
+    public function setBillingDetails(?string $billingDetails): static
+    {
+        $this->billingDetails = $billingDetails;
+
+        return $this;
+    }
+
+    public function getDisplayOrder(): ?int
+    {
+        return $this->displayOrder;
+    }
+
+    public function setDisplayOrder(int $displayOrder): static
+    {
+        $this->displayOrder = $displayOrder;
+
+        return $this;
+    }
+
+    public function isIsPublished(): ?bool
+    {
+        return $this->isPublished;
+    }
+
+    public function setIsPublished(bool $isPublished): static
+    {
+        $this->isPublished = $isPublished;
+
+        return $this;
+    }
+
     /**
-     * @return Collection|Subscription[]
+     * @return Collection<int, PlanPriceTier>
+     */
+    public function getPriceTiers(): Collection
+    {
+        return $this->priceTiers;
+    }
+
+    public function addPriceTier(PlanPriceTier $priceTier): static
+    {
+        if (!$this->priceTiers->contains($priceTier)) {
+            $this->priceTiers->add($priceTier);
+            $priceTier->setPlan($this);
+        }
+
+        return $this;
+    }
+
+    public function removePriceTier(PlanPriceTier $priceTier): static
+    {
+        if ($this->priceTiers->removeElement($priceTier)) {
+            // set the owning side to null (unless already changed)
+            if ($priceTier->getPlan() === $this) {
+                $priceTier->setPlan(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Subscription>
      */
     public function getSubscriptions(): Collection
     {
         return $this->subscriptions;
     }
 
-    public function addSubscription(Subscription $subscription): self
+    public function addSubscription(Subscription $subscription): static
     {
         if (!$this->subscriptions->contains($subscription)) {
-            $this->subscriptions[] = $subscription;
+            $this->subscriptions->add($subscription);
             $subscription->setPlan($this);
         }
 
         return $this;
     }
 
-    public function removeSubscription(Subscription $subscription): self
+    public function removeSubscription(Subscription $subscription): static
     {
         if ($this->subscriptions->removeElement($subscription)) {
             // set the owning side to null (unless already changed)
@@ -125,73 +251,25 @@ class Plan
         return $this;
     }
 
-    public function getTotalCost(): ?float
-    {
-        return $this->totalCost;
-    }
-
-    public function setTotalCost(float $totalCost): self
-    {
-        $this->totalCost = $totalCost;
-
-        return $this;
-    }
-
-    public function getBillingDetails(): ?string
-    {
-        return $this->billingDetails;
-    }
-
-    public function setBillingDetails(string $billingDetails): self
-    {
-        $this->billingDetails = $billingDetails;
-
-        return $this;
-    }
-
-    public function getOldPrice(): ?float
-    {
-        return $this->oldPrice;
-    }
-
-    public function setOldPrice(?float $oldPrice): self
-    {
-        $this->oldPrice = $oldPrice;
-
-        return $this;
-    }
-
-    public function getSavingPercentage(): ?string
-    {
-        return $this->savingPercentage;
-    }
-
-    public function setSavingPercentage(?string $savingPercentage): self
-    {
-        $this->savingPercentage = $savingPercentage;
-
-        return $this;
-    }
-
     /**
-     * @return Collection|Order[]
+     * @return Collection<int, Order>
      */
     public function getOrders(): Collection
     {
         return $this->orders;
     }
 
-    public function addOrder(Order $order): self
+    public function addOrder(Order $order): static
     {
         if (!$this->orders->contains($order)) {
-            $this->orders[] = $order;
+            $this->orders->add($order);
             $order->setPlan($this);
         }
 
         return $this;
     }
 
-    public function removeOrder(Order $order): self
+    public function removeOrder(Order $order): static
     {
         if ($this->orders->removeElement($order)) {
             // set the owning side to null (unless already changed)
@@ -203,33 +281,29 @@ class Plan
         return $this;
     }
 
-    public function getPlanDescription(): ?string
+    public function getCode(): ?PlanCode
     {
-        return $this->plan_description;
+        return $this->code;
     }
 
-    public function setPlanDescription(string $plan_description): self
+    public function setCode(PlanCode $code): static
     {
-        $this->plan_description = $plan_description;
+        $this->code = $code;
 
         return $this;
     }
 
-    public function __toString()
+    public function getPricingModel(): ?PricingModel
     {
-        return $this->getPlanDescription();
+        return $this->pricingModel;
     }
 
-    public function getPlanPeriod(): ?int
+    public function setPricingModel(PricingModel $pricingModel): static
     {
-        return $this->plan_period;
-    }
-
-    public function setPlanPeriod(int $plan_period): self
-    {
-        $this->plan_period = $plan_period;
+        $this->pricingModel = $pricingModel;
 
         return $this;
     }
+
 
 }

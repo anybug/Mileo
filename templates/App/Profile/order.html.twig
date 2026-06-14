@@ -13,22 +13,23 @@
     <div class="card shadow-lg mb-4 pb-4">
       <div class="card-header border-bottom-0 pt-4">
         <div class="d-flex justify-content-center">
-          {% set priceExcVat = plan.getPricePerYear()|number_format %}
+          {% set priceExcVat = plan.pricePerYear|number_format %}
           {% set priceIncVat = priceExcVat*1.2 %}
           <h4 class="h2 fw-bold d-flex">{{ priceExcVat }}€ HT <span class="text-secondary fw-normal px-1">({{ priceIncVat }}€ TTC)</span></h4>
         </div>
       </div>
       <div class="card-body mx-auto">
         <ul class="list-unstyled mb-4">
-          <li class="text-700 py-2"><i class="fa-solid fa-circle-check text-success"></i> <span class="text-secondary">Nombre de véhicules illimité</span></li>
+            <li class="text-700 py-2"><i class="fa-solid fa-circle-check text-success"></i> <span class="text-secondary"> Assistant intelligent de duplication de trajets</span></li>
+          <li class="text-700 py-2"><i class="fa-solid fa-circle-check text-success"></i> <span class="text-secondary"> Assistant intelligent de duplication de rapports</span></li>
+          <li class="text-700 py-2"><i class="fa-solid fa-circle-check text-success"></i> <span class="text-secondary"> Import de trajets depuis un calendrier connecté</span></li>
+          <li class="text-700 py-2"><i class="fa-solid fa-circle-check text-success"></i> <span class="text-secondary"> Nombre de véhicules illimité</span></li>
           <li class="text-700 py-2"><i class="fa-solid fa-circle-check text-success"></i> <span class="text-secondary"> Adresses favorites illimitées</span></li>
-          <li class="text-700 py-2"><i class="fa-solid fa-circle-check text-success"></i> <span class="text-secondary"> Nombre de trajets illimité</span></li>
-          <li class="text-700 py-2"><i class="fa-solid fa-circle-check text-success"></i> <span class="text-secondary"> Saisie trajet par trajet ou au mois</span></li>
-          <li class="text-700 py-2"><i class="fa-solid fa-circle-check text-success"></i> <span class="text-secondary"> Calcul automatique de vos trajets</span></li>
-          <li class="text-700 py-2"><i class="fa-solid fa-circle-check text-success"></i> <span class="text-secondary"> Export des rapports mensuel et annuels au format PDF</span></li>
-          <li class="text-700 py-2"><i class="fa-solid fa-circle-check text-success"></i> <span class="text-secondary"> Accès au support 5/7j de 9h à 18h</span></li>
-          <li class="text-700 py-2"><i class="fa-solid fa-circle-check text-success"></i> <span class="text-secondary"> Règlement 100% sécurisé</span></li>
+          
+          <li class="text-700 py-2"><i class="fa-solid fa-circle-check text-success"></i> <span class="text-secondary"> Participation aux décisions sur les innovations</span></li>
+          <li class="text-700 py-2"><i class="fa-solid fa-circle-check text-success"></i> <span class="text-secondary"> Support 5/7j de 9h à 18h</span></li>
         </ul>
+        <p>Activation immédiate - règlement 100% sécurisé</p>
       </div>
     </div>
   </div>

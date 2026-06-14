@@ -44,8 +44,8 @@ class PaymentController extends AbstractController
         $payment = $storage->create();
         $payment->setNumber(uniqid());
         $payment->setCurrencyCode('EUR');
-        $payment->setTotalAmount($order->getPlan()->getTotalCost()*(120/100)*100);
-        $payment->setDescription($order->getPlan()->getPlanDescription());
+        $payment->setTotalAmount($order->getPlan()->getPricePerYear()*(120/100)*100);
+        $payment->setDescription($order->getPlan()->getBillingDetails());
         $payment->setClientId($user->getId());
         $payment->setClientEmail($user->getEmail());
 
@@ -80,47 +80,47 @@ class PaymentController extends AbstractController
 
             $user = $this->getUser();
             $subscription = $this->getUser()->getSubscription();
+
             $order = $manager->getRepository(Order::class)->find($order_id);
             $plan = $order->getPlan();
             $subscription->setPlan($plan);
             
+            //store invoice
             $invoice = new Invoice;
-
             $manager->persist($invoice);
             $manager->flush();
             
             // order in bd
-            $order->setUser($user);
-            $order->setPlan($plan);
-            $order->setCreatedAt(new \DateTime());
-            $order->setUpdatedAt(new \DateTime());
-            $order->setProductName($plan->getName());
-            $order->setProductDescription($plan->getPlanDescription());
-            $order->setTotalHt($plan->getTotalCost());
-            $order->calculateVatAmount();
             $order->setInvoice($invoice);
             $order->setStatus("paid");
             
             // subscription in bd 
+            $now = new \DateTimeImmutable('now');
             
             if( $subscription == null){
                 $subscription = new Subscription;
-                $subscription->setSubscriptionStart(new \DateTime('now'));
-                $subscription->setSubscriptionEnd(new \DateTime('+'.$plan->getPlanPeriod().' month'));
-            } else if ($subscription->getSubscriptionEnd() < new \DateTime('now')){
-                $subscription->setSubscriptionEnd(new \DateTime('+'.$plan->getPlanPeriod().' month'));
-            } else {
-                $date = new DateTime($subscription->getSubscriptionEnd()->format('y-m-d'));
-                $date->modify('+'.$plan->getPlanPeriod().' month');
-                $subscription->setSubscriptionEnd($date);
+                $subscription->setSubscriptionStart($now);
             }
+
+            if ($subscription->getSubscriptionEnd() < new \DateTimeImmutable('now')){
+                $start = $now;
+            } else {
+                $start = clone $subscription->getSubscriptionEnd();
+            }
+
+            $end = $start->modify('+'.$plan->getPlanPeriod().' month');
+            $subscription->setSubscriptionEnd($end);
+
             $order->setSubscriptionEnd($subscription->getSubscriptionEnd());
             $manager->persist($order);
             $manager->persist($subscription);
-            $user->setSubscription($subscription);
+            
 
             //user in bd
+            $user->setSubscription($subscription);
             $manager->persist($user);
+
+            //flush
             $manager->flush();
 
             $url = $adminUrlGenerator

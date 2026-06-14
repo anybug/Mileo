@@ -60,15 +60,11 @@ use Symfony\Component\Routing\Annotation\Route;
 
 class ReportLineAppCrudController extends AbstractCrudController
 {
-    private $entityManager;
-    private $adminUrlGenerator;
-    private $cloned;
-
-    public function __construct(EntityManagerInterface $entityManager,AdminUrlGenerator $adminUrlGenerator)
-    {
-        $this->entityManager = $entityManager;
-        $this->adminUrlGenerator = $adminUrlGenerator;
-    }
+    public function __construct(
+        private readonly EntityManagerInterface $entityManager,
+        private readonly AdminUrlGenerator $adminUrlGenerator
+    )
+    {}
 
     public static function getEntityFqcn(): string
     {
@@ -102,9 +98,16 @@ class ReportLineAppCrudController extends AbstractCrudController
 
     public function configureCrud(Crud $crud): Crud
     {
+        $reportUrl = $this->adminUrlGenerator
+                    ->setController(ReportAppCrudController::class)
+                    ->setAction(Action::INDEX)
+                    ->setDashboard(DashboardAppController::class)
+                    ->generateUrl()
+        ;
+
         return $crud
             ->setDefaultSort(['travel_date' => 'ASC'])
-            ->setPageTitle(Crud::PAGE_INDEX, 'Mes trajets <br /><span class="fs-6 fw-normal">Mode de saisie <i>trajet par trajet</i>: les trajets saisis ici sont automatiquement regroupés dans un rapport mensuel. <br />Vous pouvez également opter pour le mode de saisie <i>au mois</i> depuis le menu Rapports.</span>')
+            ->setPageTitle(Crud::PAGE_INDEX, 'Mes trajets <br /><span class="fs-6 fw-normal">Mode de saisie <i>trajet par trajet</i>: les trajets saisis ici sont automatiquement regroupés dans un rapport mensuel. <br />Vous pouvez également opter pour le mode de saisie <i>au mois</i> depuis le menu <a href="'.$reportUrl.'">Rapports</a>.</span>')
             ->setPageTitle(Crud::PAGE_NEW, 'Saisir un trajet')
             ->setPageTitle(Crud::PAGE_EDIT, fn (ReportLine $reportLine) => sprintf('Modifier trajet du %s', $reportLine->getTravelDate()->format("d/m/Y")))
             ->showEntityActionsInlined()
@@ -123,14 +126,6 @@ class ReportLineAppCrudController extends AbstractCrudController
 
     public function index(AdminContext $context)
     {
-        if (!$this->getUser()->getSubscription()->isValid()) {
-            return $this->redirect(
-                $this->adminUrlGenerator
-                    ->setController(UserAppCrudController::class)
-                    ->setAction(Action::INDEX)
-                    ->generateUrl()
-            );
-        }
 
         if (!$this->getUser()->hasCompletedSetup()) {
             return $this->redirectToRoute('app', ['menuIndex' => 0, 'submenuIndex' => -1]);

@@ -5,11 +5,14 @@ namespace App\Entity;
 use App\Repository\OrderRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Gedmo\Timestampable\Traits\TimestampableEntity;
 
 #[ORM\Table(name: '`order`')]
 #[ORM\Entity(repositoryClass: OrderRepository::class)]
 class Order
 {
+    use TimestampableEntity;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
@@ -19,16 +22,9 @@ class Order
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?User $user = null;
 
-
-    #[ORM\Column(type: 'datetime', nullable: true)]
-    private $createdAt;
-
     #[ORM\JoinColumn(nullable: true)]
     #[ORM\ManyToOne(targetEntity: Plan::class, inversedBy: 'orders')]
-    private $Plan;
-
-    #[ORM\Column(type: 'datetime', nullable: true)]
-    private $updatedAt;
+    private $plan;
 
     #[ORM\Column(type: 'string', length: 255, nullable: true)]
     private $productName;
@@ -40,7 +36,7 @@ class Order
     private $subscription_end;
 
     #[ORM\Column(type: 'float', nullable: true)]
-    private $vatAmount = 20/100;
+    private $vatAmount = 0;
 
     #[ORM\Column(type: 'float', nullable: true)]
     private $totalHt;
@@ -109,38 +105,14 @@ class Order
         return $this;
     }
 
-    public function getCreatedAt(): ?\DateTimeInterface
-    {
-        return $this->createdAt;
-    }
-
-    public function setCreatedAt(\DateTimeInterface $createdAt): self
-    {
-        $this->createdAt = $createdAt;
-
-        return $this;
-    }
-
     public function getPlan(): ?Plan
     {
-        return $this->Plan;
+        return $this->plan;
     }
 
-    public function setPlan(?Plan $Plan): self
+    public function setPlan(?Plan $plan): self
     {
-        $this->Plan = $Plan;
-
-        return $this;
-    }
-
-    public function getUpdatedAt(): ?\DateTimeInterface
-    {
-        return $this->updatedAt;
-    }
-
-    public function setUpdatedAt(\DateTimeInterface $updatedAt): self
-    {
-        $this->updatedAt = $updatedAt;
+        $this->plan = $plan;
 
         return $this;
     }

@@ -19,35 +19,43 @@
 
         <div class="card-body">
 
-        {{ form_start(form, {'attr': {'id': 'assistant-form'}}) }}
-            
-            {{ form_row(form.action) }}
+            {{ form_start(form, {'attr': {'id': 'assistant-form'}}) }}
+                
+                {{ form_row(form.action) }}
 
-            {{ include('App/Report/_assistant_form.html.twig', {
-                form: form,
-                calendarValidationUrl: calendarValidationUrl,
-                hasSavedCalendar: hasSavedCalendar|default(false)
-            }) }}
-            
-            {# Bouton de soumission avec spinner #}
-            <button type="submit"
-                    class="btn btn-primary mt-3"
-                    id="preview-button"
-                    data-calendar-preview-button>
-                <span id="button-text">
-                    <i class="fa fa-eye"></i> {{ "Prévisualiser"|trans }}
-                </span>
-                <span id="button-spinner"
-                    class="spinner-border spinner-border-sm d-none"
-                    role="status"
-                    aria-hidden="true"></span>
-                <span id="button-loading-text" class="d-none">
-                    {{ "Génération des trajets en cours..."|trans }}
-                </span>
-            </button>
+                {% if not app.user.canUseAssistant %}
 
-        {{ form_end(form) }}
-            
+                    <p class="fs-6 fw-normal fst-italic"><i class="fa-solid fa-circle-info"></i> 
+                        <i>Vous utilisez la version gratuite de Mileo et nous vous en remercions ! Si vous souhaitez utiliser l'assistant intelligent ainsi que d'autres fonctionnalités avancées, merci de passer à la version Pro depuis <a href="{{ path('app_user_app_index') }}">votre profil</a></i>.</span>
+                    </p>
+                {% else %}
+
+                    {{ include('App/Report/_assistant_form.html.twig', {
+                        form: form,
+                        calendarValidationUrl: calendarValidationUrl,
+                        hasSavedCalendar: hasSavedCalendar|default(false)
+                    }) }}
+                    
+                    {# Bouton de soumission avec spinner #}
+                    <button type="submit"
+                            class="btn btn-primary mt-3"
+                            id="preview-button"
+                            data-calendar-preview-button>
+                        <span id="button-text">
+                            <i class="fa fa-eye"></i> {{ "Prévisualiser"|trans }}
+                        </span>
+                        <span id="button-spinner"
+                            class="spinner-border spinner-border-sm d-none"
+                            role="status"
+                            aria-hidden="true"></span>
+                        <span id="button-loading-text" class="d-none">
+                            {{ "Génération des trajets en cours..."|trans }}
+                        </span>
+                    </button>
+                {% endif %} 
+
+            {{ form_end(form) }}
+           
         </div>
     </div>
 

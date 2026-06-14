@@ -2,9 +2,13 @@
 
 namespace App\Controller\App;
 
+use App\Controller\App\CalendarUserCrudController;
+use App\Dto\CalendarConnectionData;
 use App\Entity\Order;
 use App\Entity\Plan;
 use App\Entity\User;
+use App\Enum\PlanCode;
+use App\Form\CalendarConnectionType;
 use App\Form\OrderType;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\QueryBuilder;
@@ -13,6 +17,7 @@ use EasyCorp\Bundle\EasyAdminBundle\Collection\FilterCollection;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
+use EasyCorp\Bundle\EasyAdminBundle\Config\KeyValueStore;
 use EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
 use EasyCorp\Bundle\EasyAdminBundle\Dto\EntityDto;
@@ -27,9 +32,6 @@ use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Component\Form\Extension\Core\Type\PasswordType;
 use Symfony\Component\Form\Extension\Core\Type\RepeatedType;
-use App\Dto\CalendarConnectionData;
-use App\Form\CalendarConnectionType;
-use EasyCorp\Bundle\EasyAdminBundle\Config\KeyValueStore;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -39,7 +41,6 @@ use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
-use App\Controller\App\CalendarUserCrudController;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Component\Security\Csrf\CsrfToken;
@@ -189,11 +190,18 @@ class UserAppCrudController extends AbstractCrudController
     public function subscriptionForm(Request $request, EntityManagerInterface $manager)
     {
         $order = new Order;
-        $plan = $manager->getRepository(Plan::class)->findOneBy(['id' => 3]);
+        $plan = $manager->getRepository(Plan::class)->findByCode(PlanCode::PRO);
         $order->setPlan($plan);
 
         //order name autocomplete
         $order->setBillingName($this->getUser()->getCompany() ?? $this->getUser()->__toString()); 
+        $order->setUser($this->getUser());
+        $order->setPlan($plan);
+        $order->setProductName($plan->getName());
+        $order->setProductDescription($plan->getBillingDetails());
+        $order->setTotalHt($plan->getPricePerYear());
+        $order->calculateVatAmount();
+        $order->setStatus('new');
         
         //TODO: autocomplete billingAddress, billingPostcode, billingCity
 
@@ -202,7 +210,6 @@ class UserAppCrudController extends AbstractCrudController
         $form->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
             $order->setStatus('pending');
-            $order->setUser($this->getUser());
             $manager->persist($order);
             $manager->flush();
 

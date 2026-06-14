@@ -30,14 +30,11 @@ class PlanCrudController extends AbstractCrudController
         return [
             IdField::new('id')->hideOnForm(),
             Field::new('name'),
-            Field::new('price_per_month'),
             Field::new('price_per_year'),
             Field::new('plan_period'),
-            Field::new('totalCost'),
             Field::new('billingDetails'),
-            Field::new('old_price'),
-            Field::new('saving_percentage'),
-            Field::new('plan_description'),
+            Field::new('old_price_per_year'),
+            Field::new('description'),
             
         ];
     }

@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\Plan;
+use App\Enum\PlanCode;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -19,47 +20,40 @@ class PlanRepository extends ServiceEntityRepository
         parent::__construct($registry, Plan::class);
     }
 
-    // /**
-    //  * @return Plan[] Returns an array of Plan objects
-    //  */
-    /*
-    public function findByExampleField($value)
+    public function findByCode(PlanCode $code): ?Plan
     {
-        return $this->createQueryBuilder('p')
-            ->andWhere('p.exampleField = :val')
-            ->setParameter('val', $value)
-            ->orderBy('p.id', 'ASC')
-            ->setMaxResults(10)
-            ->getQuery()
-            ->getResult()
-        ;
+        return $this->findOneBy(['code' => $code]);
     }
-    */
 
-    /*
-    public function findOneBySomeField($value): ?Plan
+    /**
+     * Le socle de repli. Doit toujours exister en base
+     * pour que PlanResolver le renvoie par défaut
+     */
+    public function getFree(): Plan
     {
-        return $this->createQueryBuilder('p')
-            ->andWhere('p.exampleField = :val')
-            ->setParameter('val', $value)
-            ->getQuery()
-            ->getOneOrNullResult()
-        ;
+        $free = $this->findByCode(PlanCode::FREE);
+
+        if ($free === null) {
+            throw new \RuntimeException(
+                'Le plan FREE est introuvable : il doit exister en base comme socle de repli.'
+            );
+        }
+
+        return $free;
     }
-    */
 
-    /*
-    * Query to get all Subscription Plans ordered by monthly cost
-    * We take out the 1 month free subscription
-    */
-    public function findAllPaidSubscriptions(): ?Array
+    /**
+     * Plans publiés, ordonnés pour la grille tarifaire.
+     *
+     * @return Plan[]
+     */
+    public function findPublishedOrdered(): array
     {
         return $this->createQueryBuilder('p')
-            ->andWhere('p.totalCost != 0')
-            ->orderBy('p.price_per_month', 'ASC')
+            ->andWhere('p.isPublished = true')
+            ->orderBy('p.displayOrder', 'ASC')
             ->getQuery()
-            ->getResult()
-        ;    
+            ->getResult();
     }
 
 }   

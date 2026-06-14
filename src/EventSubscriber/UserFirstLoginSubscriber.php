@@ -38,6 +38,10 @@ class UserFirstLoginSubscriber implements EventSubscriberInterface
                 'user' => $user,
             ]);
 
+        if($_ENV['ADMIN_EMAIL']){
+            $email->addBcc(new Address($_ENV['ADMIN_EMAIL']));
+        }    
+
         try {
             $this->mailer->send($email);
         } catch (TransportExceptionInterface $e) {
