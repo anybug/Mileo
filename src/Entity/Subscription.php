@@ -13,22 +13,23 @@ class Subscription
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
-    #[ORM\Column(type: 'integer')]
-    private $id;
+    #[ORM\Column]
+    private ?int $id = null;
 
+    #[ORM\OneToOne(inversedBy: 'subscription')]
     #[ORM\JoinColumn(nullable: false)]
-    #[ORM\OneToOne(targetEntity: User::class, inversedBy: 'subscription')]
-    private $user;
+    private ?User $user = null;
 
-    #[ORM\JoinColumn(nullable: false)]
+    /** Le plan souscrit : PRO (en essai ou payé), TEAM, CABINET. */
     #[ORM\ManyToOne(targetEntity: Plan::class, inversedBy: 'subscriptions')]
-    private $plan;
-    
-    #[ORM\Column(type: 'datetime')]
-    private $subscription_start;
+    #[ORM\JoinColumn(nullable: false)]
+    private ?Plan $plan = null;
 
-    #[ORM\Column(type: 'datetime')]
-    private $subscription_end;
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    private \DateTimeImmutable $subscription_start;
+
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    private \DateTimeImmutable $subscription_end;
 
     public function __construct()
     {
@@ -63,45 +64,18 @@ class Subscription
 
         return $this;
     }
-
-    public function getSubscriptionStart(): ?\DateTimeInterface
-    {
-        return $this->subscription_start;
-    }
-
-    public function setSubscriptionStart(\DateTimeInterface $subscription_start): self
-    {
-        $this->subscription_start = $subscription_start;
-
-        return $this;
-    }
-
-    public function setSubscriptionEnd(\DateTimeInterface $subscription_end): self
-    {
-        $this->subscription_end = $subscription_end;
-
-        return $this;
-    }
-
-    public function getSubscriptionEnd(): ?\DateTimeInterface
-    {
-        return $this->subscription_end;
-    }
     
     public function __toString()
     {
         return $this->getPlan()->getName();
     }
-
-    public function isValid()
+   
+    /** L'abonnement est-il valide à l'instant donné (par défaut : maintenant) ? */
+    public function isValid(?\DateTimeImmutable $at = null): bool
     {
-        $now = new \DateTime('now');
-        if($this->getSubscriptionEnd() > $now)
-        {
-            return true;
-        }
+        $at ??= new \DateTimeImmutable();
 
-        return false;
+        return $at >= $this->getSubscriptionStart() && $at < $this->getSubscriptionEnd();
     }
     
     public function isWarning()
@@ -131,8 +105,6 @@ class Subscription
         return false;
     }
 
-
-
     public function getNumberDays(){
         $now = time(); // or your date as well
         $your_date = strtotime($this->getSubscriptionEnd()->format("Y-m-d"));
@@ -145,5 +117,43 @@ class Subscription
 
         $value = $this->getNumberDays()/360*100 ;
         return $value;
+    }
+
+    /** TODO: En essai ACTIF (à distinguer d'un essai expiré : isTrial true mais isValid false). */
+    /*public function isInTrial(?\DateTimeImmutable $at = null): bool
+    {
+        return $this->isTrial && $this->isValid($at);
+    }*/
+
+    /** Nombre de jours avant expiration (négatif si déjà expiré). Pratique pour les nudges. */
+    public function daysUntilExpiry(?\DateTimeImmutable $at = null): int
+    {
+        $at ??= new \DateTimeImmutable();
+
+        return (int) $at->diff($this->getSubscriptionEnd())->format('%r%a');
+    }
+
+    public function getSubscriptionStart(): ?\DateTimeImmutable
+    {
+        return $this->subscription_start;
+    }
+
+    public function setSubscriptionStart(\DateTimeImmutable $subscription_start): static
+    {
+        $this->subscription_start = $subscription_start;
+
+        return $this;
+    }
+
+    public function getSubscriptionEnd(): ?\DateTimeImmutable
+    {
+        return $this->subscription_end;
+    }
+
+    public function setSubscriptionEnd(\DateTimeImmutable $subscription_end): static
+    {
+        $this->subscription_end = $subscription_end;
+
+        return $this;
     }
 }

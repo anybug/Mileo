@@ -109,16 +109,6 @@ class DashboardAppController extends AbstractDashboardController
 
         $step = [];
 
-        if (!$user->getSubscription() || !$user->getSubscription()->isValid()) {
-
-            $url = $this->adminUrlGenerator
-            ->setController(UserAppCrudController::class)
-            ->setAction(Action::INDEX)
-            ->generateUrl();
-
-            return $this->redirect($url);
-        }
-
         if(!$user->hasCompletedSetup())
         {
             if(!$user->hasCompletedStep2() || $step2){
@@ -294,12 +284,6 @@ class DashboardAppController extends AbstractDashboardController
         /** @var \App\Entity\User $user */
         $user = $this->getUser();
 
-        if ($user && $user->getSubscription() && $user->getSubscription()->getPlan()) {
-            $planName = strtolower(trim((string) $user->getSubscription()->getPlan()->getName()));
-        }else{
-            $planName = false;
-        }
-
         yield MenuItem::linktoDashboard('Dashboard', 'fa fa-home');
 
         yield MenuItem::section('Travels');
@@ -311,7 +295,7 @@ class DashboardAppController extends AbstractDashboardController
         yield MenuItem::linkToCrud('My vehicules', 'fa fa-car', Vehicule::class)->setController(VehiculeAppCrudController::class);
         yield MenuItem::linkToCrud('My addresses', 'fa fa-map-marker-alt', UserAddress::class)->setController(AddressesAppCrudController::class);
 
-        if ($planName && $planName !== 'free') {
+        if ($user->hasInvoices()) {
             yield MenuItem::linkToCrud('My invoices', 'fa-solid fa-file-invoice', Order::class)->setController(OrderAppCrudController::class);
         }
         
