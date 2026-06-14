@@ -6,6 +6,7 @@ namespace App\EventSubscriber;
 use App\Entity\Order;
 use App\Entity\Plan;
 use App\Entity\Subscription;
+use App\Enum\PlanCode;
 use App\Event\UserFirstSubscriptionEvent;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
@@ -19,11 +20,11 @@ class UserFirstSubscriptionSubscriber implements EventSubscriberInterface
     public static function getSubscribedEvents(): array
     {
         return [
-            UserFirstSubscriptionEvent::class => 'onFirstSubscrption',
+            UserFirstSubscriptionEvent::class => 'onFirstSubscription',
         ];
     }
 
-    public function onFirstSubscrption(UserFirstSubscriptionEvent $event): void
+    public function onFirstSubscription(UserFirstSubscriptionEvent $event): void
     {
         $user = $event->getUser();
 
@@ -33,8 +34,7 @@ class UserFirstSubscriptionSubscriber implements EventSubscriberInterface
         }
 
         // Plan gratuit
-        $plan = $this->em->getRepository(Plan::class)
-            ->findOneBy(['price_per_year' => 0]);
+        $plan = $this->em->getRepository(Plan::class)->findByCode(PlanCode::FREE);
 
         if (!$plan) {
             // Rien en base => on ne casse pas la connexion
@@ -45,25 +45,11 @@ class UserFirstSubscriptionSubscriber implements EventSubscriberInterface
         $subscription = new Subscription();
         $subscription->setUser($user);
         $subscription->setPlan($plan);
-        $subscription->setSubscriptionStart(new \DateTime());
-        $subscription->setSubscriptionEnd(new \DateTime('+'.$plan->getPlanPeriod().' month'));
+        $subscription->setSubscriptionStart(new \DateTimeImmutable());
+        $subscription->setSubscriptionEnd(new \DateTimeImmutable('+'.$plan->getPlanPeriod().' month'));
         $user->setSubscription($subscription);
 
-        // Order gratuit
-        $order = new Order();
-        $order->setUser($user);
-        $order->setPlan($plan);
-        $order->setCreatedAt(new \DateTime());
-        $order->setUpdatedAt(new \DateTime());
-        $order->setProductName($plan->getName());
-        $order->setProductDescription($plan->getPlanDescription());
-        $order->setVatAmount($plan->getTotalCost());
-        $order->setTotalHt($plan->getTotalCost());
-        $order->setSubscriptionEnd($subscription->getSubscriptionEnd());
-        $order->setStatus('new');
-
         $this->em->persist($subscription);
-        $this->em->persist($order);
         $this->em->flush();
 
     }

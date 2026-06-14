@@ -25,6 +25,7 @@ use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
 use EasyCorp\Bundle\EasyAdminBundle\Field\FormField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
+use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
 use Error;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\FormEvent;
@@ -36,12 +37,10 @@ use Vich\UploaderBundle\Form\Type\VichFileType;
 
 class VehiculeAppCrudController extends AbstractCrudController
 {
-    private $entityManager;
-
-    public function __construct(EntityManagerInterface $entityManager)
-    {
-        $this->entityManager = $entityManager;
-    }
+    public function __construct(
+        private readonly AdminUrlGenerator $adminUrlGenerator,
+        private readonly EntityManagerInterface $entityManager,
+    ) {}
 
     public static function getEntityFqcn(): string
     {
@@ -50,24 +49,48 @@ class VehiculeAppCrudController extends AbstractCrudController
 
     public function configureCrud(Crud $crud): Crud
     {
-        return $crud
-        ->overrideTemplate('crud/edit', 'App/advanced_edit.html.twig')
-        ->overrideTemplate('crud/new', 'App/advanced_new.html.twig')
-        ->setSearchFields(['model', 'user.first_name', 'user.last_name', 'user.email'])
+        $profileUrl = $this->adminUrlGenerator
+                    ->setController(UserAppCrudController::class)
+                    ->setAction(Action::INDEX)
+                    ->setDashboard(DashboardAppController::class)
+                    ->generateUrl()
         ;
+
+        $pageIndexTitle = 'Mes véhicules<br /><span class="fs-6 fw-normal">Enregistrez ici vos véhicules et définissez le véhicule qui sera utilisé par défaut pour les IK. Si vous avez plusieurs véhicules, vous pourrez en sélectionner un par trajet.</span>';
+
+        //limite version Pero: 1 seul véhicule
+        if(!$this->getUser()->canAddVehicule())
+        {
+            $pageIndexTitle .= '<br /><span class="fs-6 fw-light small"><i class="fa-solid fa-circle-info"></i> <i>Vous utilisez la version gratuite de Mileo et nous vous en remercions ! Si vous souhaitez ajouter des véhicules supplémentaires, merci de passer à la version Pro depuis <a href="'.$profileUrl.'">votre profil</a></i>.</span>';
+        }
+
+        $crud
+            ->setPageTitle(Crud::PAGE_INDEX, $pageIndexTitle)
+            ->overrideTemplate('crud/edit', 'App/advanced_edit.html.twig')
+            ->overrideTemplate('crud/new', 'App/advanced_new.html.twig')
+        ;
+
+        return $crud;
     }
 
     public function configureActions(Actions $actions): Actions
     {
-        return $actions
+        $actions
             ->update(Crud::PAGE_INDEX, Action::DELETE, function (Action $action) {
                 return $action->displayIf(function ($entity) {
                     return $entity->getReportlines()->isEmpty() && !$entity->getIsDefault();
                 });
             })
             ->remove(Crud::PAGE_INDEX, Action::BATCH_DELETE)
-            ;
         ;
+
+        //limite version Pero: 1 seul véhicule
+        if(!$this->getUser()->canAddVehicule())
+        {
+            $actions->disable(Action::NEW);
+        }
+
+        return $actions;
     }
 
     public function createIndexQueryBuilder(SearchDto $searchDto, EntityDto $entityDto, FieldCollection $fields, FilterCollection $filters): QueryBuilder

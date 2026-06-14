@@ -631,6 +631,26 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
+    public function hasValidSubscription()
+    {
+        if($this->getSubscription() && $this->getSubscription()->isValid())
+        {
+            return true;
+        }
+
+        return false;    
+    }
+
+    public function hasExpiringSubscription()
+    {
+        if($this->getSubscription() && $this->getSubscription()->isWarning())
+        {
+            return true;
+        }
+
+        return false;    
+    }
+
     public function getResetToken(): ?string
     {
         return $this->resetToken;
@@ -923,6 +943,34 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->calendarSynchronized = $calendarSynchronized;
 
         return $this;
+    }
+
+    public function canAddVehicule(): bool
+    {
+        return $this->hasValidSubscription() || count($this->getVehicules()) < 1;
+    }
+
+    public function canAddAddress(): bool
+    {
+        return $this->hasValidSubscription() || count($this->getUserAddresses()) < 3;
+    }
+
+    public function canUseAssistant(): bool
+    {
+        return $this->hasValidSubscription();
+    }
+
+    public function hasInvoices()
+    {
+        foreach($this->getOrders() as $order)
+        {
+            if($order->getInvoice())
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
 }

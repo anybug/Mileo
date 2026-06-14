@@ -59,41 +59,19 @@ use Symfony\Component\Form\Extension\Core\Type\PasswordType;
 
 class ReportAppCrudController extends AbstractCrudController
 {
-    private $adminUrlGenerator;
-    private $exporter;
-    private $slugger;
-    private $mistral;
-    private $tripDuplicator;
-    private $logger;
-    private $dispatcher;
-    private $reportService;
-    private RequestStack $requestStack;
-    private CalendarReportImporter $calendarReportImporter;
-
     public function __construct(
-        AdminUrlGenerator $adminUrlGenerator,
-        XlsxExporter $exporter,
-        SluggerInterface $slugger,
-        MistralApiService $mistral,
-        TripDuplicationService $tripDuplicator,
-        LoggerInterface $logger,
-        EventDispatcherInterface $dispatcher,
-        ReportService $reportService,
-        RequestStack $requestStack,
-        CalendarReportImporter $calendarReportImporter,
-        private EntityManagerInterface $entityManager,
-    ) {
-        $this->adminUrlGenerator = $adminUrlGenerator;
-        $this->exporter = $exporter;
-        $this->slugger = $slugger;
-        $this->mistral = $mistral;
-        $this->tripDuplicator = $tripDuplicator;
-        $this->logger = $logger;
-        $this->dispatcher = $dispatcher;
-        $this->reportService = $reportService;
-        $this->requestStack = $requestStack;
-        $this->calendarReportImporter = $calendarReportImporter;
-    }
+        private readonly AdminUrlGenerator $adminUrlGenerator,
+        private readonly XlsxExporter $exporter,
+        private readonly SluggerInterface $slugger,
+        private readonly MistralApiService $mistral,
+        private readonly TripDuplicationService $tripDuplicator,
+        private readonly LoggerInterface $logger,
+        private readonly EventDispatcherInterface $dispatcher,
+        private readonly ReportService $reportService,
+        private readonly RequestStack $requestStack,
+        private readonly CalendarReportImporter $calendarReportImporter,
+        private readonly EntityManagerInterface $entityManager,
+    ) {}
 
     public function configureAssets(Assets $assets): Assets
     {
@@ -126,15 +104,6 @@ class ReportAppCrudController extends AbstractCrudController
 
         if (!$user) {
             throw new AccessDeniedHttpException();
-        }
-
-        if (!$user->getSubscription()->isValid()) {
-            return $this->redirect(
-                $this->adminUrlGenerator
-                    ->setController(UserAppCrudController::class)
-                    ->setAction(Action::INDEX)
-                    ->generateUrl()
-            );
         }
 
         if (!$user->hasCompletedSetup()) {
@@ -182,6 +151,13 @@ class ReportAppCrudController extends AbstractCrudController
     {
         $request = $this->requestStack->getCurrentRequest();
 
+        $reportLineUrl = $this->adminUrlGenerator
+                    ->setController(ReportLineAppCrudController::class)
+                    ->setAction(Action::INDEX)
+                    ->setDashboard(DashboardAppController::class)
+                    ->generateUrl()
+        ;
+
         $crudAction = $request?->query->get('crudAction')
             ?? $request?->attributes->get('crudAction')
             ?? $request?->query->get('action')
@@ -189,7 +165,7 @@ class ReportAppCrudController extends AbstractCrudController
 
         $crud = $crud
             ->setDefaultSort(['start_date' => 'ASC'])
-            ->setPageTitle(Crud::PAGE_INDEX, 'Rapports annuels et provisions mensuelles<br /><span class="fs-6 fw-normal">Mode de saisie <i>au mois</i>: chaque rapport contient les trajets effectués le mois concerné. Vous pouvez ajouter/modifier autant de trajets par Rapport que nécessaire, n\'hésitez pas à utiliser l\'assistant pour vous aider.<br />Vous pouvez également opter pour le mode de saisie <i>trajet par trajet</i> depuis le menu Mes trajets.</span>')
+            ->setPageTitle(Crud::PAGE_INDEX, 'Rapports annuels et provisions mensuelles<br /><span class="fs-6 fw-normal">Mode de saisie <i>au mois</i>: chaque rapport contient les trajets effectués le mois concerné. Vous pouvez ajouter/modifier autant de trajets par Rapport que nécessaire, n\'hésitez pas à utiliser l\'assistant pour vous aider.<br />Vous pouvez également opter pour le mode de saisie <i>trajet par trajet</i> depuis le menu <a href="'.$reportLineUrl.'">Mes trajets</a>.</span>')
             ->setPageTitle(Crud::PAGE_EDIT, fn (Report $r) => sprintf('Modifier le rapport de %s', $r->getPeriod()))
             ->setPageTitle(Crud::PAGE_NEW, 'New report period')
             ->overrideTemplate('crud/index', 'App/Report/index.html.twig')
