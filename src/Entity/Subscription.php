@@ -20,7 +20,7 @@ class Subscription
     #[ORM\JoinColumn(nullable: false)]
     private ?User $user = null;
 
-    /** Le plan souscrit : PRO (en essai ou payé), TEAM, CABINET. */
+    /** Le plan souscrit : FREE, PRO, TEAM, CABINET. */
     #[ORM\ManyToOne(targetEntity: Plan::class, inversedBy: 'subscriptions')]
     #[ORM\JoinColumn(nullable: false)]
     private ?Plan $plan = null;

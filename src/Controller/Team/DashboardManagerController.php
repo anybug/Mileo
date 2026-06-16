@@ -67,6 +67,9 @@ class DashboardManagerController extends AbstractDashboardController
 
         $chartAmountByMonth = $this->createAmountByMonthChart($yearSelected);
         $chartAmountByYear = $this->createAmountByYearChart();
+    
+        $topCollaboratorIndemnities = $this->getTopCollaboratorIndemnities($yearSelected, 10);
+        $topCollaboratorIndemnitiesChart = $this->createTopCollaboratorIndemnitiesChart($topCollaboratorIndemnities);
 
         return $this->render('Team/Dashboard/index.html.twig', [
             'dashboard' => $this->easyAdminDashboard->getDashboard(),
@@ -76,6 +79,7 @@ class DashboardManagerController extends AbstractDashboardController
             'chartTripsByYear' => $chartTripsByYear,
             'chartAmountByMonth' => $chartAmountByMonth,
             'chartAmountByYear' => $chartAmountByYear,
+            'topCollaboratorIndemnitiesChart' => $topCollaboratorIndemnitiesChart,
         ]);
     }
 
@@ -141,6 +145,144 @@ class DashboardManagerController extends AbstractDashboardController
         $rows = $qb->getQuery()->getScalarResult();
 
         return array_map(static fn(array $row) => (int) $row['year'], $rows);
+    }
+
+    private function getTopCollaboratorIndemnities(int $year, int $limit = 10): array
+    {
+        $qb = $this->entityManager->createQueryBuilder()
+            ->select(
+                'u.id AS userId',
+                'u.first_name AS firstName',
+                'u.last_name AS lastName',
+                'u.email AS email',
+                'COALESCE(SUM(rl.km_total), 0) AS totalKm',
+                'COALESCE(SUM(rl.amount), 0) AS totalAmount'
+            )
+            ->from(ReportLine::class, 'rl')
+            ->where('rl.travel_date IS NOT NULL')
+            ->andWhere('YEAR(rl.travel_date) = :year')
+            ->setParameter('year', $year)
+            ->groupBy('u.id')
+            ->addGroupBy('u.first_name')
+            ->addGroupBy('u.last_name')
+            ->addGroupBy('u.email')
+            ->orderBy('totalAmount', 'DESC')
+            ->setMaxResults($limit);
+
+        $this->applyManagedUsersFilterOnReportLines($qb);
+
+        $rows = $qb->getQuery()->getScalarResult();
+
+        return array_map(static function (array $row): array {
+            $firstName = trim((string) ($row['firstName'] ?? ''));
+            $lastName = trim((string) ($row['lastName'] ?? ''));
+            $fullName = trim($firstName.' '.$lastName);
+
+            if ($fullName === '') {
+                $fullName = (string) ($row['email'] ?? 'Collaborateur');
+            }
+
+            return [
+                'userId' => (int) $row['userId'],
+                'fullName' => $fullName,
+                'email' => (string) ($row['email'] ?? ''),
+                'totalKm' => (int) $row['totalKm'],
+                'totalAmount' => (float) $row['totalAmount'],
+            ];
+        }, $rows);
+    }
+
+    private function truncateLabel(string $string, int $length = 20, string $suffix = '...'): string
+    {
+        if (mb_strlen($string, 'UTF-8') <= $length) {
+            return $string;
+        }
+
+        return mb_substr($string, 0, $length, 'UTF-8') . $suffix;
+    }
+
+    private function createTopCollaboratorIndemnitiesChart(array $topCollaboratorIndemnities): ?Chart
+    {
+        if (count($topCollaboratorIndemnities) === 0) {
+            return null;
+        }
+
+        $labels = array_map(
+            fn ($value) => $this->truncateLabel((string) $value, 30),
+            array_column($topCollaboratorIndemnities, 'fullName')
+        );
+
+        $amounts = array_column($topCollaboratorIndemnities, 'totalAmount');
+        $kms = array_column($topCollaboratorIndemnities, 'totalKm');
+
+        $chart = $this->chartBuilder->createChart(Chart::TYPE_BAR);
+
+        $chart->setData([
+            'labels' => $labels,
+            'datasets' => [
+                [
+                    'label' => 'Montant des IK (€)',
+                    'data' => $amounts,
+                    'backgroundColor' => '#5368d5',
+                    'borderColor' => '#5368d5',
+                    'borderWidth' => 1,
+                    'borderRadius' => 6,
+                    'yAxisID' => 'y',
+                ],
+                [
+                    'label' => 'Distance des IK (km)',
+                    'data' => $kms,
+                    'backgroundColor' => '#f28e2b',
+                    'borderColor' => '#f28e2b',
+                    'borderWidth' => 1,
+                    'borderRadius' => 6,
+                    'yAxisID' => 'y1',
+                ],
+            ],
+        ]);
+
+        $chart->setOptions([
+            'responsive' => true,
+            'maintainAspectRatio' => true,
+            'plugins' => [
+                'legend' => [
+                    'display' => true,
+                    'position' => 'bottom',
+                ],
+                'tooltip' => [
+                    'enabled' => true,
+                ],
+            ],
+            'scales' => [
+                'x' => [
+                    'title' => [
+                        'display' => true,
+                        'text' => 'Collaborateurs',
+                    ],
+                ],
+                'y' => [
+                    'beginAtZero' => true,
+                    'position' => 'left',
+                    'title' => [
+                        'display' => true,
+                        'text' => 'Montant des IK (€)',
+                    ],
+                ],
+                'y1' => [
+                    'beginAtZero' => true,
+                    'position' => 'right',
+                    'title' => [
+                        'display' => true,
+                        'text' => 'Distance des IK (km)',
+                    ],
+                    'grid' => [
+                        'drawOnChartArea' => false,
+                    ],
+                ],
+            ],
+        ]);
+
+        return $chart;
     }
 
     private function createTripsByYearChart(): ?Chart

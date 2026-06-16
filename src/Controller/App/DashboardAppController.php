@@ -15,6 +15,7 @@ use App\Form\UserStep2Type;
 use App\Form\BugReportType;
 use App\Form\UserStep3Type;
 use App\Entity\Subscription;
+use Doctrine\ORM\QueryBuilder;
 use Symfony\Component\Mime\Email;
 use Symfony\UX\Chartjs\Model\Chart;
 use Symfony\Component\Asset\Packages;
@@ -104,43 +105,49 @@ class DashboardAppController extends AbstractDashboardController
         $request = $this->container->get('request_stack')->getCurrentRequest();
         $step2 = $request->query->get('step2') ?? false;
         $request->query->get('step3') ?? false;
-        /** @var \App\Entity\User $user */
+
+        /** @var User $user */
         $user = $this->getUser();
+
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException();
+        }
 
         $step = [];
 
-        if(!$user->hasCompletedSetup())
-        {
-            if(!$user->hasCompletedStep2() || $step2){
+        if (!$user->hasCompletedSetup()) {
+            if (!$user->hasCompletedStep2() || $step2) {
                 $form = $this->createForm(UserStep2Type::class, $user);
-                $step = ['title' => "Informations personnelles et juridiques", 'number' => 2];
+                $step = ['title' => 'Informations personnelles et juridiques', 'number' => 2];
                 $step2 = true;
-            }else{
+            } else {
                 $form = $this->formFactory->createNamed('Vehicule', UserStep3Type::class);
-                $step = ['title' => "Véhicule par défaut", 'number' => 3];
+                $step = ['title' => 'Véhicule par défaut', 'number' => 3];
             }
-            
+
             $form->handleRequest($request);
 
             if ($form->isSubmitted() && $form->isValid()) {
                 $data = $form->getData();
 
-                if($data instanceof Vehicule)
-                {
+                if ($data instanceof Vehicule) {
                     $data->setUser($user);
                 }
 
-                $this->entityManager->persist($data);      
+                $this->entityManager->persist($data);
                 $this->entityManager->flush();
 
-                if(!$step2){
+                if (!$step2) {
                     $this->addFlash(
                         'success',
                         '<span class="fs-4">Félicitations! Vous pouvez désormais profiter de Mileo, amusez-vous bien <i class="far fa-smile-wink"></i> </span>'
                     );
                 }
-                
-                return $this->redirectToRoute('app', ['menuIndex' => 0, 'submenuIndex' => '-1']);
+
+                return $this->redirectToRoute('app', [
+                    'menuIndex' => 0,
+                    'submenuIndex' => '-1',
+                ]);
             }
 
             return $this->render('App/Dashboard/wizard.html.twig', [
@@ -149,110 +156,46 @@ class DashboardAppController extends AbstractDashboardController
                 'step' => $step,
             ]);
         }
-   
-        $yearSelected = date('Y');
 
-        $lastReport = $this->entityManager->getRepository(Report::class)->getLastReportForUser();
-        if($lastReport){
-            $yearSelected = $lastReport->getStartDate()->format('Y');
-        }
-        
-        if($request->query->get('yearSelected')){
-            $yearDate = \DateTimeImmutable::createFromFormat('Y', $request->query->get('yearSelected'));
-            if($yearDate){
-                $yearSelected = $yearDate->format('Y');
-            }
+        $years = $this->getAvailableYears();
+        $currentYear = (int) date('Y');
+
+        if (!in_array($currentYear, $years, true)) {
+            $years[] = $currentYear;
         }
 
-        $reports = $this->entityManager->getRepository(Report::class)->findByYear($yearSelected);
-        $labels = [];
-        $data = [];
-        foreach ($reports as $report) {
-            array_push($labels,$report->getStartDate()->format('m/Y'));
-            array_push($data,$report->getTotal());
-        }
-        
-        $chartAnnuel = $this->chartBuilder->createChart(Chart::TYPE_LINE);
-        
-        $chartAnnuel->setData([
-            'labels' => $labels,
-            'datasets' => [
-                [
-                    'label' => 'Montant des indemnité en Euro par mois',
-                    'backgroundColor' => '#0d6efd',
-                    'borderColor' => '#0d6efd',
-                    'data' => $data,
-                ],
-            ],
-        ]);
-        
-        /*$chartAnnuel->setOptions([
-            'scales' => [
-                'y' => [
-                    'suggestedMin' => 0,
-                    'suggestedMax' => 100,
-                ],
-            ],
-        ]);*/
+        rsort($years);
 
-        $reports = $this->entityManager->getRepository(Report::class)->getReportsForUser();
+        $yearSelected = (int) ($request?->query->get('yearSelected', $currentYear) ?? $currentYear);
 
-        $valueListYears = [];
-        foreach ($reports as $report) {
-            $valueListYears[] = $report->getStartDate()->format('Y');
-            $report_labels[$report->getStartDate()->format('Y')] = $report->getStartDate()->format('Y');
-            if(isset($report_data[$report->getStartDate()->format('Y')])){
-                $report_data[$report->getStartDate()->format('Y')] += $report->getTotal();
-            }else{
-                $report_data[$report->getStartDate()->format('Y')] = $report->getTotal();
-            }
-        }
-        $resultListYears = array_unique($valueListYears);
-
-        $labels = [];
-        $data = [];
-        if(isset($report_labels)){
-            foreach($report_labels as $val){
-                array_push($labels,$val);
-            }
-        }
-        if(isset($report_data)){
-            foreach($report_data as $val){
-                array_push($data,$val);
-            }
+        if (!in_array($yearSelected, $years, true) && count($years) > 0) {
+            $yearSelected = $years[0];
         }
 
-        $chartTotal = $this->chartBuilder->createChart(Chart::TYPE_BAR);
-        
-        $chartTotal->setData([
-            'labels' => $labels,
-            'datasets' => [
-                [
-                    'label' => 'Kilomètres par année',
-                    'backgroundColor' => '#0d6efd',
-                    'borderColor' => '#0d6efd',
-                    'data' => $data,
-                ],
-            ],
-        ]);
+        $chartTripsByMonth = $this->createTripsByMonthChart($yearSelected);
+        $chartTripsByYear = $this->createTripsByYearChart();
 
-        //check if vehicule is set up with latest Scale
-        $flash  = false;
-        foreach($this->getUser()->getVehicules() as $vehicule)
-        {
+        $chartAmountByMonth = $this->createAmountByMonthChart($yearSelected);
+        $chartAmountByYear = $this->createAmountByYearChart();
+
+        $topUsedAddressesChart = $this->createTopUsedAddressesChart($yearSelected);
+
+        $flash = false;
+        $url = null;
+
+        foreach ($user->getVehicules() as $vehicule) {
             $url = $this->container->get(AdminUrlGenerator::class)
-            ->setController(VehiculeAppCrudController::class)
-            ->setAction(Action::INDEX)
-            ->set('menuIndex', 6)
-            ->generateUrl()
-            ;
+                ->setController(VehiculeAppCrudController::class)
+                ->setAction(Action::INDEX)
+                ->set('menuIndex', 6)
+                ->generateUrl();
 
-            if(!$vehicule->hasLatestScale()){
-                $flash  = true;
+            if (!$vehicule->hasLatestScale()) {
+                $flash = true;
             }
         }
 
-        if($flash){
+        if ($flash && $url !== null) {
             $this->addFlash(
                 'info',
                 '<span class="fs-4">Certains de vos véhicules ne sont pas configurés avec le dernier barème en date. <a href="'.$url.'" class=""><i class="action-icon fa fa-pen"></i> Mettre à jour mes véhicules</a></span>'
@@ -261,10 +204,13 @@ class DashboardAppController extends AbstractDashboardController
 
         return $this->render('App/Dashboard/index.html.twig', [
             'dashboard' => $this->easyAdminDashboard->getDashboard(),
-            'chartAnnuel' => $chartAnnuel,
-            'chartTotal' => $chartTotal,
-            'years' => $resultListYears,
-            'yearSelected' => $yearSelected
+            'years' => $years,
+            'yearSelected' => $yearSelected,
+            'chartTripsByMonth' => $chartTripsByMonth,
+            'chartTripsByYear' => $chartTripsByYear,
+            'chartAmountByMonth' => $chartAmountByMonth,
+            'chartAmountByYear' => $chartAmountByYear,
+            'topUsedAddressesChart' => $topUsedAddressesChart,
         ]);
     }
 
@@ -276,6 +222,7 @@ class DashboardAppController extends AbstractDashboardController
             ->setTitle(sprintf('<img src="%s" />', $this->assets->getUrl('img/logo.png')))
             ->setFaviconPath($this->assets->getUrl('img/favicons/favicon.ico'))
             ->disableDarkMode()
+            //->renderContentMaximized()
             ;
     }
 
@@ -287,7 +234,7 @@ class DashboardAppController extends AbstractDashboardController
         yield MenuItem::linktoDashboard('Dashboard', 'fa fa-home');
 
         yield MenuItem::section('Travels');
-        yield MenuItem::linkToCrud('My travels', 'fa fa-road', ReportLine::class)->setController(ReportLineAppCrudController::class);
+        yield MenuItem::linkToCrud('My travels', 'fa-solid fa-map-location-dot', ReportLine::class)->setController(ReportLineAppCrudController::class);
         yield MenuItem::linkToCrud('Monthly reports', 'fa fa-road', Report::class)->setController(ReportAppCrudController::class);
 
         yield MenuItem::section('Parameters');
@@ -385,5 +332,347 @@ class DashboardAppController extends AbstractDashboardController
             'dashboard' => $this->easyAdminDashboard->getDashboard(),
             'form' => $form->createView(),
         ]);
+    }
+
+    private function truncateLabel(string $string, int $length = 20, string $suffix = '...'): string
+    {
+        if (mb_strlen($string, 'UTF-8') <= $length) {
+            return $string;
+        }
+
+        return mb_substr($string, 0, $length, 'UTF-8') . $suffix;
+    }
+
+    private function getAvailableYears(): array
+    {
+        $qb = $this->entityManager->createQueryBuilder()
+            ->select('DISTINCT YEAR(rl.travel_date) AS year')
+            ->from(ReportLine::class, 'rl')
+            ->where('rl.travel_date IS NOT NULL')
+            ->orderBy('year', 'DESC');
+
+        $this->applyCurrentUserFilterOnReportLines($qb);
+
+        $rows = $qb->getQuery()->getScalarResult();
+
+        return array_map(static fn (array $row) => (int) $row['year'], $rows);
+    }
+
+    private function getTopUsedAddresses(int $year, int $limit = 20): array
+    {
+        $startAddressQb = $this->entityManager->createQueryBuilder()
+            ->select(
+                'rl.startAdress AS address',
+                'COUNT(rl.id) AS startCount'
+            )
+            ->from(ReportLine::class, 'rl')
+            ->where('rl.travel_date IS NOT NULL')
+            ->andWhere('YEAR(rl.travel_date) = :year')
+            ->andWhere('rl.startAdress IS NOT NULL')
+            ->andWhere('rl.startAdress != :empty')
+            ->setParameter('year', $year)
+            ->setParameter('empty', '')
+            ->groupBy('rl.startAdress');
+
+        $this->applyCurrentUserFilterOnReportLines($startAddressQb);
+
+        $startRows = $startAddressQb->getQuery()->getScalarResult();
+
+        $endAddressQb = $this->entityManager->createQueryBuilder()
+            ->select(
+                'rl.endAdress AS address',
+                'COUNT(rl.id) AS endCount'
+            )
+            ->from(ReportLine::class, 'rl')
+            ->where('rl.travel_date IS NOT NULL')
+            ->andWhere('YEAR(rl.travel_date) = :year')
+            ->andWhere('rl.endAdress IS NOT NULL')
+            ->andWhere('rl.endAdress != :empty')
+            ->setParameter('year', $year)
+            ->setParameter('empty', '')
+            ->groupBy('rl.endAdress');
+
+        $this->applyCurrentUserFilterOnReportLines($endAddressQb);
+
+        $endRows = $endAddressQb->getQuery()->getScalarResult();
+
+        $addresses = [];
+
+        foreach ($startRows as $row) {
+            $address = trim((string) $row['address']);
+
+            if ($address === '') {
+                continue;
+            }
+
+            $key = mb_strtolower($address);
+
+            if (!isset($addresses[$key])) {
+                $addresses[$key] = [
+                    'address' => $address,
+                    'startCount' => 0,
+                    'endCount' => 0,
+                    'totalCount' => 0,
+                ];
+            }
+
+            $count = (int) $row['startCount'];
+
+            $addresses[$key]['startCount'] += $count;
+            $addresses[$key]['totalCount'] += $count;
+        }
+
+        foreach ($endRows as $row) {
+            $address = trim((string) $row['address']);
+
+            if ($address === '') {
+                continue;
+            }
+
+            $key = mb_strtolower($address);
+
+            if (!isset($addresses[$key])) {
+                $addresses[$key] = [
+                    'address' => $address,
+                    'startCount' => 0,
+                    'endCount' => 0,
+                    'totalCount' => 0,
+                ];
+            }
+
+            $count = (int) $row['endCount'];
+
+            $addresses[$key]['endCount'] += $count;
+            $addresses[$key]['totalCount'] += $count;
+        }
+
+        usort($addresses, static function (array $a, array $b): int {
+            return $b['totalCount'] <=> $a['totalCount'];
+        });
+
+        return array_slice($addresses, 0, $limit);
+    }
+
+    private function createTopUsedAddressesChart(int $year): ?Chart
+    {
+        $topUsedAddresses = $this->getTopUsedAddresses($year, 10);
+
+        $labels = array_map(
+            fn ($value) => $this->truncateLabel((string) $value, 35),
+            array_column($topUsedAddresses, 'address')
+        );
+
+        $data = array_column($topUsedAddresses, 'totalCount');
+
+        //$chart = $this->chartBuilder->createChart(Chart::TYPE_PIE);
+
+        $chart = $this->createDataChart(
+            Chart::TYPE_PIE,
+            $labels,
+            $data,
+            $label = sprintf('Top 10 des adresses les plus utilisées en %d', $year)
+        );
+
+        return $chart;
+    }
+
+    private function createTripsByYearChart(): ?Chart
+    {
+        $qb = $this->entityManager->createQueryBuilder()
+            ->select('YEAR(rl.travel_date) AS year, COUNT(rl.id) AS total')
+            ->from(ReportLine::class, 'rl')
+            ->where('rl.travel_date IS NOT NULL')
+            ->groupBy('year')
+            ->orderBy('year', 'ASC');
+
+        $this->applyCurrentUserFilterOnReportLines($qb);
+
+        $rows = $qb->getQuery()->getScalarResult();
+
+        $labels = [];
+        $data = [];
+
+        foreach ($rows as $row) {
+            $labels[] = (string) $row['year'];
+            $data[] = (int) $row['total'];
+        }
+
+        $chart = $this->createDataChart(
+            Chart::TYPE_LINE,
+            $labels,
+            $data,
+            $label = 'Nombre total de trajets par année'
+        );
+
+        return $chart;
+    }
+
+    private function createTripsByMonthChart(int $year): ?Chart
+    {
+        $qb = $this->entityManager->createQueryBuilder()
+            ->select('MONTH(rl.travel_date) AS monthNumber, COUNT(rl.id) AS total')
+            ->from(ReportLine::class, 'rl')
+            ->where('rl.travel_date IS NOT NULL')
+            ->andWhere('YEAR(rl.travel_date) = :year')
+            ->setParameter('year', $year)
+            ->groupBy('monthNumber')
+            ->orderBy('monthNumber', 'ASC');
+
+        $this->applyCurrentUserFilterOnReportLines($qb);
+
+        $rows = $qb->getQuery()->getScalarResult();
+
+        $dataByMonth = array_fill(1, 12, 0);
+
+        foreach ($rows as $row) {
+            $dataByMonth[(int) $row['monthNumber']] = (int) $row['total'];
+        }
+
+        $chart = $this->createDataChart(
+            Chart::TYPE_BAR,
+            $labels = ['Jan', 'Fév', 'Mars', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'],
+            count(array_filter($dataByMonth)) > 0 ? array_values($dataByMonth) : [],
+            $label = sprintf('Nombre de trajets par mois pour l\'année %d', $year)
+        );
+
+        return $chart;
+    }
+
+    private function createAmountByYearChart(): ?Chart
+    {
+        $qb = $this->entityManager->createQueryBuilder()
+            ->select('YEAR(r.start_date) AS year, COALESCE(SUM(r.total), 0) AS totalAmount')
+            ->from(Report::class, 'r')
+            ->where('r.start_date IS NOT NULL')
+            ->groupBy('year')
+            ->orderBy('year', 'ASC');
+
+        $this->applyCurrentUserFilterOnReports($qb);
+
+        $rows = $qb->getQuery()->getScalarResult();
+
+        $labels = [];
+        $data = [];
+
+        foreach ($rows as $row) {
+            $labels[] = (string) $row['year'];
+            $data[] = (float) $row['totalAmount'];
+        }
+
+        $chart = $this->chartBuilder->createChart(Chart::TYPE_LINE);
+
+        $chart = $this->createDataChart(
+            Chart::TYPE_LINE,
+            $labels,
+            $data,
+            $label = 'Indemnités kilométriques totales par année'
+        );
+
+        return $chart;
+    }
+
+    private function createAmountByMonthChart(int $year): ?Chart
+    {
+        $qb = $this->entityManager->createQueryBuilder()
+            ->select('MONTH(r.start_date) AS monthNumber, COALESCE(SUM(r.total), 0) AS totalAmount')
+            ->from(Report::class, 'r')
+            ->where('r.start_date IS NOT NULL')
+            ->andWhere('YEAR(r.start_date) = :year')
+            ->setParameter('year', $year)
+            ->groupBy('monthNumber')
+            ->orderBy('monthNumber', 'ASC');
+
+        $this->applyCurrentUserFilterOnReports($qb);
+
+        $rows = $qb->getQuery()->getScalarResult();
+
+        $dataByMonth = array_fill(1, 12, 0);
+
+        foreach ($rows as $row) {
+            $dataByMonth[(int) $row['monthNumber']] = (float) $row['totalAmount'];
+        }
+
+        $chart = $this->createDataChart(
+            Chart::TYPE_BAR,
+            $labels = ['Jan', 'Fév', 'Mars', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'],
+            count(array_filter($dataByMonth)) > 0 ? array_values($dataByMonth) : [],
+            $label = sprintf('Indemnités kilométriques par mois pour l\'année %d', $year)
+        );
+
+        return $chart;
+    }
+
+    private function createDataChart
+    (
+        string $type,
+        array $labels,
+        array $data,
+        string $label = '',
+    ): Chart {
+
+        $chart = $this->chartBuilder->createChart($type);
+
+        $colors = [
+            '#5368d5', '#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f',
+            '#edc948', '#b07aa1', '#ff9da7', '#9c755f', '#bab0ab',
+            '#8cd17d', '#bd7ebe', '#fabfd2', '#b6992d', '#e9967a'
+        ];
+
+        //const backgroundColors = (type === 'pie') ? generateColors(labels.length) : 'rgba(54, 162, 235, 0.6)';
+        //const borderColors = (type === 'pie') ? backgroundColors : 'rgba(54, 162, 235, 1)';
+
+        $options = [
+                    'responsive' => true,
+                    'maintainAspectRatio' => true,
+                    'plugins' => [
+                        'legend' => ['position' => 'bottom'],
+                        'tooltip' => ['enabled' => true]
+                    ]
+                ];
+        
+        $chart->setData([
+            'labels' => array_map(function($val) {return $this->truncateLabel($val, 30);}, $labels),
+            'datasets' => [[
+                'label' => $label, 0, 30,
+                'data' => $data,
+                'backgroundColor' => $type == Chart::TYPE_PIE ? $colors : $colors[0],
+                'fill' => $type == Chart::TYPE_LINE ? true : false,
+            ]]
+        ]);
+
+        $chart->setOptions($options);
+
+        return $chart;
+    }
+
+    private function applyCurrentUserFilterOnReportLines(QueryBuilder $qb): void
+    {
+        $user = $this->getUser();
+
+        if (!$user instanceof User) {
+            $qb->andWhere('1 = 0');
+
+            return;
+        }
+
+        $qb
+            ->join('rl.report', 'r')
+            ->andWhere('r.user = :user')
+            ->setParameter('user', $user);
+    }
+
+    private function applyCurrentUserFilterOnReports(QueryBuilder $qb): void
+    {
+        $user = $this->getUser();
+
+        if (!$user instanceof User) {
+            $qb->andWhere('1 = 0');
+
+            return;
+        }
+
+        $qb
+            ->andWhere('r.user = :user')
+            ->setParameter('user', $user);
     }
 }

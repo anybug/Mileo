@@ -9,43 +9,157 @@
 {% block main %}
 
     {{ parent() }}
+    <hr />
+    <div class="dashboard-content row m-1">
+        <div class="mt-3 pb-3 col-12 border-bottom border-light">
+            <h3 class="text-primary mb-3">{{ 'Statistiques'|trans }} par année</h3>
+            <span>{{ 'Afficher'|trans }}</span>
 
-<div class="dashboard-content row m-1">
-    <div class="mt-3 pb-3 col-12 border-bottom border-light">
-        <h3 class="text-primary mb-3">{{ "Statistiques"|trans }}</h3>
-        {% if years is defined and years|length > 0 %}
-            <form action="{{ ea_url() }}" method="GET" id="yearSelected">
-                <select class="form-control form-select mb-2 yearSelected d-inline-flex" name="yearSelected" style="width: 100px;">
-                    {% for year in years %}
-                        <option name="yearSelected" value="{{year}}" {% if yearSelected == year %}selected="selected"{%endif %}>{{year}}</option>
-                    {% endfor %}
-                </select>
-                <input type="hidden" name="menuIndex" value="{{ app.request.get('menuIndex') }}">
-                <input type="hidden" name="submenuIndex" value="{{ app.request.get('submenuIndex') }}">
-            </form>
-            <script>
-                document.addEventListener('DOMContentLoaded', () => {
-                const select = document.querySelector('.yearSelected');
-                const form = document.getElementById('yearSelected');
-                if (!select || !form) return;
+            {% if years is defined and years|length > 0 %}
+                <form action="{{ ea_url() }}" method="GET" id="yearSelected" class="d-inline-flex">
+                    <select class="form-control form-select mb-2 yearSelected d-inline-flex" name="yearSelected" style="width: 100px;">
+                        {% for year in years %}
+                            <option value="{{ year }}" {% if yearSelected == year %}selected="selected"{% endif %}>
+                                {{ year }}
+                            </option>
+                        {% endfor %}
+                    </select>
 
-                select.addEventListener('change', () => form.submit());
-                });
-            </script>
+                    <input type="hidden" name="menuIndex" value="{{ app.request.get('menuIndex') }}">
+                    <input type="hidden" name="submenuIndex" value="{{ app.request.get('submenuIndex') }}">
+                </form>
 
-            <div class="card-group">
-                {% if chartAnnuel|length > 0 %}
-                    <div class="p-5 col-lg-6">{{ render_chart(chartAnnuel) }}</div>
-                {% endif %}
-                {% if chartTotal|length > 0 %}
-                    <div class="p-5 col-lg-6">{{ render_chart(chartTotal) }}</div>
-                {% endif %}
+                <script>
+                    document.addEventListener('DOMContentLoaded', () => {
+                        const select = document.querySelector('.yearSelected');
+                        const form = document.getElementById('yearSelected');
+
+                        if (!select || !form) {
+                            return;
+                        }
+
+                        select.addEventListener('change', () => form.submit());
+                    });
+                </script>
+
+                <div class="row">
+                    
+                    <div class="p-4 col-lg-6">
+                        <div class="card mb-4 shadow-sm">
+                            <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+                                <div>
+                                    <h5 class="mb-1 text-primary">
+                                        <i class="fa-solid fa-map-location-dot me-2"></i>
+                                        {{ chartTripsByMonth.data.datasets[0].label }}
+                                    </h5>
+                                </div>
+                            </div>
+
+                            <div class="card-body">
+                                {% if chartTripsByMonth is not null and chartTripsByMonth.data.datasets[0].data|length > 0 %}
+                                    {{ render_chart(chartTripsByMonth) }}
+                                {% else %}
+                                    <p>{{ "Pas de trajets pour cette période"|trans }}</p>
+                                {% endif %}
+                            </div>
+                        </div> 
+
+                        <div class="card mb-4 shadow-sm">
+                            <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+                                <div>
+                                    <h5 class="mb-1 text-primary">
+                                        <i class="fa fa-road me-2"></i>
+                                        {{ chartAmountByMonth.data.datasets[0].label }}
+                                    </h5>
+                                </div>
+                            </div>
+
+                            <div class="card-body">
+                                {% if chartAmountByMonth is not null and chartAmountByMonth.data.datasets[0].data|length > 0 %}
+                                    {{ render_chart(chartAmountByMonth) }}
+                                {% else %}
+                                    <p>{{ "Pas d'IK pour cette période"|trans }}</p>
+                                {% endif %}    
+                            </div>
+                        </div>   
+                    </div>    
+                
+                    <div class="p-4 col-lg-6">
+                        <div class="card mb-4 shadow-sm">
+                            <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+                                <div>
+                                    <h5 class="mb-1 text-primary">
+                                        <i class="fa-solid fa-map-location-dot me-2"></i>
+                                        {{ topUsedAddressesChart.data.datasets[0].label }}
+                                    </h5>
+                                </div>
+                            </div>
+
+                            <div class="card-body">
+                                <div class="data-chart mb-4">
+                                    {% if topUsedAddressesChart is not null and topUsedAddressesChart.data.datasets[0].data|length > 0 %}
+                                        {{ render_chart(topUsedAddressesChart) }}
+                                    {% else %}
+                                        <p>{{ "Pas de trajets pour cette période"|trans }}</p>
+                                    {% endif %} 
+                                </div>
+                            </div>
+                        </div> 
+                    </div>
+ 
+                </div>
+
+                <hr />
+
+                <h3 class="text-primary mb-2">{{ 'Statistiques globales'|trans }}</h3>
+
+                <div class="row">
+                    <div class="p-4 col-lg-6">
+                        <div class="card mb-2 shadow-sm">
+                            <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+                                <div>
+                                    <h5 class="mb-1 text-primary">
+                                        <i class="fa-solid fa-map-location-dot me-2"></i>
+                                        {{ chartTripsByYear.data.datasets[0].label }}
+                                    </h5>
+                                </div>
+                            </div>
+
+                            <div class="card-body">
+                                {% if chartTripsByYear is not null and chartTripsByYear.data.datasets[0].data is not null %}
+                                    {{ render_chart(chartTripsByYear) }}
+                                {% else %}
+                                    <p>{{ "Pas de trajets effectués pour le moment"|trans }}</p>
+                                {% endif %} 
+                            </div>
+                        </div>    
+                    </div>
+
+                    <div class="p-4 col-lg-6">
+                        <div class="card mb-2 shadow-sm">
+                            <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+                                <div>
+                                    <h5 class="mb-1 text-primary">
+                                        <i class="fa fa-road me-2"></i>
+                                        {{ chartAmountByYear.data.datasets[0].label }}
+                                    </h5>
+                                </div>
+                            </div>
+
+                            <div class="card-body">
+                                {% if chartAmountByYear is not null and chartAmountByYear.data.datasets[0].data is not null %}
+                                    {{ render_chart(chartAmountByYear) }}
+                                {% else %}
+                                    <p>{{ "Pas de trajets effectués pour le moment"|trans }}</p>
+                                {% endif %} 
+                            </div>
+                        </div>    
+                    </div>
+                </div>
             {% else %}
-                <p>Vous n'avez pas encore de trajets.</p>
+                <p>{{ "Pas de trajets effectués pour le moment"|trans }}.</p>
             {% endif %}
-            </div>
+        </div>
     </div>
 
-</div>
-    
 {% endblock %}
