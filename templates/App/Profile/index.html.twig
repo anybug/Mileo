@@ -380,6 +380,11 @@
                 buttonDisconnected: 'Connecter le calendrier'
             } %}
 
+            {% if not app.user.managedBy %}
+                {# --- Bouton suppression compte (index uniquement, dans ce template) --- #}
+                {% include 'App/Profile/_delete_profile.html.twig' %}
+            {% endif %}
+
         </div>
     </div>
 {% endblock %}
