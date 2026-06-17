@@ -306,6 +306,9 @@ class ReportAppCrudController extends AbstractCrudController
         if ($form->isSubmitted() && $form->isValid()) {
            
             $action = $form->get('action')->getData();
+
+            $previewTrips = [];
+            $unrecognizedCalendarTripsCount = 0;
             
             switch ($action) {
                 case 'duplicate_week':
@@ -413,7 +416,7 @@ class ReportAppCrudController extends AbstractCrudController
                             $calendarPassword = null;
                         }
 
-                        $previewTrips = $this->calendarReportImporter->previewTrips(
+                        $calendarPreview = $this->calendarReportImporter->previewTrips(
                             $report,
                             $tripMode,
                             $startAddress,
@@ -421,6 +424,14 @@ class ReportAppCrudController extends AbstractCrudController
                             $calendarUsername ?: null,
                             $calendarPassword ?: null
                         );
+
+                        if (isset($calendarPreview['trips'])) {
+                            $previewTrips = $calendarPreview['trips'];
+                            $unrecognizedCalendarTripsCount = $calendarPreview['unrecognized_count'] ?? 0;
+                        } else {
+                            $previewTrips = $calendarPreview;
+                            $unrecognizedCalendarTripsCount = 0;
+                        }
 
                     } catch (\Throwable $e) {
                         $this->logger->error('Erreur import calendrier', [
@@ -461,6 +472,7 @@ class ReportAppCrudController extends AbstractCrudController
                     'report' => $report,
                     'confirmActionUrl' => $confirmActionUrl,
                     'backUrl' => $backUrl,
+                    'unrecognizedCalendarTripsCount' => $unrecognizedCalendarTripsCount,
                 ];
 				
 				if ($action === 'duplicate_report') {
