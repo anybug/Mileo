@@ -267,7 +267,7 @@ class DashboardManagerController extends AbstractDashboardController
             Chart::TYPE_BAR,
             $labels,
             $data,
-            $label = 'Nombre total de trajets par année'
+            $label = 'Nombre total de trajets de l\'équipe par année'
         );
 
         return $chart;
@@ -328,7 +328,7 @@ class DashboardManagerController extends AbstractDashboardController
             Chart::TYPE_LINE,
             $labels,
             $data,
-            $label = 'Indemnité kilométrique des collaborateurs par année'
+            $label = 'Indemnités kilométriques des collaborateurs par année'
         );
 
         return $chart;
