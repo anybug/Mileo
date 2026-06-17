@@ -7,6 +7,7 @@ use App\Entity\ReportLine;
 use App\Entity\User;
 use App\Entity\UserAddress;
 use App\Entity\Vehicule;
+use App\Service\ChartService;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\QueryBuilder;
 use EasyAdminFriends\EasyAdminDashboardBundle\Service\EasyAdminDashboard;
@@ -22,25 +23,19 @@ use Symfony\Component\Asset\Packages;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
-use Symfony\UX\Chartjs\Builder\ChartBuilderInterface;
 use Symfony\UX\Chartjs\Model\Chart;
 
 #[IsGranted("ROLE_MANAGER")]
 #[AdminDashboard(routePath: '/manager', routeName: 'manager_dashboard')]
 class DashboardManagerController extends AbstractDashboardController
 {
-    private Packages $assets;
-    private EasyAdminDashboard $easyAdminDashboard;
-
     public function __construct(
-        Packages $packages,
-        EasyAdminDashboard $easyAdminDashboard,
+        private readonly Packages $assets,
+        private readonly EasyAdminDashboard $easyAdminDashboard,
         private readonly RequestStack $requestStack,
-        private readonly ChartBuilderInterface $chartBuilder,
+        private readonly ChartService $chartService,
         private readonly EntityManagerInterface $entityManager,
     ) {
-        $this->assets = $packages;
-        $this->easyAdminDashboard = $easyAdminDashboard;
     }
 
     public function index(): Response
@@ -67,9 +62,8 @@ class DashboardManagerController extends AbstractDashboardController
 
         $chartAmountByMonth = $this->createAmountByMonthChart($yearSelected);
         $chartAmountByYear = $this->createAmountByYearChart();
-    
-        $topCollaboratorIndemnities = $this->getTopCollaboratorIndemnities($yearSelected, 10);
-        $topCollaboratorIndemnitiesChart = $this->createTopCollaboratorIndemnitiesChart($topCollaboratorIndemnities);
+
+        $topCollaboratorIndemnitiesChart = $this->createTopCollaboratorIndemnitiesChart($yearSelected);
 
         return $this->render('Team/Dashboard/index.html.twig', [
             'dashboard' => $this->easyAdminDashboard->getDashboard(),
@@ -201,23 +195,27 @@ class DashboardManagerController extends AbstractDashboardController
         return mb_substr($string, 0, $length, 'UTF-8') . $suffix;
     }
 
-    private function createTopCollaboratorIndemnitiesChart(array $topCollaboratorIndemnities): ?Chart
+    private function createTopCollaboratorIndemnitiesChart(int $year): ?Chart
     {
-        if (count($topCollaboratorIndemnities) === 0) {
-            return null;
-        }
+
+        $topCollaboratorIndemnities = $this->getTopCollaboratorIndemnities($year, 10);
 
         $labels = array_map(
             fn ($value) => $this->truncateLabel((string) $value, 30),
             array_column($topCollaboratorIndemnities, 'fullName')
         );
 
-        $amounts = array_column($topCollaboratorIndemnities, 'totalAmount');
+        $data = array_column($topCollaboratorIndemnities, 'totalAmount');
         $kms = array_column($topCollaboratorIndemnities, 'totalKm');
 
-        $chart = $this->chartBuilder->createChart(Chart::TYPE_BAR);
+        $chart = $this->chartService->createDataChart(
+            Chart::TYPE_PIE,
+            $labels,
+            $data,
+            $label = sprintf('Top 10 des IK des collaborateurs en %d', $year)
+        );
 
-        $chart->setData([
+        /*$chart->setData([
             'labels' => $labels,
             'datasets' => [
                 [
@@ -239,48 +237,7 @@ class DashboardManagerController extends AbstractDashboardController
                     'yAxisID' => 'y1',
                 ],
             ],
-        ]);
-
-        $chart->setOptions([
-            'responsive' => true,
-            'maintainAspectRatio' => true,
-            'plugins' => [
-                'legend' => [
-                    'display' => true,
-                    'position' => 'bottom',
-                ],
-                'tooltip' => [
-                    'enabled' => true,
-                ],
-            ],
-            'scales' => [
-                'x' => [
-                    'title' => [
-                        'display' => true,
-                        'text' => 'Collaborateurs',
-                    ],
-                ],
-                'y' => [
-                    'beginAtZero' => true,
-                    'position' => 'left',
-                    'title' => [
-                        'display' => true,
-                        'text' => 'Montant des IK (€)',
-                    ],
-                ],
-                'y1' => [
-                    'beginAtZero' => true,
-                    'position' => 'right',
-                    'title' => [
-                        'display' => true,
-                        'text' => 'Distance des IK (km)',
-                    ],
-                    'grid' => [
-                        'drawOnChartArea' => false,
-                    ],
-                ],
-            ],
-        ]);
+        ]);*/
 
         return $chart;
     }
@@ -306,30 +263,12 @@ class DashboardManagerController extends AbstractDashboardController
             $data[] = (int) $row['total'];
         }
 
-        $chart = $this->chartBuilder->createChart(Chart::TYPE_LINE);
-        $chart->setData([
-            'labels' => $labels,
-            'datasets' => [[
-                'label' => 'Nombre de trajets par année',
-                'data' => $data,
-                'backgroundColor' => 'rgba(13,110,253,0.15)',
-                'borderColor' => 'rgb(13,110,253)',
-                'pointBackgroundColor' => 'rgb(13,110,253)',
-                'fill' => true,
-                'tension' => 0.3,
-            ]],
-        ]);
-
-        $chart->setOptions([
-            'responsive' => true,
-            'plugins' => [
-                'legend' => ['display' => false],
-                'title' => [
-                    'display' => false,
-                    'text' => sprintf('Nombre total de trajets par année'),
-                ],
-            ],
-        ]);
+        $chart = $this->chartService->createDataChart(
+            Chart::TYPE_BAR,
+            $labels,
+            $data,
+            $label = 'Nombre total de trajets par année'
+        );
 
         return $chart;
     }
@@ -354,75 +293,12 @@ class DashboardManagerController extends AbstractDashboardController
             $dataByMonth[(int) $row['monthNumber']] = (int) $row['total'];
         }
 
-        $chart = $this->chartBuilder->createChart(Chart::TYPE_BAR);
-        $chart->setData([
-            'labels' => ['Jan', 'Fév', 'Mars', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'],
-            'datasets' => [[
-                'label' => sprintf('Nombre de trajets des collaborateurs en %d', $year),
-                'data' => array_values($dataByMonth),
-                'backgroundColor' => [
-                    'rgba(54, 162, 235, 0.75)',
-                    'rgba(75, 192, 192, 0.75)',
-                    'rgba(153, 102, 255, 0.75)',
-                    'rgba(255, 159, 64, 0.75)',
-                    'rgba(255, 99, 132, 0.75)',
-                    'rgba(255, 205, 86, 0.75)',
-                    'rgba(54, 162, 235, 0.75)',
-                    'rgba(75, 192, 192, 0.75)',
-                    'rgba(153, 102, 255, 0.75)',
-                    'rgba(255, 159, 64, 0.75)',
-                    'rgba(255, 99, 132, 0.75)',
-                    'rgba(255, 205, 86, 0.75)',
-                ],
-                'borderColor' => [
-                    'rgb(54, 162, 235)',
-                    'rgb(75, 192, 192)',
-                    'rgb(153, 102, 255)',
-                    'rgb(255, 159, 64)',
-                    'rgb(255, 99, 132)',
-                    'rgb(255, 205, 86)',
-                    'rgb(54, 162, 235)',
-                    'rgb(75, 192, 192)',
-                    'rgb(153, 102, 255)',
-                    'rgb(255, 159, 64)',
-                    'rgb(255, 99, 132)',
-                    'rgb(255, 205, 86)',
-                ],
-                'hoverBackgroundColor' => [
-                    'rgba(54, 162, 235, 0.9)',
-                    'rgba(75, 192, 192, 0.9)',
-                    'rgba(153, 102, 255, 0.9)',
-                    'rgba(255, 159, 64, 0.9)',
-                    'rgba(255, 99, 132, 0.9)',
-                    'rgba(255, 205, 86, 0.9)',
-                    'rgba(54, 162, 235, 0.9)',
-                    'rgba(75, 192, 192, 0.9)',
-                    'rgba(153, 102, 255, 0.9)',
-                    'rgba(255, 159, 64, 0.9)',
-                    'rgba(255, 99, 132, 0.9)',
-                    'rgba(255, 205, 86, 0.9)',
-                ],
-                'borderWidth' => 1,
-                'borderRadius' => 6,
-            ]],
-        ]);
-
-        $chart->setOptions([
-            'responsive' => true,
-            'plugins' => [
-                'legend' => ['display' => false],
-                'title' => [
-                    'display' => false,
-                    'text' => sprintf('Trajets des collaborateurs par mois - %d', $year),
-                ],
-            ],
-            'scales' => [
-                'y' => [
-                    'beginAtZero' => true,
-                    'ticks' => ['precision' => 0],
-                ],
-            ],
-        ]);
+        $chart = $this->chartService->createDataChart(
+            Chart::TYPE_BAR,
+            $labels = ['Jan', 'Fév', 'Mars', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'],
+            count(array_filter($dataByMonth)) > 0 ? array_values($dataByMonth) : [],
+            $label = sprintf('Nombre de trajets des collaborateurs en %d', $year)
+        );
 
         return $chart;
     }
@@ -448,36 +324,12 @@ class DashboardManagerController extends AbstractDashboardController
             $data[] = (float) $row['totalAmount'];
         }
 
-        $chart = $this->chartBuilder->createChart(Chart::TYPE_LINE);
-        $chart->setData([
-            'labels' => $labels,
-            'datasets' => [[
-                'label' => 'Indemnité kilométrique des collaborateurs par année',
-                'backgroundColor' => 'rgba(40, 167, 69, 0.2)',
-                'borderColor' => 'rgb(40, 167, 69)',
-                'pointBackgroundColor' => 'rgb(40, 167, 69)',
-                'pointBorderColor' => '#fff',
-                'pointHoverBackgroundColor' => '#fff',
-                'pointHoverBorderColor' => 'rgb(40, 167, 69)',
-                'data' => $data,
-                'fill' => true,
-                'tension' => 0.3,
-                'borderWidth' => 3,
-                'pointRadius' => 5,
-                'pointHoverRadius' => 7,
-            ]],
-        ]);
-
-        $chart->setOptions([
-            'responsive' => true,
-            'plugins' => [
-                'legend' => ['display' => false],
-                'title' => [
-                    'display' => false,
-                    'text' => 'Évolution annuelle des indemnités des collaborateurs',
-                ],
-            ],
-        ]);
+        $chart = $this->chartService->createDataChart(
+            Chart::TYPE_LINE,
+            $labels,
+            $data,
+            $label = 'Indemnité kilométrique des collaborateurs par année'
+        );
 
         return $chart;
     }
@@ -502,27 +354,12 @@ class DashboardManagerController extends AbstractDashboardController
             $dataByMonth[(int)$row['monthNumber']] = (float)$row['totalAmount'];
         }
 
-        $chart = $this->chartBuilder->createChart(Chart::TYPE_BAR);
-        $chart->setData([
-            'labels' => ['Jan','Fév','Mars','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc'],
-            'datasets' => [[
-                'label' => sprintf('Indemnités en %d', $year),
-                'data' => array_values($dataByMonth),
-                'backgroundColor' => 'rgba(13,110,253,0.65)',
-                'borderColor' => 'rgb(13,110,253)',
-            ]],
-        ]);
-
-        $chart->setOptions([
-            'responsive' => true,
-            'plugins' => [
-                'legend' => ['display' => false],
-                'title' => [
-                    'display' => false,
-                    'text' => sprintf('Indemnités kilométriques par mois pour l\'année %d', $year),
-                ],
-            ],
-        ]);
+        $chart = $this->chartService->createDataChart(
+            Chart::TYPE_LINE,
+            $labels = ['Jan', 'Fév', 'Mars', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'],
+            count(array_filter($dataByMonth)) > 0 ? array_values($dataByMonth) : [],
+            $label = sprintf('Montants des IK des collaborateurs en %d', $year)
+        );
 
         return $chart;
     }
