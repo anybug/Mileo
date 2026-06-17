@@ -1,4 +1,5 @@
 {# templates/admin/_assistant_preview_content.html.twig #}
+{% set unrecognizedCalendarTripsCount = unrecognizedCalendarTripsCount|default(0) %}
 <div class="alert alert-info w-75 mt-3">
     <div>
         {% set previewTxt = 'à ajouter au' %}
@@ -15,22 +16,35 @@
             {{ "Prévisualisation des trajets"|trans }} {{ previewTxt|trans }} {{ "Rapport d'IK de"|trans }} {{ previewPeriodLabel }}
         </strong>
 
+        <div class="d-inline-flex flex-wrap align-items-center gap-2 ms-2">
+            <span class="badge rounded-pill bg-primary text-light">
+        
+                <i class="fa fa-plus me-1"></i>{{ previewTrips|length }}
 
-        <span class="badge rounded-pill bg-primary text-light">
-
-            {% if previewTrips|length > 0 %}
-                <i class="fa fa-plus me-1">{{ previewTrips|length }}</i> 
                 {% if previewTrips|length > 1 %}
                     {{ "trajets"|trans }}
                 {% else %}
                     {{ "trajet"|trans }}
                 {% endif %}
+            </span>
 
-            {% else %}
-                {{ "Aucun trajet possible"|trans }}
-            {% endif %}  
+            {% if action is defined
+                and action == 'import_calendar'
+                and unrecognizedCalendarTripsCount > 0
+                and previewTrips|length == 0 
+            %}
+                <span class="badge rounded-pill bg-warning text-dark">
+                    <i class="fa-solid fa-triangle-exclamation me-1"></i>
+                    {{ unrecognizedCalendarTripsCount }}
 
-        </span>    
+                    {% if unrecognizedCalendarTripsCount > 1 %}
+                        {{ "événements non reconnus"|trans }}
+                    {% else %}
+                        {{ "événement non reconnu"|trans }}
+                    {% endif %}
+                </span>
+            {% endif %}
+        </div>
     </div>
     
 </div>
@@ -131,6 +145,22 @@
         {% endfor %}
     </tbody>
 </table>
+{% if action is defined
+    and action == 'import_calendar'
+    and unrecognizedCalendarTripsCount > 0
+    and previewTrips|length == 0
+%}
+    <div class="alert alert-warning w-75 mt-2">
+        <i class="fa-solid fa-triangle-exclamation me-1"></i>
+
+        {% if unrecognizedCalendarTripsCount > 1 %}
+            {{ unrecognizedCalendarTripsCount }}
+            {{ "événements ont été trouvés dans votre calendrier mais n’ont pas été reconnus comme trajets."|trans }}
+        {% else %}
+            {{ "1 événement a été trouvé dans votre calendrier mais n’a pas été reconnu comme trajet."|trans }}
+        {% endif %}
+    </div>
+{% endif %}
 <div id="calculation-warning" class="alert alert-warning w-75 mt-2 d-none">
     <strong>Certains trajets ne se sont pas calculés automatiquement.</strong><br>
     Les lignes affichées en orange correspondent aux trajets pour lesquels Mileo n’a pas pu déterminer la distance ou le montant.

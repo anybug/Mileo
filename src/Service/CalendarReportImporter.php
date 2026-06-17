@@ -63,13 +63,16 @@ class CalendarReportImporter
         ?string $calendarUsername = null,
         ?string $calendarPassword = null
     ): array {
+        $unrecognizedCount = 0;
+
         $lines = $this->buildReportLinesFromCalendar(
             $report,
             $tripMode,
             $startAddress,
             $calendarUrl,
             $calendarUsername,
-            $calendarPassword
+            $calendarPassword,
+            $unrecognizedCount
         );
 
         $previewTrips = [];
@@ -89,7 +92,10 @@ class CalendarReportImporter
             ];
         }
 
-        return $previewTrips;
+        return [
+            'trips' => $previewTrips,
+            'unrecognized_count' => $unrecognizedCount,
+        ];
     }
 
     private function buildReportLinesFromCalendar(
@@ -98,7 +104,8 @@ class CalendarReportImporter
         string $startAddress,
         ?string $calendarUrl = null,
         ?string $calendarUsername = null,
-        ?string $calendarPassword = null
+        ?string $calendarPassword = null,
+        ?int &$unrecognizedCount = null,
     ): array {
         $user = $report->getUser();
 
@@ -126,7 +133,14 @@ class CalendarReportImporter
 
         $calendar = Reader::read($calendarContent);
 
+        $unrecognizedCount = 0;
         $events = [];
+
+        $startDate = \DateTimeImmutable::createFromInterface($report->getStartDate())
+            ->setTime(0, 0, 0);
+
+        $endDate = \DateTimeImmutable::createFromInterface($report->getEndDate())
+            ->setTime(23, 59, 59);
 
         foreach ($calendar->VEVENT as $event) {
             if (!$event instanceof VEvent) {
@@ -139,12 +153,6 @@ class CalendarReportImporter
                 continue;
             }
 
-            $startDate = \DateTimeImmutable::createFromInterface($report->getStartDate())
-                ->setTime(0, 0, 0);
-
-            $endDate = \DateTimeImmutable::createFromInterface($report->getEndDate())
-                ->setTime(23, 59, 59);
-
             if ($date < $startDate || $date > $endDate) {
                 continue;
             }
@@ -152,6 +160,7 @@ class CalendarReportImporter
             $location = trim((string) ($event->LOCATION ?? ''));
 
             if ($location === '') {
+                $unrecognizedCount++;
                 continue;
             }
 

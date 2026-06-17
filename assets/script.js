@@ -340,6 +340,7 @@ import TomSelect from 'tom-select';
         bindReadonlyContainerEvents();
         bindReadonlyPanelEvents();
         bindReadonlyWindowMessageEvents();
+        bindReadonlyIframeRedirectFallback();
 
         applyReadonlySearchFilter();
         updateReadonlyStats();
@@ -882,6 +883,7 @@ import TomSelect from 'tom-select';
         const { panelEl, backdropEl, iframe } = getReadonlyPanelElements();
         if (!panelEl || !iframe || !url) return;
 
+        iframe.dataset.firstLoadDone = '0';
         iframe.src = url;
         panelEl.classList.add('is-open');
         backdropEl?.classList.add('is-open');
@@ -1089,6 +1091,61 @@ import TomSelect from 'tom-select';
                 closeReadonlySidepanel();
                 await refreshReadonlyOrReload();
             }
+        });
+    }
+
+    function bindReadonlyIframeRedirectFallback() {
+        const { iframe } = getReadonlyPanelElements();
+
+        if (!iframe || iframe.dataset.redirectFallbackBound === '1') {
+            return;
+        }
+
+        iframe.dataset.redirectFallbackBound = '1';
+
+        iframe.addEventListener('load', async function () {
+            const { panelEl } = getReadonlyPanelElements();
+
+            if (!panelEl?.classList.contains('is-open')) {
+                return;
+            }
+
+            /*
+            * Premier chargement normal du formulaire dans l'iframe :
+            * on ne ferme pas.
+            */
+            if (iframe.dataset.firstLoadDone !== '1') {
+                iframe.dataset.firstLoadDone = '1';
+                return;
+            }
+
+            let doc = null;
+
+            try {
+                doc = iframe.contentDocument || iframe.contentWindow?.document;
+            } catch (e) {
+                return;
+            }
+
+            if (!doc) {
+                return;
+            }
+
+            /*
+            * Si après sauvegarde l'iframe contient la page rapport/liste,
+            * c'est qu'EasyAdmin a redirigé dans l'iframe au lieu de notifier le parent.
+            */
+            const hasReportReadonlyList = !!doc.querySelector('#report-lines-readonly');
+            const hasSidebarForm = !!doc.querySelector('form');
+
+            if (!hasReportReadonlyList && hasSidebarForm) {
+                return;
+            }
+
+            setReadonlyStatsLoading(true);
+
+            closeReadonlySidepanel();
+            await refreshReadonlyOrReload();
         });
     }
 
