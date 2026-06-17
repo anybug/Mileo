@@ -87,14 +87,31 @@ class ReportAppCrudController extends AbstractCrudController
 
     public function configureResponseParameters(KeyValueStore $parameters): KeyValueStore
     {
-        $context = $this->getContext();
-        $new = parent::configureResponseParameters($parameters);
+        $parameters = parent::configureResponseParameters($parameters);
 
-        if ($new->get('pageName') === Crud::PAGE_INDEX) {
-            $new = $this->generateFooterLine($new, $context);
+        if ($parameters->get('pageName') === Crud::PAGE_INDEX) {
+            $isFreeHistoryLimitedUser = $this->isFreeHistoryLimitedUser();
+            $freeHistoryLimitDate = $this->getFreeHistoryLimitDate();
+
+            $parameters->set('isFreeHistoryLimitedUser', $isFreeHistoryLimitedUser);
+
+            $parameters->set(
+                'hasHistoryLimitedByFreePlan',
+                $isFreeHistoryLimitedUser && $this->hasReportHistoryBeforeFreeLimit()
+            );
+
+            $parameters->set(
+                'freeHistoryLimitYear',
+                (int) $freeHistoryLimitDate->format('Y')
+            );
+
+            $parameters->set(
+                'freeHistoryLimitDate',
+                $freeHistoryLimitDate
+            );
         }
 
-        return $new;
+        return $parameters;
     }
 
     public function index(AdminContext $context)
@@ -941,6 +958,15 @@ class ReportAppCrudController extends AbstractCrudController
                 
         }
 
+        $currentYear = (int) date('Y');
+        $minYear = $currentYear - 4;
+        $maxYear = $currentYear + 1;
+
+        if ($pageName === Crud::PAGE_NEW && $this->isFreeHistoryLimitedUser()) {
+            $freeHistoryLimitYear = (int) $this->getFreeHistoryLimitDate()->format('Y');
+            $minYear = max($minYear, $freeHistoryLimitYear);
+        }
+
         if ($pageName === Crud::PAGE_NEW) {
 
             yield DateField::new('Year', 'Année')
@@ -949,7 +975,7 @@ class ReportAppCrudController extends AbstractCrudController
                 ->hideWhenUpdating()
                 ->setFormTypeOptions([
                     'required' => true,
-                    'years' => range(date('Y') - 4, date('Y') + 1),
+                    'years' => range($minYear, $maxYear),
                 ]);
 
             yield ChoiceField::new('Period', 'Mois')
@@ -1431,5 +1457,46 @@ class ReportAppCrudController extends AbstractCrudController
 
         $this->entityManager->persist($user);
         $this->entityManager->flush();
+    }
+
+    private function getFreeHistoryLimitDate(): \DateTimeImmutable
+    {
+        return (new \DateTimeImmutable('-2 years'))->setTime(0, 0, 0);
+    }
+
+    private function isFreeHistoryLimitedUser(): bool
+    {
+        $user = $this->getUser();
+
+        if (!$user instanceof User) {
+            return false;
+        }
+
+        $subscription = $user->getSubscription();
+        $planName = $subscription?->getPlan()?->getCode()->value;
+
+        return $planName === null || strtoupper((string) $planName) === 'FREE';
+    }
+
+    private function hasReportHistoryBeforeFreeLimit(): bool
+    {
+        $user = $this->getUser();
+
+        if (!$user instanceof User) {
+            return false;
+        }
+
+        $count = (int) $this->entityManager
+            ->getRepository(Report::class)
+            ->createQueryBuilder('r')
+            ->select('COUNT(r.id)')
+            ->andWhere('r.user = :user')
+            ->andWhere('r.start_date < :limitDate')
+            ->setParameter('user', $user)
+            ->setParameter('limitDate', $this->getFreeHistoryLimitDate())
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return $count > 0;
     }
 }
