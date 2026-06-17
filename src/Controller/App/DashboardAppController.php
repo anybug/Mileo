@@ -2,60 +2,60 @@
 
 namespace App\Controller\App;
 
-use App\Entity\Plan;
-use App\Entity\User;
-use App\Entity\Order;
-use App\Entity\Power;
-use App\Entity\Scale;
-use App\Entity\Report;
-use App\Entity\Vehicule;
-use App\Entity\ReportLine;
-use App\Entity\UserAddress;
-use App\Form\UserStep2Type;
-use App\Form\BugReportType;
-use App\Form\UserStep3Type;
-use App\Entity\Subscription;
-use Doctrine\ORM\QueryBuilder;
-use Symfony\Component\Mime\Email;
-use Symfony\UX\Chartjs\Model\Chart;
-use Symfony\Component\Asset\Packages;
-use Doctrine\ORM\EntityManagerInterface;
 use App\Controller\Admin\UserCrudController;
-use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Mailer\MailerInterface;
-use Symfony\Component\Form\Test\FormInterface;
-use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Routing\Annotation\Route;
 use App\Controller\Admin\VehiculeCrudController;
-use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
-use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
-use Symfony\Component\Form\FormFactoryInterface;
+use App\Entity\Order;
+use App\Entity\Plan;
+use App\Entity\Power;
+use App\Entity\Report;
+use App\Entity\ReportLine;
+use App\Entity\Scale;
+use App\Entity\Subscription;
+use App\Entity\User;
+use App\Entity\UserAddress;
+use App\Entity\Vehicule;
+use App\Form\BugReportType;
+use App\Form\UserStep2Type;
+use App\Form\UserStep3Type;
+use App\Service\ChartService;
+use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\QueryBuilder;
+use EasyAdminFriends\EasyAdminDashboardBundle\Service\EasyAdminDashboard;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
-use EasyCorp\Bundle\EasyAdminBundle\Config\Assets;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Assets;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Dashboard;
 use EasyCorp\Bundle\EasyAdminBundle\Config\MenuItem;
 use EasyCorp\Bundle\EasyAdminBundle\Config\UserMenu;
-use EasyCorp\Bundle\EasyAdminBundle\Config\Dashboard;
-use Symfony\Component\Form\Test\FormBuilderInterface;
-use Symfony\UX\Chartjs\Builder\ChartBuilderInterface;
-use EasyCorp\Bundle\EasyAdminBundle\Field\ChoiceField;
-use Symfony\Component\Security\Core\User\UserInterface;
-use Symfony\Component\HttpFoundation\File\UploadedFile;
-use Symfony\Component\Form\Extension\Core\Type\SubmitType;
-use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractDashboardController;
-use EasyAdminFriends\EasyAdminDashboardBundle\Service\EasyAdminDashboard;
+use EasyCorp\Bundle\EasyAdminBundle\Field\ChoiceField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
+use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
+use Symfony\Component\Asset\Packages;
+use Symfony\Component\Form\Extension\Core\Type\SubmitType;
+use Symfony\Component\Form\FormFactoryInterface;
+use Symfony\Component\Form\Test\FormBuilderInterface;
+use Symfony\Component\Form\Test\FormInterface;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Mailer\MailerInterface;
+use Symfony\Component\Mime\Email;
+use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\UX\Chartjs\Model\Chart;
 
 class DashboardAppController extends AbstractDashboardController
 {
     public function __construct(
         private readonly AdminUrlGenerator $adminUrlGenerator, 
         private readonly EasyAdminDashboard $easyAdminDashboard,
-        private readonly ChartBuilderInterface $chartBuilder,
         private readonly EntityManagerInterface $entityManager, 
         private readonly FormFactoryInterface $formFactory,
-        private readonly Packages $assets
+        private readonly Packages $assets,
+        private readonly ChartService $chartService,
     )
     {}
 
@@ -334,15 +334,6 @@ class DashboardAppController extends AbstractDashboardController
         ]);
     }
 
-    private function truncateLabel(string $string, int $length = 20, string $suffix = '...'): string
-    {
-        if (mb_strlen($string, 'UTF-8') <= $length) {
-            return $string;
-        }
-
-        return mb_substr($string, 0, $length, 'UTF-8') . $suffix;
-    }
-
     private function getAvailableYears(): array
     {
         $qb = $this->entityManager->createQueryBuilder()
@@ -458,15 +449,13 @@ class DashboardAppController extends AbstractDashboardController
         $topUsedAddresses = $this->getTopUsedAddresses($year, 10);
 
         $labels = array_map(
-            fn ($value) => $this->truncateLabel((string) $value, 35),
+            fn ($value) => $this->chartService->truncateLabel((string) $value, 35),
             array_column($topUsedAddresses, 'address')
         );
 
         $data = array_column($topUsedAddresses, 'totalCount');
 
-        //$chart = $this->chartBuilder->createChart(Chart::TYPE_PIE);
-
-        $chart = $this->createDataChart(
+        $chart = $this->chartService->createDataChart(
             Chart::TYPE_PIE,
             $labels,
             $data,
@@ -497,8 +486,8 @@ class DashboardAppController extends AbstractDashboardController
             $data[] = (int) $row['total'];
         }
 
-        $chart = $this->createDataChart(
-            Chart::TYPE_LINE,
+        $chart = $this->chartService->createDataChart(
+            Chart::TYPE_BAR,
             $labels,
             $data,
             $label = 'Nombre total de trajets par année'
@@ -528,7 +517,7 @@ class DashboardAppController extends AbstractDashboardController
             $dataByMonth[(int) $row['monthNumber']] = (int) $row['total'];
         }
 
-        $chart = $this->createDataChart(
+        $chart = $this->chartService->createDataChart(
             Chart::TYPE_BAR,
             $labels = ['Jan', 'Fév', 'Mars', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'],
             count(array_filter($dataByMonth)) > 0 ? array_values($dataByMonth) : [],
@@ -559,9 +548,7 @@ class DashboardAppController extends AbstractDashboardController
             $data[] = (float) $row['totalAmount'];
         }
 
-        $chart = $this->chartBuilder->createChart(Chart::TYPE_LINE);
-
-        $chart = $this->createDataChart(
+        $chart = $this->chartService->createDataChart(
             Chart::TYPE_LINE,
             $labels,
             $data,
@@ -592,8 +579,8 @@ class DashboardAppController extends AbstractDashboardController
             $dataByMonth[(int) $row['monthNumber']] = (float) $row['totalAmount'];
         }
 
-        $chart = $this->createDataChart(
-            Chart::TYPE_BAR,
+        $chart = $this->chartService->createDataChart(
+            Chart::TYPE_LINE,
             $labels = ['Jan', 'Fév', 'Mars', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'],
             count(array_filter($dataByMonth)) > 0 ? array_values($dataByMonth) : [],
             $label = sprintf('Indemnités kilométriques par mois pour l\'année %d', $year)
@@ -602,49 +589,7 @@ class DashboardAppController extends AbstractDashboardController
         return $chart;
     }
 
-    private function createDataChart
-    (
-        string $type,
-        array $labels,
-        array $data,
-        string $label = '',
-    ): Chart {
-
-        $chart = $this->chartBuilder->createChart($type);
-
-        $colors = [
-            '#5368d5', '#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f',
-            '#edc948', '#b07aa1', '#ff9da7', '#9c755f', '#bab0ab',
-            '#8cd17d', '#bd7ebe', '#fabfd2', '#b6992d', '#e9967a'
-        ];
-
-        //const backgroundColors = (type === 'pie') ? generateColors(labels.length) : 'rgba(54, 162, 235, 0.6)';
-        //const borderColors = (type === 'pie') ? backgroundColors : 'rgba(54, 162, 235, 1)';
-
-        $options = [
-                    'responsive' => true,
-                    'maintainAspectRatio' => true,
-                    'plugins' => [
-                        'legend' => ['position' => 'bottom'],
-                        'tooltip' => ['enabled' => true]
-                    ]
-                ];
-        
-        $chart->setData([
-            'labels' => array_map(function($val) {return $this->truncateLabel($val, 30);}, $labels),
-            'datasets' => [[
-                'label' => $label, 0, 30,
-                'data' => $data,
-                'backgroundColor' => $type == Chart::TYPE_PIE ? $colors : $colors[0],
-                'fill' => $type == Chart::TYPE_LINE ? true : false,
-            ]]
-        ]);
-
-        $chart->setOptions($options);
-
-        return $chart;
-    }
-
+    
     private function applyCurrentUserFilterOnReportLines(QueryBuilder $qb): void
     {
         $user = $this->getUser();
