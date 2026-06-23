@@ -14,6 +14,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Address;
+use Doctrine\ORM\EntityManagerInterface;
 
 class SubscriptionEndedCommand extends Command
 {
@@ -22,17 +23,20 @@ class SubscriptionEndedCommand extends Command
     private UserRepository $userRepository;
     private MailerInterface $mailer;
     private AdminUrlGenerator $adminUrlGenerator;
+    private EntityManagerInterface $entityManager;
 
     public function __construct(
         UserRepository $userRepository,
         MailerInterface $mailer,
-        AdminUrlGenerator $adminUrlGenerator
+        AdminUrlGenerator $adminUrlGenerator,
+        EntityManagerInterface $entityManager
     ) {
         parent::__construct();
 
         $this->userRepository = $userRepository;
         $this->mailer = $mailer;
         $this->adminUrlGenerator = $adminUrlGenerator;
+        $this->entityManager = $entityManager;
     }
 
     protected function configure(): void
@@ -63,7 +67,11 @@ class SubscriptionEndedCommand extends Command
                 continue;
             }
 
-            $end = \DateTimeImmutable::createFromMutable($subscription->getSubscriptionEnd());
+            if ($subscription->getWarningMailSentAt() !== null) {
+                continue;
+            }
+
+            $end = $subscription->getSubscriptionEnd();
 
             // URL de renouvellement
             $url = $this->adminUrlGenerator
@@ -98,6 +106,9 @@ class SubscriptionEndedCommand extends Command
             }
 
             $this->mailer->send($email);
+            $subscription->setExpiredMailSentAt(new \DateTimeImmutable());
+            $this->entityManager->flush();
+            
             $io->info(sprintf('Email sent to %s (expired at %s)', $user->getEmail(), $end->format('Y-m-d')));
             $sent++;
         }
