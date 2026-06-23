@@ -15,6 +15,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Address;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Mime\Email;
 
 class WarningSubscriptionEndCommand extends Command
@@ -22,14 +23,16 @@ class WarningSubscriptionEndCommand extends Command
     private $userRepository;
     private $mailer;
     private $adminUrlGenerator;
+    private EntityManagerInterface $entityManager;
 
     protected static $defaultName = 'app:subscription:warning';
 
-    public function __construct(UserRepository $userRepository, MailerInterface $mailer, AdminUrlGenerator $adminUrlGenerator)
+    public function __construct(UserRepository $userRepository, MailerInterface $mailer, AdminUrlGenerator $adminUrlGenerator, EntityManagerInterface $entityManager)
     {
         $this->userRepository = $userRepository;
         $this->mailer = $mailer;
         $this->adminUrlGenerator = $adminUrlGenerator;
+        $this->entityManager = $entityManager;
 
         parent::__construct();
     }
@@ -59,7 +62,11 @@ class WarningSubscriptionEndCommand extends Command
                 continue;
             }
 
-            $end = \DateTimeImmutable::createFromMutable($sub->getSubscriptionEnd());
+            if ($sub->getWarningMailSentAt() !== null) {
+                continue;
+            }
+
+            $end = $sub->getSubscriptionEnd();
             $plan = $sub->getPlan();
             $planName = $plan?->getName() ?? 'Free';
 
@@ -103,6 +110,9 @@ class WarningSubscriptionEndCommand extends Command
                 ]);
 
             $this->mailer->send($email);
+
+            $sub->setWarningMailSentAt(new \DateTimeImmutable());
+            $this->entityManager->flush();
 
             $io->info(sprintf('Mail envoyé (%s) à %s', $planName, $user->getEmail()));
         }

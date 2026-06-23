@@ -31,10 +31,14 @@ class Subscription
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $subscription_end;
 
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $warningMailSentAt = null;
+
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $expiredMailSentAt = null;
+
     public function __construct()
-    {
-    
-    }
+    {}
 
     public function getId(): ?int
     {
@@ -153,6 +157,30 @@ class Subscription
     public function setSubscriptionEnd(\DateTimeImmutable $subscription_end): static
     {
         $this->subscription_end = $subscription_end;
+
+        return $this;
+    }
+
+    public function getWarningMailSentAt(): ?\DateTimeImmutable
+    {
+        return $this->warningMailSentAt;
+    }
+
+    public function setWarningMailSentAt(?\DateTimeImmutable $warningMailSentAt): static
+    {
+        $this->warningMailSentAt = $warningMailSentAt;
+
+        return $this;
+    }
+
+    public function getExpiredMailSentAt(): ?\DateTimeImmutable
+    {
+        return $this->expiredMailSentAt;
+    }
+
+    public function setExpiredMailSentAt(?\DateTimeImmutable $expiredMailSentAt): static
+    {
+        $this->expiredMailSentAt = $expiredMailSentAt;
 
         return $this;
     }
