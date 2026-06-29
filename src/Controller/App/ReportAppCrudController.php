@@ -87,28 +87,12 @@ class ReportAppCrudController extends AbstractCrudController
 
     public function configureResponseParameters(KeyValueStore $parameters): KeyValueStore
     {
+        $context = $this->getContext();
+
         $parameters = parent::configureResponseParameters($parameters);
 
         if ($parameters->get('pageName') === Crud::PAGE_INDEX) {
-            $isFreeHistoryLimitedUser = $this->isFreeHistoryLimitedUser();
-            $freeHistoryLimitDate = $this->getFreeHistoryLimitDate();
-
-            $parameters->set('isFreeHistoryLimitedUser', $isFreeHistoryLimitedUser);
-
-            $parameters->set(
-                'hasHistoryLimitedByFreePlan',
-                $isFreeHistoryLimitedUser && $this->hasReportHistoryBeforeFreeLimit()
-            );
-
-            $parameters->set(
-                'freeHistoryLimitYear',
-                (int) $freeHistoryLimitDate->format('Y')
-            );
-
-            $parameters->set(
-                'freeHistoryLimitDate',
-                $freeHistoryLimitDate
-            );
+            $parameters = $this->generateFooterLine($parameters, $context);
         }
 
         return $parameters;
@@ -962,11 +946,6 @@ class ReportAppCrudController extends AbstractCrudController
         $minYear = $currentYear - 4;
         $maxYear = $currentYear + 1;
 
-        if ($pageName === Crud::PAGE_NEW && $this->isFreeHistoryLimitedUser()) {
-            $freeHistoryLimitYear = (int) $this->getFreeHistoryLimitDate()->format('Y');
-            $minYear = max($minYear, $freeHistoryLimitYear);
-        }
-
         if ($pageName === Crud::PAGE_NEW) {
 
             yield DateField::new('Year', 'Année')
@@ -1457,46 +1436,5 @@ class ReportAppCrudController extends AbstractCrudController
 
         $this->entityManager->persist($user);
         $this->entityManager->flush();
-    }
-
-    private function getFreeHistoryLimitDate(): \DateTimeImmutable
-    {
-        return (new \DateTimeImmutable('-2 years'))->setTime(0, 0, 0);
-    }
-
-    private function isFreeHistoryLimitedUser(): bool
-    {
-        $user = $this->getUser();
-
-        if (!$user instanceof User) {
-            return false;
-        }
-
-        $subscription = $user->getSubscription();
-        $planName = $subscription?->getPlan()?->getCode()->value;
-
-        return $planName === null || strtoupper((string) $planName) === 'FREE';
-    }
-
-    private function hasReportHistoryBeforeFreeLimit(): bool
-    {
-        $user = $this->getUser();
-
-        if (!$user instanceof User) {
-            return false;
-        }
-
-        $count = (int) $this->entityManager
-            ->getRepository(Report::class)
-            ->createQueryBuilder('r')
-            ->select('COUNT(r.id)')
-            ->andWhere('r.user = :user')
-            ->andWhere('r.start_date < :limitDate')
-            ->setParameter('user', $user)
-            ->setParameter('limitDate', $this->getFreeHistoryLimitDate())
-            ->getQuery()
-            ->getSingleScalarResult();
-
-        return $count > 0;
     }
 }

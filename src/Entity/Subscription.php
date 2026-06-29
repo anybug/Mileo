@@ -3,8 +3,6 @@
 namespace App\Entity;
 
 use App\Repository\SubscriptionRepository;
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -31,10 +29,16 @@ class Subscription
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $subscription_end;
 
-    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
-    private ?\DateTimeImmutable $warningMailSentAt = null;
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $trialEndsAt = null;
 
-    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $warningMailThirtyDaysSentAt = null;
+
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $warningMailSevenDaysSentAt = null;
+
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
     private ?\DateTimeImmutable $expiredMailSentAt = null;
 
     public function __construct()
@@ -161,18 +165,6 @@ class Subscription
         return $this;
     }
 
-    public function getWarningMailSentAt(): ?\DateTimeImmutable
-    {
-        return $this->warningMailSentAt;
-    }
-
-    public function setWarningMailSentAt(?\DateTimeImmutable $warningMailSentAt): static
-    {
-        $this->warningMailSentAt = $warningMailSentAt;
-
-        return $this;
-    }
-
     public function getExpiredMailSentAt(): ?\DateTimeImmutable
     {
         return $this->expiredMailSentAt;
@@ -183,5 +175,55 @@ class Subscription
         $this->expiredMailSentAt = $expiredMailSentAt;
 
         return $this;
+    }
+
+    public function getWarningMailThirtyDaysSentAt(): ?\DateTimeImmutable
+    {
+        return $this->warningMailThirtyDaysSentAt;
+    }
+
+    public function setWarningMailThirtyDaysSentAt(?\DateTimeImmutable $warningMailThirtyDaysSentAt): static
+    {
+        $this->warningMailThirtyDaysSentAt = $warningMailThirtyDaysSentAt;
+
+        return $this;
+    }
+
+    public function getWarningMailSevenDaysSentAt(): ?\DateTimeImmutable
+    {
+        return $this->warningMailSevenDaysSentAt;
+    }
+
+    public function setWarningMailSevenDaysSentAt(?\DateTimeImmutable $warningMailSevenDaysSentAt): static
+    {
+        $this->warningMailSevenDaysSentAt = $warningMailSevenDaysSentAt;
+
+        return $this;
+    }
+
+    public function getTrialEndsAt(): ?\DateTimeImmutable
+    {
+        return $this->trialEndsAt;
+    }
+
+    public function setTrialEndsAt(?\DateTimeImmutable $trialEndsAt): static
+    {
+        $this->trialEndsAt = $trialEndsAt;
+
+        return $this;
+    }
+
+    public function isTrial(): bool
+    {
+        return null !== $this->trialEndsAt;
+    }
+
+    public function isInTrial(?\DateTimeImmutable $at = null): bool
+    {
+        $at ??= new \DateTimeImmutable();
+
+        return $this->isTrial()
+            && $this->isValid($at)
+            && $at < $this->trialEndsAt;
     }
 }

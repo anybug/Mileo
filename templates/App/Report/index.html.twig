@@ -6,93 +6,8 @@
     {% if ea.request.query.all['filters'] is defined %}
         {% set applied_filters = ea.request.query.all['filters']|default([])|keys %}
 
-        <style>
-            .history-limited-option {
-                color: #adb5bd !important;
-                background-color: #f8f9fa !important;
-            }
-
-            optgroup[label="Accès payant"] {
-                color: #6c757d;
-                font-weight: 600;
-            }
-        </style>
-
         <script>
-            function groupReportHistoryOptions(root, limitYear) {
-                const select = root.querySelector('#filters_Period_value');
-
-                if (!select || !limitYear) {
-                    return;
-                }
-
-                if (select.tomselect) {
-                    select.tomselect.destroy();
-                }
-
-                const options = Array.from(select.querySelectorAll('option'))
-                    .map((option) => {
-                        const source = `${option.textContent || ''} ${option.value || ''}`;
-                        const match = source.match(/\b((?:19|20)\d{2})\b/);
-
-                        if (!match) {
-                            return null;
-                        }
-
-                        const year = parseInt(match[1], 10);
-
-                        return {
-                            year: year,
-                            value: option.value,
-                            label: option.textContent.trim(),
-                            selected: option.selected,
-                        };
-                    })
-                    .filter(Boolean)
-                    .sort((a, b) => b.year - a.year);
-
-                const availableOptions = options.filter((item) => item.year >= limitYear);
-                const paidOptions = options.filter((item) => item.year < limitYear);
-
-                select.innerHTML = '';
-
-                if (availableOptions.length > 0) {
-                    const availableGroup = document.createElement('optgroup');
-                    availableGroup.label = '{{ "Historique disponible"|trans|e('js') }}';
-
-                    availableOptions.forEach((item) => {
-                        const option = document.createElement('option');
-
-                        option.value = item.value;
-                        option.textContent = item.label;
-                        option.selected = item.selected;
-
-                        availableGroup.appendChild(option);
-                    });
-
-                    select.appendChild(availableGroup);
-                }
-
-                if (paidOptions.length > 0) {
-                    const paidGroup = document.createElement('optgroup');
-                    paidGroup.label = '{{ "Accès payant"|trans|e('js') }}';
-
-                    paidOptions.forEach((item) => {
-                        const option = document.createElement('option');
-
-                        option.value = item.value;
-                        option.textContent = item.label;
-                        option.disabled = true;
-                        option.setAttribute('disabled', 'disabled');
-                        option.classList.add('history-limited-option');
-
-                        paidGroup.appendChild(option);
-                    });
-
-                    select.appendChild(paidGroup);
-                }
-            }
-
+            // Requête AJAX pour charger les filtres
             fetch('{{ ea_url().setAction('renderFilters').includeReferrer()|raw }}', {
                 method: 'GET',
                 headers: {
@@ -101,29 +16,17 @@
             })
             .then(response => response.text())
             .then(data => {
-                const ajaxFilters = document.querySelector('.ajaxFilters');
-
-                if (!ajaxFilters) {
-                    return;
-                }
-
-                ajaxFilters.innerHTML = data;
-
-               {% if isFreeHistoryLimitedUser|default(false) and freeHistoryLimitYear is defined %}
-                    setTimeout(() => {
-                        groupReportHistoryOptions(
-                            ajaxFilters,
-                            {{ freeHistoryLimitYear }}
-                        );
-                    }, 300);
-                {% endif %}
+                document.querySelector('.ajaxFilters').innerHTML = data;
             })
             .catch(error => {
                 console.error('Erreur lors du chargement des filtres :', error);
             });
+
         </script>
 
-        <div class="ajaxFilters action-filters"></div>
+        <div class="ajaxFilters action-filters">
+
+        </div>
     {% endif %}
 {% endblock filters %}
 

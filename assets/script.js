@@ -1650,6 +1650,16 @@ import TomSelect from 'tom-select';
         });
     }
 
+    function getFavoriteMotifField(field, fallbackLine = null) {
+        const line = fallbackLine || getLineContainer(field);
+
+        if (line) {
+            return line.querySelector('.report_lines_comment');
+        }
+
+        return field?.closest('form')?.querySelector('.report_lines_comment') || null;
+    }
+
     let favoriteModalOpening = false;
     let favoriteModalLastTriggerAt = 0;
 
@@ -1724,7 +1734,9 @@ import TomSelect from 'tom-select';
             applyFavoriteSearchFilter(modalEl);
             focusFavoriteSearch(modalEl);
 
-            const applyFavorite = (value) => {
+            const applyFavorite = (choice) => {
+                const value = choice?.value || '';
+
                 if (valueApplied || !value || !fieldToChange) {
                     return;
                 }
@@ -1732,6 +1744,34 @@ import TomSelect from 'tom-select';
                 valueApplied = true;
 
                 setFavoriteValue(fieldToChange, value);
+
+                // Remplit le motif uniquement si l'adresse choisie est l'arrivée.
+                if (
+                    fieldToChange.classList.contains('lines_end')
+                    || fieldToChange.classList.contains('report_lines_end')
+                ) {
+                    const line = fallbackLine || getLineContainer(fieldToChange);
+
+                    const motifField = line
+                        ? line.querySelector('.report_lines_comment')
+                        : fieldToChange
+                            .closest('form')
+                            ?.querySelector('.report_lines_comment, .report_comment');
+
+                    const motifExistant = motifField?.value.trim() || '';
+                    const motifAdresse = choice.dataset.motif?.trim() || '';
+
+                    if (motifField && !motifExistant && motifAdresse) {
+                        setFieldValue(motifField, motifAdresse);
+
+                        motifField.dispatchEvent(
+                            new Event('input', { bubbles: true })
+                        );
+                        motifField.dispatchEvent(
+                            new Event('change', { bubbles: true })
+                        );
+                    }
+                }
 
                 const context = resolveFavoriteContext(fieldToChange, fallbackLine);
 
@@ -1770,7 +1810,7 @@ import TomSelect from 'tom-select';
 
                 const choice = e.target.closest('.report_favories_choice');
                 if (choice) {
-                    applyFavorite(choice.value);
+                    applyFavorite(choice);
                     return;
                 }
 
@@ -1779,7 +1819,7 @@ import TomSelect from 'tom-select';
                     const input = label.parentElement?.querySelector('.report_favories_choice');
                     if (input && !input.disabled && input.value) {
                         input.checked = true;
-                        applyFavorite(input.value);
+                        applyFavorite(input);
                     }
                 }
             });
@@ -1787,7 +1827,7 @@ import TomSelect from 'tom-select';
             modalEl.addEventListener('change', (e) => {
                 const choice = e.target.closest('.report_favories_choice');
                 if (choice && !choice.disabled && choice.value) {
-                    applyFavorite(choice.value);
+                    applyFavorite(choice);
                 }
             });
 
@@ -1808,7 +1848,7 @@ import TomSelect from 'tom-select';
 
                 if (firstVisibleChoice) {
                     firstVisibleChoice.checked = true;
-                    applyFavorite(firstVisibleChoice.value);
+                    applyFavorite(firstVisibleChoice);
                 }
             });
 

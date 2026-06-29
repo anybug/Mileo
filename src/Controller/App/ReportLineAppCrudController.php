@@ -247,6 +247,33 @@ class ReportLineAppCrudController extends AbstractCrudController
         yield FormField::addRow();
         yield FormField::addPanel('Travel information')->setIcon('fa fa-car');
 
+        $motifsByAddress = [];
+
+        // Adresses personnelles
+        foreach ($me->getUserAddresses() as $userAddress) {
+            $motifsByAddress[(string) $userAddress->getAddress()] = (string) ($userAddress->getReason() ?? '');
+        }
+
+        // Adresses du groupe, pour les membres d'une équipe
+        if ($me->getManagedBy()) {
+            $manager = $me->getManagedBy();
+
+            $users = $this->entityManager
+                ->getRepository(\App\Entity\User::class)
+                ->createQueryBuilder('u')
+                ->where('u.managedBy = :manager OR u = :manager')
+                ->setParameter('manager', $manager)
+                ->getQuery()
+                ->getResult();
+
+            foreach ($users as $user) {
+                foreach ($user->getUserAddresses() as $userAddress) {
+                    $motifsByAddress[(string) $userAddress->getAddress()]
+                        = (string) ($userAddress->getReason() ?? '');
+                }
+            }
+        }
+
         /** Compte individuel: quelques adresses en bouton radion */
         if(!$me->getManagedBy()){
             $addresses = $this->getUser()->getFormattedUserAddresses();
@@ -256,8 +283,13 @@ class ReportLineAppCrudController extends AbstractCrudController
                     'expanded' => true,
                     'mapped' => false,
                     'required' => false,
-                    'choice_attr' => function($choice, $key, $value) {
-                        return ['class' => 'report_favories_choice'];
+                    'choice_attr' => function ($choice) use ($motifsByAddress) {
+                        $address = (string) $choice;
+
+                        return [
+                            'class' => 'report_favories_choice',
+                            'data-motif' => $motifsByAddress[$address] ?? '',
+                        ];
                     }
                 ])
                 ->onlyOnForms()
@@ -272,8 +304,13 @@ class ReportLineAppCrudController extends AbstractCrudController
                     'expanded' => true,
                     'mapped' => false,
                     'required' => false,
-                    'choice_attr' => function($choice, $key, $value) {
-                        return ['class' => 'report_favories_choice'];
+                    'choice_attr' => function ($choice) use ($motifsByAddress) {
+                        $address = (string) $choice;
+
+                        return [
+                            'class' => 'report_favories_choice',
+                            'data-motif' => $motifsByAddress[$address] ?? '',
+                        ];
                     }
                 ])
                 ->onlyOnForms()
