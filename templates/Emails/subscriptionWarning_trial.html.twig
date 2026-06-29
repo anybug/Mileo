@@ -1,0 +1,27 @@
+<body>
+    <p>Bonjour {{ user.getFirstName() }} {{ user.getLastName() }},</p>
+
+    <p>
+        Votre période d’essai Mileo arrive prochainement à expiration.
+    </p>
+
+    <p>
+        Elle prendra fin le
+        <strong>{{ expiresAt|format_datetime(locale='fr', pattern='dd MMMM YYYY') }}</strong>.
+        Pour continuer à profiter de Mileo et de l’ensemble de ses fonctionnalités,
+        choisissez l’offre qui correspond le mieux à vos besoins avant la fin de votre période d’essai.
+    </p>
+
+    <p>Choisir une offre :</p>
+    <p><a href="{{ url }}">Voir les offres</a></p>
+
+    <p>
+        L'équipe
+        <span style="font-size: 20px; font-weight: bold; color: #6174d1 !important;">
+            <font color="#6174d1">Mil</font>
+        </span>
+        <span style="font-size: 20px; font-weight: bold; color: #242F51 !important;">
+            <font color="#242F51">eo</font>
+        </span>
+    </p>
+</body>

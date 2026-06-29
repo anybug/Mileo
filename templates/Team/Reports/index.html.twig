@@ -1,0 +1,31 @@
+{% extends '@EasyAdmin/page/content.html.twig' %}
+
+{% set pageTitle = "Récapitulatif des rapports de l'équipe"|trans %}
+{% block page_title %}{{ pageTitle }}{% endblock %}
+
+{% block content_title %}
+
+
+    <span class="d-inline-flex align-items-center justify-content-center p-3 rounded-circle bg-primary-subtle text-primary lh-1">
+        <i class="fa-solid fa-chart-column"></i>
+    </span>
+
+    {{ pageTitle }}
+
+
+{% endblock %}
+
+{% block main %}
+
+<section class="content-body">
+    <div class="dashboard-content row m-1">
+        <div class="col-12 mt-3">
+            {% include 'Team/Component/_team_reports_summary.html.twig' with {
+                members: members,
+                years: years,
+                componentId: 'manager-team-reports-summary',
+            } only %}
+        </div>
+    </div>
+</section>    
+{% endblock %}
