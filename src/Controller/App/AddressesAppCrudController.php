@@ -18,7 +18,9 @@ use EasyCorp\Bundle\EasyAdminBundle\Dto\EntityDto;
 use EasyCorp\Bundle\EasyAdminBundle\Dto\SearchDto;
 use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
+use EasyCorp\Bundle\EasyAdminBundle\Field\FormField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IdField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\TextareaField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
 use EasyCorp\Bundle\EasyAdminBundle\Orm\EntityRepository as EasyAdminEntityRep;
 use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
@@ -61,6 +63,8 @@ class AddressesAppCrudController extends AbstractCrudController
         
         $crud
             ->setPageTitle(Crud::PAGE_INDEX, $pageIndexTitle)
+            ->setPageTitle(Crud::PAGE_EDIT, "Modifier une adresse récurrente")
+            ->setPageTitle(Crud::PAGE_NEW, "Ajouter une adresse récurrente")
             ->overrideTemplate('crud/edit', 'App/advanced_edit.html.twig')
             ->overrideTemplate('crud/new', 'App/advanced_new.html.twig')
         ;
@@ -110,11 +114,42 @@ class AddressesAppCrudController extends AbstractCrudController
 
     public function configureFields(string $pageName): iterable
     {
-        return [
-            TextField::new('name','Nom'),
-            TextField::new('address','Adresse')
-                ->setFormTypeOptions(['attr' => ['class'=>'autocomplete']])
-            ,
-        ];
+        if (Crud::PAGE_INDEX === $pageName) {
+            return [
+                TextField::new('name', 'Nom'),
+
+                TextField::new('address', 'Adresse'),
+
+                TextField::new('reason', 'Motif'),
+
+            ];
+        }
+
+        if (Crud::PAGE_NEW === $pageName || Crud::PAGE_EDIT === $pageName) {
+            return [
+                FormField::addColumn(6),
+                FormField::addFieldset('Informations adresse')->setIcon('fa fa-map-marker-alt'),
+                TextField::new('name', 'Nom'),
+
+                TextField::new('address', 'Adresse')
+                    ->setFormTypeOptions([
+                        'attr' => [
+                            'class' => 'autocomplete',
+                        ],
+                    ]),
+                
+                TextareaField::new('reason', 'Motif du déplacement')
+                    ->setRequired(false)
+                    ->setHelp("Facultatif: ce motif sera automatiquement proposé si cette adresse est utilisée comme destination dans un trajet.")
+                    ->setFormTypeOptions([
+                        'attr' => [
+                            'placeholder' => 'Ex. : Rendez-vous client',
+                        ],
+                    ]),    
+
+            ];
+        }
+
+        return [];
     }
 }

@@ -1,0 +1,23 @@
+{% set members = field.value ?? [] %}
+{% set years = [] %}
+
+{% for member in members %}
+    {% for report in member.reports %}
+        {% if report.startDate is not null %}
+            {% set reportYear = report.startDate|date('Y') %}
+
+            {% if reportYear not in years %}
+                {% set years = years|merge([reportYear]) %}
+            {% endif %}
+        {% endif %}
+    {% endfor %}
+{% endfor %}
+
+{# Années de la plus récente à la plus ancienne #}
+{% set years = years|sort|reverse %}
+
+{% include 'Team/Component/_team_reports_summary.html.twig' with {
+    members: members,
+    years: years,
+    componentId: 'manager-team-reports-' ~ entity.primaryKeyValue,
+} only %}
