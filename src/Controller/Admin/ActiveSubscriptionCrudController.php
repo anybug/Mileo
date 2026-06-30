@@ -49,6 +49,9 @@ final class ActiveSubscriptionCrudController extends AbstractCrudController
         yield AssociationField::new('user', 'Utilisateur')
             ->autocomplete();
 
+        yield DateTimeField::new('user.lastLogin', 'Last login')
+            ->hideOnForm();
+
         yield AssociationField::new('plan', 'Offre');
 
         yield DateTimeField::new('subscription_start', 'Début');

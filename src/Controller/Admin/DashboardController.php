@@ -91,7 +91,7 @@ class DashboardController extends AbstractDashboardController
         yield MenuItem::section('Users');
         yield MenuItem::linkTo(UserCrudController::class, 'Users', 'fa fa-user');
         yield MenuItem::linkTo(UserProCrudController::class, 'Pro users', 'fa-solid fa-star');
-        yield MenuItem::linkTo(UserManagerCrudController::class, 'Manager users', 'fa-solid fa-user-tie');
+        yield MenuItem::linkTo(UserManagerCrudController::class, 'Team users', 'fa-solid fa-user-tie');
        
     }
 }
