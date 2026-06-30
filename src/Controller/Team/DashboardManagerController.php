@@ -8,8 +8,10 @@ use App\Entity\User;
 use App\Entity\UserAddress;
 use App\Entity\Vehicule;
 use App\Service\ChartService;
+use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\QueryBuilder;
+use Doctrine\ORM\Query\Expr\Join;
 use EasyAdminFriends\EasyAdminDashboardBundle\Service\EasyAdminDashboard;
 use EasyCorp\Bundle\EasyAdminBundle\Attribute\AdminDashboard;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
@@ -22,6 +24,7 @@ use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractDashboardController;
 use Symfony\Component\Asset\Packages;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\UX\Chartjs\Model\Chart;
 
@@ -35,8 +38,10 @@ class DashboardManagerController extends AbstractDashboardController
         private readonly RequestStack $requestStack,
         private readonly ChartService $chartService,
         private readonly EntityManagerInterface $entityManager,
+        private readonly UserRepository $userRepository,
     ) {
     }
+
 
     public function index(): Response
     {
@@ -114,16 +119,15 @@ class DashboardManagerController extends AbstractDashboardController
         yield MenuItem::linkToDashboard('Dashboard', 'fa fa-home');
 
         yield MenuItem::section('Équipe');
-        yield MenuItem::linkToCrud('Membres collaborateurs', 'fa fa-users', User::class)
-            ->setController(TeamUserCrudController::class);
-        yield MenuItem::linkToCrud('Flotte de véhicules', 'fa fa-car', Vehicule::class)
-            ->setController(TeamVehiculeCrudController::class);
-        yield MenuItem::linkToCrud('Carnet d\'adresses', 'fa fa-map-marker-alt', UserAddress::class)
-            ->setController(TeamAddressesCrudController::class);
+        yield MenuItem::linkTo(TeamUserCrudController::class, 'Membres collaborateurs', 'fa fa-users');
+        yield MenuItem::linkTo(TeamVehiculeCrudController::class, 'Flotte de véhicules', 'fa fa-car');
+        yield MenuItem::linkTo(TeamAddressesCrudController::class, 'Carnet d\'adresses', 'fa fa-map-marker-alt');
+        //retrait temporaire: à revoir et replacer
+        //yield MenuItem::linkToRoute('Summary', 'fa-solid fa-chart-column', 'manager_team_reports'); 
 
-        yield MenuItem::section('Parameters');
-        yield MenuItem::linkToCrud('Profile', 'fa fa-id-card', User::class)
-            ->setController(ManagerProfileCrudController::class);
+        yield MenuItem::section('Compte');
+        yield MenuItem::linkTo(ManagerProfileCrudController::class, 'Profile', 'fa fa-id-card');
+
     }
 
     private function getAvailableYears(): array
@@ -393,5 +397,42 @@ class DashboardManagerController extends AbstractDashboardController
             ->join('r.user', 'u')
             ->andWhere('u.managedBy = :manager')
             ->setParameter('manager', $manager);
+    }
+
+    #[Route('/manager/team-reports', name: 'manager_team_reports', methods: ['GET'])]
+    public function teamReports(UserRepository $userRepository): Response
+    {
+        $manager = $this->getUser();
+
+        if (!$manager instanceof User) {
+            throw $this->createAccessDeniedException();
+        }
+
+        $members = $userRepository->findManagedMembersWithReports($manager);
+
+        $years = [];
+
+        foreach ($members as $member) {
+            foreach ($member->getReports() as $report) {
+                $startDate = $report->getStartDate();
+
+                if ($startDate !== null) {
+                    $years[(int) $startDate->format('Y')] = true;
+                }
+            }
+        }
+
+        $years = array_keys($years);
+        rsort($years);
+
+        // Garde une année affichable même lorsqu'il n'y a encore aucun relevé.
+        if ($years === []) {
+            $years[] = (int) (new \DateTimeImmutable())->format('Y');
+        }
+
+        return $this->render('Team/Reports/index.html.twig', [
+            'members' => $members,
+            'years' => $years,
+        ]);
     }
 }

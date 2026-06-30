@@ -12,6 +12,7 @@ use EasyCorp\Bundle\EasyAdminBundle\Collection\FilterCollection;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Filters;
 use EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
 use EasyCorp\Bundle\EasyAdminBundle\Dto\EntityDto;
@@ -35,6 +36,15 @@ class OrderCrudController extends AbstractCrudController
     {
         return $crud
             ->setEntityPermission('ROLE_ADMIN')
+        ;
+    }
+
+    public function configureFilters(Filters $filters): Filters
+    {
+        return $filters
+            ->add('user')
+            ->add('plan')
+            ->add('updatedAt')
         ;
     }
 
@@ -62,16 +72,16 @@ class OrderCrudController extends AbstractCrudController
     public function configureFields(string $pageName): iterable
     {
         return [
-            IdField::new('id')->hideOnForm(),
-            AssociationField::new('user'),
-            Field::new('plan'),
-            Field::new('createdAt')->onlyOnIndex(),
-            Field::new('updatedAt')->onlyOnIndex(),
-            Field::new('productName'),
-            Field::new('productDescription'),
-            Field::new('vatAmount'),
-            Field::new('total_ht'),
-            Field::new('status')->onlyOnIndex(),
+            IdField::new('id', 'ID')->hideOnForm(),
+            AssociationField::new('user', 'User'),
+            Field::new('plan', 'Plan'),
+            Field::new('createdAt', 'Created At')->onlyOnIndex(),
+            Field::new('updatedAt', 'Updated At')->onlyOnIndex(),
+            Field::new('productName', 'Product Name'),
+            Field::new('productDescription', 'Product Description'),
+            Field::new('vatAmount', 'Vat Amount'),
+            Field::new('total_ht', 'Total Ht'),
+            Field::new('status', 'Status')->onlyOnIndex(),
         ];
     }
 

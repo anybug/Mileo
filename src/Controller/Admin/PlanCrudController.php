@@ -24,18 +24,17 @@ class PlanCrudController extends AbstractCrudController
             ->setEntityPermission('ROLE_ADMIN')
         ;
     }
-
+    
     public function configureFields(string $pageName): iterable
     {
         return [
-            IdField::new('id')->hideOnForm(),
-            Field::new('name'),
-            Field::new('price_per_year'),
-            Field::new('plan_period'),
-            Field::new('billingDetails'),
-            Field::new('old_price_per_year'),
-            Field::new('description'),
-            
+            IdField::new('id', 'ID')->hideOnForm(),
+            Field::new('name', 'Name'),
+            Field::new('price_per_year', 'Price per year'),
+            Field::new('plan_period', 'Plan period'),
+            Field::new('billingDetails', 'Billing details'),
+            Field::new('old_price_per_year', 'Old price per year'),
+            Field::new('description', 'Description'),
         ];
     }
 }

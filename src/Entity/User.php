@@ -973,5 +973,33 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return false;
     }
 
+    public function getSubscriptionPlanName(): ?string
+    {
+        return $this->subscription?->getPlan()?->getName();
+    }
+
+    public function getSubscriptionStartDate(): ?\DateTimeImmutable
+    {
+        return $this->subscription?->getSubscriptionStart();
+    }
+
+    public function getSubscriptionEndDate(): ?\DateTimeImmutable
+    {
+        return $this->subscription?->getSubscriptionEnd();
+    }
+
+    public function getMonthlyCollaboratorsCount(): int
+    {
+        return $this->members
+            ->filter(static fn (self $member): bool => $member->isActive())
+            ->count();
+    }
+
+    public function getActiveMembers(): Collection
+    {
+        return $this->members
+            ->filter(static fn (self $member): bool => $member->isActive());
+    }
+
 }
 

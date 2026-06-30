@@ -6,6 +6,8 @@ use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Component\Security\Core\Security;
+use DateTimeInterface;
+use Doctrine\ORM\Query\Expr\Join;
 
 /**
  * @method User|null find($id, $lockMode = null, $lockVersion = null)
@@ -33,7 +35,7 @@ class UserRepository extends ServiceEntityRepository
         ;
     }
 
-     public function countManagedByCurrentUser(): int
+    public function countManagedByCurrentUser(): int
     {
         $me = $this->security->getUser();
 
@@ -47,6 +49,19 @@ class UserRepository extends ServiceEntityRepository
             ->setParameter('me', $me)
             ->getQuery()
             ->getSingleScalarResult();
+    }
+
+    public function findManagedMembersWithReports(User $manager): array
+    {
+        return $this->createQueryBuilder('teamUser')
+            ->leftJoin('teamUser.reports', 'report')
+            ->addSelect('report')
+            ->andWhere('teamUser.managedBy = :manager')
+            ->setParameter('manager', $manager)
+            ->orderBy('teamUser.last_name', 'ASC')
+            ->addOrderBy('teamUser.first_name', 'ASC')
+            ->getQuery()
+            ->getResult();
     }
 
     // /**

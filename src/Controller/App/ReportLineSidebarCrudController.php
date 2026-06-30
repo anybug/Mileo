@@ -201,7 +201,10 @@ class ReportLineSidebarCrudController extends AbstractCrudController
         yield TextareaField::new('comment', 'Motif du déplacement')
             ->setFormTypeOptions([
                 'required' => true,
-                'attr' => ['placeholder' => 'Saisissez une courte description qui justifie ce trajet'],
+                'attr' => [
+                    'placeholder' => 'Saisissez une courte description qui justifie ce trajet',
+                    'class' => 'report_lines_comment',
+                ],
             ]);
 
         yield NumberField::new('amount', 'Montant')

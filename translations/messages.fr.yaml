@@ -5,6 +5,8 @@ Orders: Commandes
 Orders list: Liste des commandes
 Order: Commande
 Subscriptions: Abonnements
+Active subscriptions: Abonnements actifs
+Inactive subscriptions: Abonnements inactifs
 Subscriptions list: Listes des abonnements
 Subscription: Abonnement
 Plans list: Liste des plans d'abonnement
@@ -133,3 +135,62 @@ Team : Équipe
 ## Vehicule ##
 delete_file: Supprimer le fichier
 download_file: Télécharger le fichier
+
+Pro users: Utilisateurs Pro
+Manager users: Utilisateurs Manager
+Free users: Utilisateurs Free
+Sign in as user: Se connecter en tant que cet utilisateur
+Last login: Dernière connexion
+Role(s): Rôle(s)
+Profile enabled: Profil activé
+Personal information: Informations personnelles
+When disabled, the user cannot sign in to the platform: Si désactivé, l'utilisateur ne peut pas se connecter à la plateforme
+The email address is used as the username to sign in to the platform: L'adresse e-mail est utilisée comme identifiant de connexion
+The passwords do not match: Les mots de passe ne correspondent pas
+View profile: Voir le profil
+Subscription start: Début de l'abonnement
+Subscription end: Fin de l'abonnement
+Active members this month: Collaborateurs actifs facturables ce mois
+Team members: Collaborateurs
+No team members: Aucun collaborateurs
+Annual overview: Récapitulatif annuel
+Monthly overview: Récapitulatif mensuel
+Reports by collaborators: Rapports des collaborateurs
+Collaborators with reports: Collaborateurs ayant déclaré des rapports
+Year: Année
+Contributors: Collaborateurs
+No reports for this month: Aucun rapport pour ce mois
+How to view monthly reports: Consulter les rapports mensuels
+Click a month to view contributors: Cliquez sur un mois pour voir les collaborateurs concernés
+No results found: Aucun résultat trouvé
+No more results: Aucun autre résultat trouvé
+Loading more results: Chargement de résultats supplémentaires…
+View more: Voir plus
+Close: Fermer
+Month: Mois
+Team reports: Récapitulatif des rapports
+Expires within 30 days: Expire dans les 30 prochains jours
+Expires within 7 days: Expire dans les 7 prochains jours
+Expires today: Expire aujourd’hui
+All expiry dates: Toutes les dates d’expiration
+Your Mileo Pro subscription expires in %days% days.: Votre abonnement Mileo Pro arrive à expiration dans %days% jours.
+Your Mileo Team subscription expires in %days% days.: Votre abonnement Mileo Team arrive à expiration dans %days% jours.
+Your Mileo trial period expires in %days% days.: Votre période d’essai Mileo expire dans %days% jours.
+
+Plan: Offre
+Created At: Créée le
+Updated At: Mise à jour le
+Product Name: Nom du produit
+Product Description: Description du produit
+Vat Amount: Montant de TVA
+Total Ht: Total HT
+Status: Statut
+
+Price per year: Prix annuel
+Plan period: Période de l’offre
+Billing details: Informations de facturation
+Old price per year: Ancien prix annuel
+Description: Description
+
+Annual summary: Récapitulatif annuel
+Summary: Récapitulatif

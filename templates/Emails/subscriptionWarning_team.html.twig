@@ -1,0 +1,27 @@
+<body>
+    <p>Bonjour {{ user.getFirstName() }} {{ user.getLastName() }},</p>
+
+    <p>
+        Votre abonnement <strong>Mileo Team</strong> arrive prochainement à expiration.
+    </p>
+
+    <p>
+        Il prendra fin le
+        <strong>{{ expiresAt|format_datetime(locale='fr', pattern='dd MMMM YYYY') }}</strong>.
+        Pour conserver l’accès de votre équipe à Mileo et à l’ensemble de ses fonctionnalités,
+        pensez à renouveler votre abonnement.
+    </p>
+
+    <p>Gérer ou renouveler votre abonnement :</p>
+    <p><a href="{{ url }}">Voir les offres</a></p>
+
+    <p>
+        L'équipe
+        <span style="font-size: 20px; font-weight: bold; color: #6174d1 !important;">
+            <font color="#6174d1">Mil</font>
+        </span>
+        <span style="font-size: 20px; font-weight: bold; color: #242F51 !important;">
+            <font color="#242F51">eo</font>
+        </span>
+    </p>
+</body>

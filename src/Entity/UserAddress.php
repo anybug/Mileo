@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Entity\User;
 use App\Repository\UserAddressRepository;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -22,6 +23,9 @@ class UserAddress
 
     #[ORM\Column(type: 'string', length: 255)]
     private $address;
+
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    private ?string $reason = null;
 
     #[ORM\Column(type: 'boolean', nullable: true)]
     private $is_default;
@@ -88,4 +92,17 @@ class UserAddress
     {
         return $this->getName().' : '.$this->getAddress();
     }
+
+    public function getReason(): ?string
+    {
+        return $this->reason;
+    }
+
+    public function setReason(?string $reason): static
+    {
+        $this->reason = $reason;
+
+        return $this;
+    }
+
 }
