@@ -88,13 +88,14 @@ class ReportAppCrudController extends AbstractCrudController
     public function configureResponseParameters(KeyValueStore $parameters): KeyValueStore
     {
         $context = $this->getContext();
-        $new = parent::configureResponseParameters($parameters);
 
-        if ($new->get('pageName') === Crud::PAGE_INDEX) {
-            $new = $this->generateFooterLine($new, $context);
+        $parameters = parent::configureResponseParameters($parameters);
+
+        if ($parameters->get('pageName') === Crud::PAGE_INDEX) {
+            $parameters = $this->generateFooterLine($parameters, $context);
         }
 
-        return $new;
+        return $parameters;
     }
 
     public function index(AdminContext $context)
@@ -941,6 +942,10 @@ class ReportAppCrudController extends AbstractCrudController
                 
         }
 
+        $currentYear = (int) date('Y');
+        $minYear = $currentYear - 4;
+        $maxYear = $currentYear + 1;
+
         if ($pageName === Crud::PAGE_NEW) {
 
             yield DateField::new('Year', 'Année')
@@ -949,7 +954,7 @@ class ReportAppCrudController extends AbstractCrudController
                 ->hideWhenUpdating()
                 ->setFormTypeOptions([
                     'required' => true,
-                    'years' => range(date('Y') - 4, date('Y') + 1),
+                    'years' => range($minYear, $maxYear),
                 ]);
 
             yield ChoiceField::new('Period', 'Mois')

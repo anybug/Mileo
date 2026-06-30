@@ -2,7 +2,7 @@
     <p>Bonjour {{ user.getFirstName() }} {{ user.getLastName() }},</p>
     <p>Vous bénéficiez actuellement de l’offre <strong>Mileo Pro</strong> et nous vous en remercions chaleureusement.
     <p>
-        Votre abonnement arrive à expiration le {{ end|format_datetime(locale='fr',pattern="dd MMMM YYYY") }}.
+        Votre abonnement arrive à expiration le {{ expiresAt|format_datetime(locale='fr',pattern="dd MMMM YYYY") }}.
     </p>
 
     <p>Afin d'éviter toute interruption, vous pouvez renouveler dès maintenant :</p>

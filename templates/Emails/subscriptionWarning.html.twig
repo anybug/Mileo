@@ -1,8 +1,0 @@
-<body>
-    <p>Bonjour {{ user.getFirstName() }} {{ user.getLastName() }},</p>
-    <p>Votre abonnement Mileo arrive à expiration dans 1 mois et ne sera plus valide à partir du <strong>{{ end|format_datetime(locale='fr',pattern="dd MMMM YYYY") }}</strong>, vous ne pourrez plus profiter pleinement de l'application.</p>
-    <p>Vous pouvez renouveler votre abonnement en cliquant sur le lien ci-dessous :</p>
-    <p><a href="{{ url }}">Renouveler mon abonnement</a></p>
-    <p>Nous vous remercions pour votre fidélité et restons à votre disposition pour tout complément d’information.</p>
-    <p>L'équipe <span style="font-size: 20px; font-weight: bold; color: #6174d1 !important;"><font color="#6174d1">Mil</font></span><span style="font-size: 20px; font-weight: bold;color: #242F51 !important;"><font color="#242F51">eo</font></span></p>
-</body>
