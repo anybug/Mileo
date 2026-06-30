@@ -7,9 +7,7 @@
 {% endblock %}
 
 {% block main %}
-
-    {{ parent() }}
-    <hr />
+    
     <div class="dashboard-content row m-1">
         <div class="mt-3 pb-3 col-12 border-bottom border-light">
             <h3 class="text-primary mb-3">{{ 'Statistiques'|trans }} par année</h3>
@@ -162,4 +160,7 @@
         </div>
     </div>
 
+<hr />
+
+{{ parent() }}
 {% endblock %}
