@@ -278,7 +278,7 @@ class TeamUserCrudController extends AbstractCrudController
                 ->setHelp(
                     $pageName === Crud::PAGE_EDIT
                         ? 'Laissez vide pour conserver le mot de passe actuel.'
-                        : null
+                        : ''
                 );
             yield BooleanField::new('is_active', 'Profil activé')->setHelp("Si désactivé, l'utilisateur ne peut pas se connecter à la plateforme");
 
