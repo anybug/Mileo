@@ -2,27 +2,29 @@
 
 namespace App\Controller\Team;
 
+use App\Entity\Subscription;
 use App\Entity\User;
 use App\Entity\UserAddress;
-use App\Entity\Subscription;
 use Doctrine\ORM\QueryBuilder;
-use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
-use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
-use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
-use EasyCorp\Bundle\EasyAdminBundle\Config\Assets;
-use EasyCorp\Bundle\EasyAdminBundle\Dto\EntityDto;
-use EasyCorp\Bundle\EasyAdminBundle\Dto\SearchDto;
-use EasyCorp\Bundle\EasyAdminBundle\Field\IdField;
-use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
-use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
-use EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext;
-use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FieldCollection;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FilterCollection;
-use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Assets;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
+use EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
+use EasyCorp\Bundle\EasyAdminBundle\Dto\EntityDto;
+use EasyCorp\Bundle\EasyAdminBundle\Dto\SearchDto;
+use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
+use EasyCorp\Bundle\EasyAdminBundle\Field\FormField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\IdField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\TextareaField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
 use EasyCorp\Bundle\EasyAdminBundle\Orm\EntityRepository as EasyAdminEntityRep;
 use Symfony\Component\ExpressionLanguage\Expression;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted("ROLE_MANAGER")]
@@ -77,11 +79,40 @@ class TeamAddressesCrudController extends AbstractCrudController
 
     public function configureFields(string $pageName): iterable
     {
-        return [
-            TextField::new('name','Nom'),
-            TextField::new('address','Adresse')
-                ->setFormTypeOptions(['attr' => ['class'=>'autocomplete']])
-            ,
-        ];
+        if (Crud::PAGE_INDEX === $pageName) {
+            return [
+                TextField::new('name', 'Nom'),
+
+                TextField::new('address', 'Adresse'),
+
+                TextField::new('reason', 'Motif'),
+            ];
+        }
+
+        if (Crud::PAGE_NEW === $pageName || Crud::PAGE_EDIT === $pageName) {
+            return [
+                FormField::addColumn(6),
+                FormField::addFieldset('Informations adresse')->setIcon('fa fa-map-marker-alt'),
+                TextField::new('name', 'Nom'),
+
+                TextField::new('address', 'Adresse')
+                    ->setFormTypeOptions([
+                        'attr' => [
+                            'class' => 'autocomplete',
+                        ],
+                    ]),
+
+                TextareaField::new('reason', 'Motif du déplacement')
+                    ->setRequired(false)
+                    ->setHelp("Facultatif: ce motif sera automatiquement proposé si cette adresse est utilisée comme destination dans un trajet.")
+                    ->setFormTypeOptions([
+                        'attr' => [
+                            'placeholder' => 'Ex. : Rendez-vous client',
+                        ],
+                    ]),
+            ];
+        }
+
+        return [];
     }
 }
