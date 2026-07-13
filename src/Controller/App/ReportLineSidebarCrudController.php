@@ -4,32 +4,33 @@ namespace App\Controller\App;
 
 use App\Entity\Report;
 use App\Entity\ReportLine;
+use App\Entity\UserAddress;
 use App\Entity\Vehicule;
 use App\Service\ReportService;
-use Doctrine\ORM\EntityRepository;
 use Doctrine\ORM\EntityManagerInterface;
-use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
-use EasyCorp\Bundle\EasyAdminBundle\Config\Assets;
+use Doctrine\ORM\EntityRepository;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
-use EasyCorp\Bundle\EasyAdminBundle\Field\FormField;
-use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
-use EasyCorp\Bundle\EasyAdminBundle\Field\DateField;
-use EasyCorp\Bundle\EasyAdminBundle\Field\HiddenField;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Assets;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
+use EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext;
+use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
+use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\DateField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\FormField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\HiddenField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\NumberField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextareaField;
-use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
-use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpFoundation\Request;
+use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
+use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\Routing\Annotation\Route;
-use EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext;
-use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
-use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
 
 class ReportLineSidebarCrudController extends AbstractCrudController
 {
@@ -139,6 +140,59 @@ class ReportLineSidebarCrudController extends AbstractCrudController
 
     public function configureFields(string $pageName): iterable
     {
+        $currentUser = $this->getUser();
+        $addressOwner = $currentUser->getManagedBy() ?? $currentUser;
+
+        $defaultUserAddress = $this->entityManager
+            ->getRepository(UserAddress::class)
+            ->findOneBy([
+                'user' => $addressOwner,
+                'is_default' => true,
+            ]);
+
+        $defaultStartAddress = trim(
+            (string) ($defaultUserAddress?->getAddress() ?? '')
+        );
+
+        if ('' === $defaultStartAddress) {
+            $defaultStartAddress = null;
+        }
+
+        $startAddressHelp = '
+            Saisissez une adresse ou
+            <a href="#" class="popup-fav-start">
+                sélectionnez une de vos <i class="fa fa-map-marker-alt"></i>
+            </a>
+        ';
+
+        if (null !== $defaultStartAddress) {
+            $startAddressHelp .= sprintf(
+                '
+                <span class="mx-1">ou</span>
+                <a
+                    href="#"
+                    class="js-use-default-start"
+                    data-default-address="%s"
+                >
+                    utilisez votre adresse par défaut
+                    <i class="fa-solid fa-house"></i>
+                </a>
+                ',
+                htmlspecialchars(
+                    $defaultStartAddress,
+                    ENT_QUOTES | ENT_SUBSTITUTE,
+                    'UTF-8'
+                )
+            );
+        }
+
+        $endAddressHelp = '
+            Saisissez une adresse ou
+            <a href="#" class="popup-fav-end">
+                sélectionnez une de vos <i class="fa fa-map-marker-alt"></i>
+            </a>
+        ';
+
         yield FormField::addPanel();
 
         yield DateField::new('travel_date', 'Date')
@@ -157,24 +211,28 @@ class ReportLineSidebarCrudController extends AbstractCrudController
             ->setTemplateName('crud/field/generic')
             ;
 
-         // --- Départ (FORM) ---
-        yield TextField::new('startAdress','Départ')
+        yield FormField::addRow();
+
+        yield TextField::new('startAdress', 'Départ')
             ->setFormTypeOptions([
-                'attr' => ['class'=>'autocomplete lines_start'],
-                'label_html' => true,
-                'help' => 'Saisissez une adresse ou <a class="popup-fav-start">selectionnez une de vos <i class="fa fa-map-marker-alt"></i></a>'
+                'attr' => [
+                    'class' => 'autocomplete lines_start',
+                ],
+                'help_html' => true,
+                'help' => $startAddressHelp,
             ])
-            ->setColumns('col-sm-12 col-lg-6 col-xxl-5')
+            ->setColumns('col-12 col-md-6')
             ->onlyOnForms();
 
-        // --- Arrivée (FORM) ---
-        yield TextField::new('endAdress',"Arrivée")
+        yield TextField::new('endAdress', 'Arrivée')
             ->setFormTypeOptions([
-                'attr' => ['class'=>'autocomplete lines_end'],
-                'label_html' => true,
-                'help' => 'Saisissez une adresse ou <a class="popup-fav-end">selectionnez une de vos <i class="fa fa-map-marker-alt"></i></a>'
+                'attr' => [
+                    'class' => 'autocomplete lines_end',
+                ],
+                'help_html' => true,
+                'help' => $endAddressHelp,
             ])
-            ->setColumns('col-sm-12 col-lg-6 col-xxl-5')
+            ->setColumns('col-12 col-md-6')
             ->onlyOnForms();
 
        yield HiddenField::new('km','Distance (km)')

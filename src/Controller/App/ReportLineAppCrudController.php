@@ -247,11 +247,34 @@ class ReportLineAppCrudController extends AbstractCrudController
         yield FormField::addRow();
         yield FormField::addPanel('Travel information')->setIcon('fa fa-car');
 
-        $motifsByAddress = [];
+        $reasonsByAddress = [];
+        $defaultStartAddress = null;
 
-        // Adresses personnelles
+        $defaultAddressOwner = $me->getManagedBy() ?? $me;
+        $defaultUserAddress = $this->entityManager
+            ->getRepository(UserAddress::class)
+            ->findOneBy([
+                'user' => $defaultAddressOwner,
+                'is_default' => true,
+            ]);
+
+        $defaultStartAddress = trim(
+            (string) ($defaultUserAddress?->getAddress() ?? '')
+        );
+
+        if ('' === $defaultStartAddress) {
+            $defaultStartAddress = null;
+        }
+
+        // Adresses personnelles : utilisées pour les motifs des favorites.
         foreach ($me->getUserAddresses() as $userAddress) {
-            $motifsByAddress[(string) $userAddress->getAddress()] = (string) ($userAddress->getReason() ?? '');
+            $address = trim((string) $userAddress->getAddress());
+
+            if ('' === $address) {
+                continue;
+            }
+
+            $reasonsByAddress[$address] = (string) ($userAddress->getReason() ?? '');
         }
 
         // Adresses du groupe, pour les membres d'une équipe
@@ -268,7 +291,7 @@ class ReportLineAppCrudController extends AbstractCrudController
 
             foreach ($users as $user) {
                 foreach ($user->getUserAddresses() as $userAddress) {
-                    $motifsByAddress[(string) $userAddress->getAddress()]
+                    $reasonsByAddress[(string) $userAddress->getAddress()]
                         = (string) ($userAddress->getReason() ?? '');
                 }
             }
@@ -283,12 +306,12 @@ class ReportLineAppCrudController extends AbstractCrudController
                     'expanded' => true,
                     'mapped' => false,
                     'required' => false,
-                    'choice_attr' => function ($choice) use ($motifsByAddress) {
+                    'choice_attr' => function ($choice) use ($reasonsByAddress) {
                         $address = (string) $choice;
 
                         return [
                             'class' => 'report_favories_choice',
-                            'data-motif' => $motifsByAddress[$address] ?? '',
+                            'data-motif' => $reasonsByAddress[$address] ?? '',
                         ];
                     }
                 ])
@@ -304,12 +327,12 @@ class ReportLineAppCrudController extends AbstractCrudController
                     'expanded' => true,
                     'mapped' => false,
                     'required' => false,
-                    'choice_attr' => function ($choice) use ($motifsByAddress) {
+                    'choice_attr' => function ($choice) use ($reasonsByAddress) {
                         $address = (string) $choice;
 
                         return [
                             'class' => 'report_favories_choice',
-                            'data-motif' => $motifsByAddress[$address] ?? '',
+                            'data-motif' => $reasonsByAddress[$address] ?? '',
                         ];
                     }
                 ])
@@ -399,14 +422,53 @@ class ReportLineAppCrudController extends AbstractCrudController
         */
 
 
+        $startAddressHelp = '
+            Saisissez une adresse ou
+            <a href="#" class="popup-fav-start">
+                <i class="fa fa-map-marker-alt"></i> sélectionnez adresse récurrente
+            </a>
+        ';
+
+        if (null !== $defaultStartAddress) {
+            $startAddressHelp .= sprintf(
+                '
+                <span class="mx-1">ou</span>
+                <a
+                    href="#"
+                    class="js-use-default-start"
+                    data-default-address="%s"
+                >
+                    <i class="fa-solid fa-house"></i> utilisez adresse par défaut
+                </a>
+                ',
+                htmlspecialchars(
+                    $defaultStartAddress,
+                    ENT_QUOTES | ENT_SUBSTITUTE,
+                    'UTF-8'
+                )
+            );
+        }
+
+       $endAddressHelp = '
+            Saisissez une adresse ou
+            <a href="#" class="popup-fav-end">
+                sélectionnez une de vos <i class="fa fa-map-marker-alt"></i>
+            </a>
+        ';
+
+        // Force une nouvelle ligne dédiée aux deux adresses.
+        yield FormField::addRow();
+
         // --- Départ (FORM) ---
-        yield TextField::new('startAdress','Départ')
+        yield TextField::new('startAdress', 'Départ')
             ->setFormTypeOptions([
-                'attr' => ['class'=>'autocomplete lines_start'],
-                'label_html' => true,
-                'help' => 'Saisissez une adresse ou <a class="popup-fav-start">selectionnez une de vos <i class="fa fa-map-marker-alt"></i></a>'
+                'attr' => [
+                    'class' => 'autocomplete lines_start',
+                ],
+                'help_html' => true,
+                'help' => $startAddressHelp,
             ])
-            ->setColumns('col-sm-12 col-lg-6 col-xxl-5')
+            ->setColumns('col-12 col-md-6')
             ->onlyOnForms();
 
         // --- Départ (INDEX) ---
@@ -414,16 +476,17 @@ class ReportLineAppCrudController extends AbstractCrudController
             ->onlyOnIndex()
             ->renderAsHtml()
             ->formatValue(fn ($value, $entity) => $entity->formatAddressWithName($value));
-       
 
         // --- Arrivée (FORM) ---
-        yield TextField::new('endAdress',"Arrivée")
+        yield TextField::new('endAdress', 'Arrivée')
             ->setFormTypeOptions([
-                'attr' => ['class'=>'autocomplete lines_end'],
-                'label_html' => true,
-                'help' => 'Saisissez une adresse ou <a class="popup-fav-end">selectionnez une de vos <i class="fa fa-map-marker-alt"></i></a>'
+                'attr' => [
+                    'class' => 'autocomplete lines_end',
+                ],
+                'help_html' => true,
+                'help' => $endAddressHelp,
             ])
-            ->setColumns('col-sm-12 col-lg-6 col-xxl-5')
+            ->setColumns('col-12 col-md-6')
             ->onlyOnForms();
 
         // --- Arrivée (INDEX) ---
