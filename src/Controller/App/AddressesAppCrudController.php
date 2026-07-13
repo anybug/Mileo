@@ -5,6 +5,7 @@ namespace App\Controller\App;
 use App\Entity\Subscription;
 use App\Entity\User;
 use App\Entity\UserAddress;
+use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\QueryBuilder;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FieldCollection;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FilterCollection;
@@ -17,6 +18,7 @@ use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
 use EasyCorp\Bundle\EasyAdminBundle\Dto\EntityDto;
 use EasyCorp\Bundle\EasyAdminBundle\Dto\SearchDto;
 use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
 use EasyCorp\Bundle\EasyAdminBundle\Field\FormField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IdField;
@@ -106,9 +108,10 @@ class AddressesAppCrudController extends AbstractCrudController
     
     public function createEntity(string $entityFqcn)
     {
-        $vehicule = new UserAddress();
-        $vehicule->setUser($this->getUser());
-        return $vehicule;
+        $address = new UserAddress();
+        $address->setUser($this->getUser());
+
+        return $address;
     }
 
 
@@ -119,6 +122,8 @@ class AddressesAppCrudController extends AbstractCrudController
                 TextField::new('name', 'Nom'),
 
                 TextField::new('address', 'Adresse'),
+
+                BooleanField::new('is_default', 'Adresse par défaut')->renderAsSwitch(false),
 
                 TextField::new('reason', 'Motif'),
 
@@ -137,6 +142,9 @@ class AddressesAppCrudController extends AbstractCrudController
                             'class' => 'autocomplete',
                         ],
                     ]),
+
+                BooleanField::new('is_default', 'Adresse par défaut')
+                    ->setHelp('Cette adresse sera proposée lors de la création ou modification d’un trajet.'),
                 
                 TextareaField::new('reason', 'Motif du déplacement')
                     ->setRequired(false)
@@ -151,5 +159,48 @@ class AddressesAppCrudController extends AbstractCrudController
         }
 
         return [];
+    }
+
+    public function persistEntity(EntityManagerInterface $entityManager, $entityInstance): void
+    {
+        if ($entityInstance instanceof UserAddress) {
+            $this->resetOtherDefaultAddresses($entityManager, $entityInstance);
+        }
+
+        parent::persistEntity($entityManager, $entityInstance);
+    }
+
+    public function updateEntity(EntityManagerInterface $entityManager, $entityInstance): void
+    {
+        if ($entityInstance instanceof UserAddress) {
+            $this->resetOtherDefaultAddresses($entityManager, $entityInstance);
+        }
+
+        parent::updateEntity($entityManager, $entityInstance);
+    }
+
+    private function resetOtherDefaultAddresses(
+        EntityManagerInterface $entityManager,
+        UserAddress $currentAddress
+    ): void {
+        if (!$currentAddress->isDefault()) {
+            return;
+        }
+
+        $queryBuilder = $entityManager->createQueryBuilder()
+            ->update(UserAddress::class, 'address')
+            ->set('address.is_default', ':isDefault')
+            ->where('address.user = :user')
+            ->setParameter('isDefault', false)
+            ->setParameter('user', $currentAddress->getUser());
+
+        // En modification, on ne désactive pas l'adresse actuellement éditée.
+        if (null !== $currentAddress->getId()) {
+            $queryBuilder
+                ->andWhere('address.id != :currentAddressId')
+                ->setParameter('currentAddressId', $currentAddress->getId());
+        }
+
+        $queryBuilder->getQuery()->execute();
     }
 }

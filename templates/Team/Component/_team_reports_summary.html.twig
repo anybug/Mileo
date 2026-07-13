@@ -1,11 +1,16 @@
 {% set currentYear = 'now'|date('Y') %}
 {% set currentMonth = 'now'|date('n') %}
 {% set availableYears = years|default([]) %}
+{% set actionModalId = componentId ~ '-billing-action-modal' %}
 {% set modalId = componentId ~ '-billing-details-modal' %}
 {% set billingPanelId = componentId ~ '-billing-panel' %}
 {% set activityPanelId = componentId ~ '-activity-panel' %}
 {% set billingTabId = componentId ~ '-billing-tab' %}
 {% set activityTabId = componentId ~ '-activity-tab' %}
+{% set showBilling = showBilling|default(false) %}
+{% set manager = manager|default(null) %}
+{% set billingReturnSeparator = '?' in app.request.uri ? '&' : '?' %}
+{% set billingReturnUrl = app.request.uri ~ billingReturnSeparator ~ 'teamMainView=billing' %}
 
 {% if availableYears is empty %}
     {% set availableYears = [currentYear] %}
@@ -33,369 +38,538 @@
             {{ 'Activité kilométrique'|trans }}
         </button>
 
-        <button
-            id="{{ billingTabId }}"
-            type="button"
-            class="btn btn-light d-inline-flex align-items-center gap-2 px-3 py-2 rounded-2"
-            role="tab"
-            aria-selected="false"
-            aria-controls="{{ billingPanelId }}"
-            data-team-main-view-button
-            data-team-main-view="billing"
-        >
-            <i class="fa-solid fa-file-invoice"></i>
-            {{ 'Facturation'|trans }}
-        </button>
+        {% if showBilling %}
+            <button
+                id="{{ billingTabId }}"
+                type="button"
+                class="btn btn-light d-inline-flex align-items-center gap-2 px-3 py-2 rounded-2"
+                role="tab"
+                aria-selected="false"
+                aria-controls="{{ billingPanelId }}"
+                data-team-main-view-button
+                data-team-main-view="billing"
+            >
+                <i class="fa-solid fa-file-invoice"></i>
+                {{ 'Facturation'|trans }}
+            </button>
+        {% endif %}
     </div>
+    {% if showBilling %}
+        <div
+            id="{{ billingPanelId }}"
+            class="d-none"
+            role="tabpanel"
+            aria-labelledby="{{ billingTabId }}"
+            data-team-main-view-pane="billing"
+        >
+            <div class="row g-3 align-items-end mb-3">
+                <div class="col-12 col-sm-auto">
+                    <label
+                        for="{{ componentId }}-billing-year-select"
+                        class="form-label text-muted mb-1"
+                    >
+                        {{ 'Année de facturation'|trans }}
+                    </label>
 
-   <div
-        id="{{ billingPanelId }}"
-        class="d-none"
-        role="tabpanel"
-        aria-labelledby="{{ billingTabId }}"
-        data-team-main-view-pane="billing"
-    >
-        <div class="row g-3 align-items-end mb-3">
-            <div class="col-12 col-sm-auto">
-                <label
-                    for="{{ componentId }}-billing-year-select"
-                    class="form-label text-muted mb-1"
-                >
-                    {{ 'Année de facturation'|trans }}
-                </label>
+                    <select
+                        id="{{ componentId }}-billing-year-select"
+                        class="form-select fw-bold"
+                        aria-label="{{ 'Année de facturation'|trans }}"
+                    >
+                        {% for availableYear in availableYears %}
+                            <option
+                                value="{{ availableYear }}"
+                                {{ availableYear == selectedYear ? 'selected' : '' }}
+                            >
+                                {{ availableYear }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
 
-                <select
-                    id="{{ componentId }}-billing-year-select"
-                    class="form-select fw-bold"
-                    aria-label="{{ 'Année de facturation'|trans }}"
-                >
-                    {% for availableYear in availableYears %}
-                        <option
-                            value="{{ availableYear }}"
-                            {{ availableYear == selectedYear ? 'selected' : '' }}
-                        >
-                            {{ availableYear }}
-                        </option>
+                {% for summaryYear in availableYears %}
+                    {% set billingReportsCount = 0 %}
+                    {% set billingTotalIk = 0 %}
+
+                    {% for member in members %}
+                        {% for report in member.reports %}
+                            {% if report.createdAt is not null and report.createdAt|date('Y') == summaryYear %}
+                                {% set billingReportsCount = billingReportsCount + 1 %}
+                                {% set billingTotalIk = billingTotalIk + (report.total|default(0)) %}
+                            {% endif %}
+                        {% endfor %}
                     {% endfor %}
-                </select>
+
+                    <div
+                        class="col-6 col-sm-auto {{ summaryYear == selectedYear ? '' : 'd-none' }}"
+                        data-team-billing-year-summary="{{ summaryYear }}"
+                    >
+                        <span class="badge badge-success fs-6 fw-normal px-3 py-2 w-100">
+                            <i class="fa-solid fa-file-lines me-1"></i>
+                            <strong>{{ billingReportsCount }}</strong>
+                            {{ "Rapports facturés"|trans }}
+                        </span>
+                    </div>
+
+                    <div
+                        class="col-6 col-sm-auto {{ summaryYear == selectedYear ? '' : 'd-none' }}"
+                        data-team-billing-year-summary="{{ summaryYear }}"
+                    >
+                        <span class="badge badge-primary fs-6 fw-normal px-3 py-2 w-100">
+                            <i class="fa-solid fa-euro-sign me-1"></i>
+                            <strong>{{ billingTotalIk|number_format(2, ',', ' ') }} €</strong>
+                            {{ 'Montant IK'|trans }}
+                        </span>
+                    </div>
+                {% endfor %}
             </div>
 
-            {% for summaryYear in availableYears %}
-                {% set billingReportsCount = 0 %}
-                {% set billingTotalIk = 0 %}
-
-                {% for member in members %}
-                    {% for report in member.reports %}
-                        {% if report.createdAt is not null and report.createdAt|date('Y') == summaryYear %}
-                            {% set billingReportsCount = billingReportsCount + 1 %}
-                            {% set billingTotalIk = billingTotalIk + (report.total|default(0)) %}
-                        {% endif %}
-                    {% endfor %}
-                {% endfor %}
-
-                <div
-                    class="col-6 col-sm-auto {{ summaryYear == selectedYear ? '' : 'd-none' }}"
-                    data-team-billing-year-summary="{{ summaryYear }}"
+            {% for year in availableYears %}
+                <section
+                    class="{{ year == selectedYear ? '' : 'd-none' }}"
+                    data-team-billing-year-section="{{ year }}"
                 >
-                    <span class="badge badge-success fs-6 fw-normal px-3 py-2 w-100">
-                        <i class="fa-solid fa-file-lines me-1"></i>
-                        <strong>{{ billingReportsCount }}</strong>
-                        {{ "Rapports facturés"|trans }}
-                    </span>
-                </div>
+                    <h2 class="visually-hidden">
+                        {{ 'Récapitulatif de facturation'|trans }} {{ year }}
+                    </h2>
 
-                <div
-                    class="col-6 col-sm-auto {{ summaryYear == selectedYear ? '' : 'd-none' }}"
-                    data-team-billing-year-summary="{{ summaryYear }}"
-                >
-                    <span class="badge badge-primary fs-6 fw-normal px-3 py-2 w-100">
-                        <i class="fa-solid fa-euro-sign me-1"></i>
-                        <strong>{{ billingTotalIk|number_format(2, ',', ' ') }} €</strong>
-                        {{ 'Montant IK'|trans }}
-                    </span>
-                </div>
-            {% endfor %}
-        </div>
-
-        {% for year in availableYears %}
-            <section
-                class="{{ year == selectedYear ? '' : 'd-none' }}"
-                data-team-billing-year-section="{{ year }}"
-            >
-                <h2 class="visually-hidden">
-                    {{ 'Récapitulatif de facturation'|trans }} {{ year }}
-                </h2>
-
-                <div class="table-responsive border rounded-3 overflow-hidden">
-                    <table class="table table-sm align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th scope="col">
-                                    {{ 'Mois facturé'|trans }}
-                                </th>
-
-                                <th scope="col" class="text-end">
-                                    {{ 'Du mois'|trans }}
-                                </th>
-
-                                <th scope="col">
-                                    {{ 'Rattrapage'|trans }}
-                                </th>
-
-                                <th scope="col" class="text-end">
-                                    {{ 'Total facturé'|trans }}
-                                </th>
-
-                                <th scope="col" class="text-end">
-                                    {{ 'Montant IK'|trans }}
-                                </th>
-
-                                <th scope="col" class="text-end">
-                                    {{ 'Détails'|trans }}
-                                </th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-                            {% for month in 1..12 %}
-                                {% set monthDate = date(year ~ '-' ~ month ~ '-01') %}
-                                {% set periodKey = monthDate|date('Y-m') %}
-                                {% set reportDetails = [] %}
-                                {% set currentPeriodReports = [] %}
-                                {% set retroReports = [] %}
-                                {% set totalIk = 0 %}
-                                {% set detailTemplateId = componentId ~ '-billing-details-' ~ year ~ '-' ~ month %}
-                                {% set isCurrentMonth = year == currentYear and month == currentMonth %}
-
-                                {% for member in members %}
-                                    {% for report in member.reports %}
-                                        {% if report.createdAt is not null and report.createdAt|date('Y-m') == periodKey %}
-                                            {% set isCurrentPeriod = report.startDate is not null
-                                                and report.startDate|date('Y-m') == periodKey
-                                            %}
-
-                                            {% set reportTotal = report.total|default(0) %}
-                                            {% set reportKm = report.km|default(0) %}
-
-                                            {% set reportDetail = {
-                                                member: member,
-                                                createdAt: report.createdAt,
-                                                startDate: report.startDate,
-                                                lines: report.lines|length,
-                                                km: reportKm,
-                                                total: reportTotal,
-                                                isRetroactive: not isCurrentPeriod,
-                                                sortKey: (
-                                                    (member.lastName|default('')|lower) ~ '|' ~
-                                                    (member.firstName|default('')|lower) ~ '|' ~
-                                                    (
-                                                        report.startDate is not null
-                                                            ? report.startDate|date('Ym')
-                                                            : report.createdAt|date('Ym')
-                                                    ) ~ '|' ~
-                                                    report.createdAt|date('YmdHis')
-                                                )
-                                            } %}
-
-                                            {% set reportDetails = reportDetails|merge([reportDetail]) %}
-                                            {% set totalIk = totalIk + reportTotal %}
-
-                                            {% if isCurrentPeriod %}
-                                                {% set currentPeriodReports = currentPeriodReports|merge([reportDetail]) %}
-                                            {% else %}
-                                                {% set retroReports = retroReports|merge([reportDetail]) %}
-                                            {% endif %}
-                                        {% endif %}
-                                    {% endfor %}
-                                {% endfor %}
-
-                                {% set reportDetails = reportDetails|sort(
-                                    (a, b) => a.sortKey <=> b.sortKey
-                                ) %}
-                                {% set reportLabel = reportDetails|length > 1 ? 'rapports facturés' : 'rapport facturé' %}
-                                {% set detailTitle = 'Détail — ' ~ (monthDate|date('F')|trans) ~ ' ' ~ year ~ ' · ' ~ reportDetails|length ~ ' ' ~ reportLabel %}
-
+                    <div class="table-responsive border rounded-3 overflow-hidden">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="table-light">
                                 <tr>
-                                    <td scope="row">
-                                        <div class="d-inline-flex align-items-center gap-2">
-                                            {% if isCurrentMonth %}
-                                                <span
-                                                    class="d-inline-block bg-primary rounded-pill"
-                                                    style="width: 0.22rem; height: 1.25rem;"
-                                                    title="{{ 'En cours'|trans }}"
-                                                >
-                                                    <span class="visually-hidden">{{ 'En cours'|trans }}</span>
+                                    <th scope="col">
+                                        {{ 'Mois facturé'|trans }}
+                                    </th>
+
+                                    <th scope="col" class="text-end">
+                                        {{ 'Du mois'|trans }}
+                                    </th>
+
+                                    <th scope="col">
+                                        {{ 'Rattrapage'|trans }}
+                                    </th>
+
+                                    <th scope="col" class="text-end">
+                                        {{ 'Total facturé'|trans }}
+                                    </th>
+
+                                    <th scope="col" class="text-end">
+                                        {{ 'Montant IK'|trans }}
+                                    </th>
+
+                                    <th scope="col" class="text-end">
+                                        {{ 'Facture'|trans }}
+                                    </th>
+
+                                    <th scope="col" class="text-end">
+                                        {{ 'Actions'|trans }}
+                                    </th>
+
+                                    <th scope="col" class="text-end">
+                                        {{ 'Détails'|trans }}
+                                    </th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {% for month in 1..12 %}
+                                    {% set monthDate = date(year ~ '-' ~ month ~ '-01') %}
+                                    {% set periodKey = monthDate|date('Y-m') %}
+                                    {% set invoice = null%}
+                                    {% set reportDetails = [] %}
+                                    {% set currentPeriodReports = [] %}
+                                    {% set retroReports = [] %}
+                                    {% set totalIk = 0 %}
+                                    {% set detailTemplateId = componentId ~ '-billing-details-' ~ year ~ '-' ~ month %}
+                                    {% set isCurrentMonth = year == currentYear and month == currentMonth %}
+
+                                    {% for member in members %}
+                                        {% for report in member.reports %}
+                                            {% if report.createdAt is not null and report.createdAt|date('Y-m') == periodKey %}
+                                                {% set isCurrentPeriod = report.startDate is not null
+                                                    and report.startDate|date('Y-m') == periodKey
+                                                %}
+
+                                                {% set reportTotal = report.total|default(0) %}
+                                                {% set reportKm = report.km|default(0) %}
+
+                                                {% set reportDetail = {
+                                                    invoice: report.invoice|default(null),
+                                                    member: member,
+                                                    createdAt: report.createdAt,
+                                                    startDate: report.startDate,
+                                                    lines: report.lines|length,
+                                                    km: reportKm,
+                                                    total: reportTotal,
+                                                    isRetroactive: not isCurrentPeriod,
+                                                    sortKey: (
+                                                        (member.lastName|default('')|lower) ~ '|' ~
+                                                        (member.firstName|default('')|lower) ~ '|' ~
+                                                        (
+                                                            report.startDate is not null
+                                                                ? report.startDate|date('Ym')
+                                                                : report.createdAt|date('Ym')
+                                                        ) ~ '|' ~
+                                                        report.createdAt|date('YmdHis')
+                                                    )
+                                                } %}
+
+                                                {% set reportDetails = reportDetails|merge([reportDetail]) %}
+                                                {% set totalIk = totalIk + reportTotal %}
+
+                                                {% if isCurrentPeriod %}
+                                                    {% set currentPeriodReports = currentPeriodReports|merge([reportDetail]) %}
+                                                {% else %}
+                                                    {% set retroReports = retroReports|merge([reportDetail]) %}
+                                                {% endif %}
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% endfor %}
+
+                                    {% set reportDetails = reportDetails|sort(
+                                        (a, b) => a.sortKey <=> b.sortKey
+                                    ) %}
+                                    {% set invoicedDetails = reportDetails|filter(detail => detail.invoice is not null) %}
+                                    {% set firstInvoicedDetail = invoicedDetails|first %}
+                                    {% set invoice = firstInvoicedDetail ? firstInvoicedDetail.invoice : null %}
+                                    {% set invoiceStatus = invoice is not null ? invoice.statusAsString : null %}
+                                    {% set reportLabel = reportDetails|length > 1 ? 'rapports facturés' : 'rapport facturé' %}
+                                    {% set detailTitle = 'Détail — ' ~ (monthDate|date('F')|trans) ~ ' ' ~ year ~ ' · ' ~ reportDetails|length ~ ' ' ~ reportLabel %}
+
+                                    <tr>
+                                        <td scope="row">
+                                            <div class="d-inline-flex align-items-center gap-2">
+                                                {% if isCurrentMonth %}
+                                                    <span
+                                                        class="d-inline-block bg-primary rounded-pill"
+                                                        style="width: 0.22rem; height: 1.25rem;"
+                                                        title="{{ 'En cours'|trans }}"
+                                                    >
+                                                        <span class="visually-hidden">{{ 'En cours'|trans }}</span>
+                                                    </span>
+                                                {% endif %}
+
+                                                <span>
+                                                    {{ monthDate|date('F')|trans }}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td class="text-end">
+                                            {{ currentPeriodReports|length }}
+                                        </td>
+
+                                        <td>
+                                            {% if retroReports is empty %}
+                                                <span class="text-muted">—</span>
+                                            {% else %}
+                                                <span class="badge bg-warning-subtle text-warning-emphasis fw-normal">
+                                                    {{ retroReports|length }}
+                                                    {{ retroReports|length > 1 ? 'rapports rétroactifs' : 'rapport rétroactif' }}
                                                 </span>
                                             {% endif %}
+                                        </td>
 
-                                            <span>
-                                                {{ monthDate|date('F')|trans }}
-                                            </span>
-                                        </div>
-                                    </td>
-                                    <td class="text-end">
-                                        {{ currentPeriodReports|length }}
-                                    </td>
+                                        <td class="text-end fw-semibold">
+                                            {{ reportDetails|length }}
+                                        </td>
 
-                                    <td>
-                                        {% if retroReports is empty %}
-                                            <span class="text-muted">—</span>
-                                        {% else %}
-                                            <span class="badge bg-warning-subtle text-warning-emphasis fw-normal">
-                                                {{ retroReports|length }}
-                                                {{ retroReports|length > 1 ? 'rapports rétroactifs' : 'rapport rétroactif' }}
-                                            </span>
-                                        {% endif %}
-                                    </td>
+                                        <td class="text-end">
+                                            {{ totalIk|number_format(2, ',', ' ') }} €
+                                        </td>
 
-                                    <td class="text-end fw-semibold">
-                                        {{ reportDetails|length }}
-                                    </td>
+                                        <td class="text-end">
+                                            {% if reportDetails is empty %}
+                                                <span class="text-muted">—</span>
+                                            {% elseif invoice is null %}
+                                                <span class="badge bg-secondary-subtle text-secondary-emphasis fw-normal">
+                                                    {{ 'À créer'|trans }}
+                                                </span>
+                                            {% else %}
+                                                {% set invoiceUrl = ea_url()
+                                                    .unsetAll()
+                                                    .setController('App\\Controller\\Admin\\InvoiceCrudController')
+                                                    .setAction('detail')
+                                                    .setEntityId(invoice.id)
+                                                    .set('invoiceTab', 'preview')
+                                                %}
 
-                                    <td class="text-end">
-                                        {{ totalIk|number_format(2, ',', ' ') }} €
-                                    </td>
+                                                <span class="badge {{ invoice.statusBadgeClass }} fw-normal">
+                                                    {{ invoice.statusLabel }}
+                                                </span>
 
-                                    <td class="text-end">
-                                        {% if reportDetails is empty %}
-                                            <span class="text-muted">—</span>
-                                        {% else %}
-                                            <button
-                                                type="button"
-                                                class="btn btn-secondary"
-                                                data-bs-toggle="modal"
-                                                data-bs-target="#{{ modalId }}"
-                                                data-team-detail-template="{{ detailTemplateId }}"
-                                                data-team-detail-title="{{ detailTitle }}"
-                                                data-team-detail-current-reports="{{ currentPeriodReports|length }}"
-                                                data-team-detail-retro-reports="{{ retroReports|length }}"
-                                                data-team-detail-total-reports="{{ reportDetails|length }}"
-                                                data-team-detail-total-ik="{{ totalIk|number_format(2, ',', ' ') }} €"
-                                            >
-                                                {{ 'Voir le détail'|trans }}
-                                                <i class="fa-solid fa-arrow-right ms-1"></i>
-                                            </button>
+                                                {% if invoice.num is not null %}
+                                                    <a
+                                                        href="{{ invoiceUrl }}"
+                                                        class="small d-block text-decoration-none fw-semibold mt-1"
+                                                        title="{{ 'Voir la facture'|trans }}"
+                                                    >
+                                                        #{{ invoice.num }}
+                                                    </a>
+                                                {% endif %}
+                                            {% endif %}
+                                        </td>
 
-                                            <template id="{{ detailTemplateId }}">
-                                                <div
-                                                    class="table-responsive overflow-auto border rounded-3"
-                                                    style="max-height: 65vh;"
-                                                >
-                                                    <table class="table table-sm align-middle mb-0">
-                                                        <thead>
-                                                            <tr>
-                                                                <th
-                                                                    scope="col"
-                                                                    class="position-sticky top-0 z-2 bg-body-secondary"
-                                                                >
-                                                                    {{ 'Collaborateur'|trans }}
-                                                                </th>
+                                        <td class="text-end">
+                                            {% if reportDetails is empty or manager is null %}
+                                                <span class="text-muted">—</span>
+                                            {% else %}
+                                                <div class="d-inline-flex justify-content-end gap-2 flex-wrap">
+                                                    {% if invoice is null %}
+                                                        <form
+                                                            method="post"
+                                                            action="{{ path('admin_team_report_invoice_draft', {
+                                                                manager: manager.id,
+                                                                year: year,
+                                                                month: month
+                                                            }) }}"
+                                                            class="d-inline"
+                                                        >
+                                                            <input
+                                                                type="hidden"
+                                                                name="_token"
+                                                                value="{{ csrf_token('team_report_invoice_Draft_' ~ manager.id ~ '_' ~ year ~ '_' ~ '%02d'|format(month)) }}"
+                                                            >
+                                                            <input
+                                                                type="hidden"
+                                                                name="_redirect"
+                                                                value="{{ billingReturnUrl }}"
+                                                            >
 
-                                                                <th
-                                                                    scope="col"
-                                                                    class="position-sticky top-0 z-2 bg-body-secondary"
-                                                                >
-                                                                    {{ 'Mois concerné'|trans }}
-                                                                </th>
+                                                            <button type="submit" class="btn btn-primary">
+                                                                <i class="fa-solid fa-file-circle-plus me-1"></i>
+                                                                {{ 'Créer facture'|trans }}
+                                                            </button>
+                                                        </form>
+                                                    {% elseif invoiceStatus == 'Draft' %}
+                                                        <button
+                                                            type="button"
+                                                            class="btn btn-success"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="#{{ actionModalId }}"
+                                                            data-team-action-url="{{ path('admin_team_report_invoice_transition', {
+                                                                manager: manager.id,
+                                                                year: year,
+                                                                month: month,
+                                                                transition: 'Sent'
+                                                            }) }}"
+                                                            data-team-action-token="{{ csrf_token('team_report_invoice_Sent_' ~ manager.id ~ '_' ~ year ~ '_' ~ '%02d'|format(month)) }}"
+                                                            data-team-action-title="{{ 'Envoyer la facture'|trans|e('html_attr') }}"
+                                                            data-team-action-message="{{ 'La facture va être générée en Factur-X puis envoyée au manager. Confirmer l’envoi ?'|trans|e('html_attr') }}"
+                                                            data-team-action-submit-label="{{ 'Envoyer'|trans|e('html_attr') }}"
+                                                            data-team-action-submit-class="btn-success"
+                                                            data-team-action-submit-icon="fa-solid fa-paper-plane"
+                                                        >
+                                                            <i class="fa-solid fa-paper-plane me-1"></i>
+                                                            {{ 'Envoyer'|trans }}
+                                                        </button>
 
-                                                                <th
-                                                                    scope="col"
-                                                                    class="position-sticky top-0 z-2 bg-body-secondary"
-                                                                >
-                                                                    {{ 'Saisi le'|trans }}
-                                                                </th>
+                                                        <button
+                                                            type="button"
+                                                            class="btn btn-danger"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="#{{ actionModalId }}"
+                                                            data-team-action-url="{{ path('admin_team_report_invoice_transition', {
+                                                                manager: manager.id,
+                                                                year: year,
+                                                                month: month,
+                                                                transition: 'Cancelled'
+                                                            }) }}"
+                                                            data-team-action-token="{{ csrf_token('team_report_invoice_Cancelled_' ~ manager.id ~ '_' ~ year ~ '_' ~ '%02d'|format(month)) }}"
+                                                            data-team-action-title="{{ 'Annuler la facture'|trans|e('html_attr') }}"
+                                                            data-team-action-message="{{ 'Cette facture brouillon sera annulée. Elle pourra ensuite être modifiée. Confirmer l’annulation ?'|trans|e('html_attr') }}"
+                                                            data-team-action-submit-label="{{ 'Annuler la facture'|trans|e('html_attr') }}"
+                                                            data-team-action-submit-class="btn-danger"
+                                                            data-team-action-submit-icon="fa-solid fa-ban"
+                                                        >
+                                                            <i class="fa-solid fa-ban me-1"></i>
+                                                            {{ 'Annuler'|trans }}
+                                                        </button>
+                                                    {% elseif invoiceStatus == 'Sent' %}
+                                                        <button
+                                                            type="button"
+                                                            class="btn btn-success"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="#{{ actionModalId }}"
+                                                            data-team-action-url="{{ path('admin_team_report_invoice_transition', {
+                                                                manager: manager.id,
+                                                                year: year,
+                                                                month: month,
+                                                                transition: 'Paid'
+                                                            }) }}"
+                                                            data-team-action-token="{{ csrf_token('team_report_invoice_Paid_' ~ manager.id ~ '_' ~ year ~ '_' ~ '%02d'|format(month)) }}"
+                                                            data-team-action-title="{{ 'Marquer comme payée'|trans|e('html_attr') }}"
+                                                            data-team-action-message="{{ 'Cette facture sera marquée comme payée. Confirmer le paiement ?'|trans|e('html_attr') }}"
+                                                            data-team-action-submit-label="{{ 'Confirmer le paiement'|trans|e('html_attr') }}"
+                                                            data-team-action-submit-class="btn-success"
+                                                            data-team-action-submit-icon="fa-solid fa-check"
+                                                        >
+                                                            <i class="fa-solid fa-check me-1"></i>
+                                                            {{ 'Payée'|trans }}
+                                                        </button>
+                                                    {% elseif invoiceStatus == 'Cancelled' %}
+                                                        {% set invoiceEditUrl = ea_url()
+                                                            .unsetAll()
+                                                            .setController('App\\Controller\\Admin\\InvoiceCrudController')
+                                                            .setAction('edit')
+                                                            .setEntityId(invoice.id)
+                                                        %}
 
-                                                                <th
-                                                                    scope="col"
-                                                                    class="position-sticky top-0 z-2 bg-body-secondary text-end"
-                                                                >
-                                                                    {{ 'Trajets'|trans }}
-                                                                </th>
-
-                                                                <th
-                                                                    scope="col"
-                                                                    class="position-sticky top-0 z-2 bg-body-secondary text-end"
-                                                                >
-                                                                    {{ 'Km'|trans }}
-                                                                </th>
-
-                                                                <th
-                                                                    scope="col"
-                                                                    class="position-sticky top-0 z-2 bg-body-secondary text-end"
-                                                                >
-                                                                    {{ 'Montant IK'|trans }}
-                                                                </th>
-                                                            </tr>
-                                                        </thead>
-
-
-                                                        <tbody>
-                                                            {% for reportDetail in reportDetails %}
-                                                                <tr class="{{ reportDetail.isRetroactive ? 'table-warning' : '' }}">
-                                                                    <td>
-                                                                        <strong>
-                                                                            {{ reportDetail.member.firstName }}
-                                                                            {{ reportDetail.member.lastName }}
-                                                                        </strong>
-
-                                                                        {% if reportDetail.isRetroactive %}
-                                                                            <span class="badge bg-warning-subtle text-warning-emphasis fw-normal ms-1">
-                                                                                {{ 'rétro'|trans }}
-                                                                            </span>
-                                                                        {% endif %}
-                                                                    </td>
-
-                                                                    <td class="{{ reportDetail.isRetroactive ? 'text-warning-emphasis' : '' }}">
-                                                                        {% if reportDetail.startDate is not null %}
-                                                                            {{ reportDetail.startDate|format_datetime(
-                                                                                locale='fr',
-                                                                                pattern='MMMM yyyy'
-                                                                            ) }}
-                                                                        {% else %}
-                                                                            —
-                                                                        {% endif %}
-                                                                    </td>
-
-                                                                    <td>
-                                                                        {{ reportDetail.createdAt|format_datetime(
-                                                                            locale='fr',
-                                                                            pattern='dd/MM/yyyy'
-                                                                        ) }}
-                                                                    </td>
-
-                                                                    <td class="text-end">
-                                                                        {{ reportDetail.lines }}
-                                                                    </td>
-
-                                                                    <td class="text-end">
-                                                                        {{ reportDetail.km|number_format(0, ',', ' ') }}
-                                                                    </td>
-
-                                                                    <td class="text-end">
-                                                                        {{ reportDetail.total|number_format(2, ',', ' ') }} €
-                                                                    </td>
-                                                                </tr>
-                                                            {% endfor %}
-                                                        </tbody>
-                                                    </table>
+                                                        <a
+                                                            href="{{ invoiceEditUrl }}"
+                                                            class="btn btn-warning"
+                                                            title="{{ 'Modifier la facture annulée'|trans }}"
+                                                        >
+                                                            <i class="fa-solid fa-pen-to-square me-1"></i>
+                                                            {{ 'Modifier'|trans }}
+                                                        </a>
+                                                    {% else %}
+                                                        <span class="text-muted">—</span>
+                                                    {% endif %}
                                                 </div>
-                                            </template>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+                                            {% endif %}
+                                        </td>
 
-                <p class="text-muted mt-2 mb-0">
-                    <i class="fa-solid fa-circle-info me-1"></i>
-                    {{ 'Un rapport rétroactif concerne un mois antérieur, mais facturé au mois où il a été saisi.'|trans }}
-                </p>
-            </section>
-        {% endfor %}
-    </div>
 
+                                        <td class="text-end">
+                                            {% if reportDetails is empty %}
+                                                <span class="text-muted">—</span>
+                                            {% else %}
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-secondary"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#{{ modalId }}"
+                                                    data-team-detail-template="{{ detailTemplateId }}"
+                                                    data-team-detail-title="{{ detailTitle }}"
+                                                    data-team-detail-current-reports="{{ currentPeriodReports|length }}"
+                                                    data-team-detail-retro-reports="{{ retroReports|length }}"
+                                                    data-team-detail-total-reports="{{ reportDetails|length }}"
+                                                    data-team-detail-total-ik="{{ totalIk|number_format(2, ',', ' ') }} €"
+                                                >
+                                                    {{ 'Voir le détail'|trans }}
+                                                    <i class="fa-solid fa-arrow-right ms-1"></i>
+                                                </button>
+
+                                                <template id="{{ detailTemplateId }}">
+                                                    <div
+                                                        class="table-responsive overflow-auto border rounded-3"
+                                                        style="max-height: 65vh;"
+                                                    >
+                                                        <table class="table table-sm align-middle mb-0">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th
+                                                                        scope="col"
+                                                                        class="position-sticky top-0 z-2 bg-body-secondary"
+                                                                    >
+                                                                        {{ 'Collaborateur'|trans }}
+                                                                    </th>
+
+                                                                    <th
+                                                                        scope="col"
+                                                                        class="position-sticky top-0 z-2 bg-body-secondary"
+                                                                    >
+                                                                        {{ 'Mois concerné'|trans }}
+                                                                    </th>
+
+                                                                    <th
+                                                                        scope="col"
+                                                                        class="position-sticky top-0 z-2 bg-body-secondary"
+                                                                    >
+                                                                        {{ 'Saisi le'|trans }}
+                                                                    </th>
+
+                                                                    <th
+                                                                        scope="col"
+                                                                        class="position-sticky top-0 z-2 bg-body-secondary text-end"
+                                                                    >
+                                                                        {{ 'Trajets'|trans }}
+                                                                    </th>
+
+                                                                    <th
+                                                                        scope="col"
+                                                                        class="position-sticky top-0 z-2 bg-body-secondary text-end"
+                                                                    >
+                                                                        {{ 'Km'|trans }}
+                                                                    </th>
+
+                                                                    <th
+                                                                        scope="col"
+                                                                        class="position-sticky top-0 z-2 bg-body-secondary text-end"
+                                                                    >
+                                                                        {{ 'Montant IK'|trans }}
+                                                                    </th>
+                                                                </tr>
+                                                            </thead>
+
+
+                                                            <tbody>
+                                                                {% for reportDetail in reportDetails %}
+                                                                    <tr class="{{ reportDetail.isRetroactive ? 'table-warning' : '' }}">
+                                                                        <td>
+                                                                            <strong>
+                                                                                {{ reportDetail.member.firstName }}
+                                                                                {{ reportDetail.member.lastName }}
+                                                                            </strong>
+
+                                                                            {% if reportDetail.isRetroactive %}
+                                                                                <span class="badge bg-warning-subtle text-warning-emphasis fw-normal ms-1">
+                                                                                    {{ 'rétro'|trans }}
+                                                                                </span>
+                                                                            {% endif %}
+                                                                        </td>
+
+                                                                        <td class="{{ reportDetail.isRetroactive ? 'text-warning-emphasis' : '' }}">
+                                                                            {% if reportDetail.startDate is not null %}
+                                                                                {{ reportDetail.startDate|format_datetime(
+                                                                                    locale='fr',
+                                                                                    pattern='MMMM yyyy'
+                                                                                ) }}
+                                                                            {% else %}
+                                                                                —
+                                                                            {% endif %}
+                                                                        </td>
+
+                                                                        <td>
+                                                                            {{ reportDetail.createdAt|format_datetime(
+                                                                                locale='fr',
+                                                                                pattern='dd/MM/yyyy'
+                                                                            ) }}
+                                                                        </td>
+
+                                                                        <td class="text-end">
+                                                                            {{ reportDetail.lines }}
+                                                                        </td>
+
+                                                                        <td class="text-end">
+                                                                            {{ reportDetail.km|number_format(0, ',', ' ') }}
+                                                                        </td>
+
+                                                                        <td class="text-end">
+                                                                            {{ reportDetail.total|number_format(2, ',', ' ') }} €
+                                                                        </td>
+                                                                    </tr>
+                                                                {% endfor %}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </template>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="text-muted mt-2 mb-0">
+                        <i class="fa-solid fa-circle-info me-1"></i>
+                        {{ 'Un rapport rétroactif concerne un mois antérieur, mais facturé au mois où il a été saisi.'|trans }}
+                    </p>
+                </section>
+            {% endfor %}
+        </div>
+    {% endif %}
     <div
         id="{{ activityPanelId }}"
         role="tabpanel"
@@ -476,11 +650,21 @@
                 data-team-activity-year-section="{{ year }}"
             >
                 <h2 class="visually-hidden">
-                    {{ 'Activité réelle'|trans }} {{ year }}
+                    {{ "Tableau d'activité kilométrique de l'équipe par mois concerné : collaborateurs ayant roulé, kilomètres et montant d'indemnités."|trans }}
                 </h2>
 
                 <div class="table-responsive border rounded-3 overflow-hidden">
-                    <table class="table table-sm align-middle mb-0">
+                    <table
+                        class="table table-sm align-middle mb-0"
+                        style="table-layout: fixed;"
+                    >
+                        <colgroup>
+                            <col style="width: 30%;">
+                            <col style="width: 26%;">
+                            <col style="width: 22%;">
+                            <col style="width: 22%;">
+                        </colgroup>
+
                         <thead class="table-light">
                             <tr>
                                 <th scope="col">
@@ -488,115 +672,69 @@
                                 </th>
 
                                 <th scope="col" class="text-end">
-                                    {{ 'Rapports'|trans }}
+                                    {{ 'Collaborateurs'|trans }}
                                 </th>
 
                                 <th scope="col" class="text-end">
-                                    {{ 'À temps'|trans }}
+                                    {{ 'Km totaux'|trans }}
                                 </th>
 
                                 <th scope="col" class="text-end">
-                                    {{ 'En retard'|trans }}
-                                </th>
-
-                                <th scope="col">
-                                    {{ "Taux de complétude"|trans }}
-                                    <span class="badge badge-dark">
-                                    <i class="fa fa-question" 
-                                        data-bs-toggle="tooltip"
-                                        data-bs-title="Part des rapports rattachés à ce mois qui ont été saisis avant la clôture du mois (dernier jour du mois). 
-                                        Le reste a été saisi plus tard et facturé ultérieurement."
-                                    ></i> 
-                                    </span>
+                                    {{ 'Montant IK'|trans }}
                                 </th>
                             </tr>
                         </thead>
 
                         <tbody>
-                            {% for month in 1..12 %}
+                            {# Année en cours : du mois courant vers janvier.
+                            Années passées : de décembre vers janvier. #}
+                            {% set lastMonth = year == currentYear ? currentMonth : 12 %}
+
+                            {% for month in lastMonth..1 %}
                                 {% set monthDate = date(year ~ '-' ~ month ~ '-01') %}
                                 {% set periodKey = monthDate|date('Y-m') %}
-                                {% set periodSortKey = monthDate|date('Ym') %}
-                                {% set totalReports = 0 %}
-                                {% set onTimeReports = 0 %}
-                                {% set lateReports = 0 %}
+                                {% set activeMembersCount = 0 %}
+                                {% set totalKm = 0 %}
+                                {% set totalIk = 0 %}
                                 {% set isCurrentMonth = year == currentYear and month == currentMonth %}
 
                                 {% for member in members %}
+                                    {% set memberHasActivity = false %}
+
                                     {% for report in member.reports %}
                                         {% if report.startDate is not null and report.startDate|date('Y-m') == periodKey %}
-                                            {% set totalReports = totalReports + 1 %}
-
-                                            {% set isLate = report.createdAt is null
-                                                or report.createdAt|date('Ym') > periodSortKey
-                                            %}
-
-                                            {% if isLate %}
-                                                {% set lateReports = lateReports + 1 %}
-                                            {% else %}
-                                                {% set onTimeReports = onTimeReports + 1 %}
-                                            {% endif %}
+                                            {% set memberHasActivity = true %}
+                                            {% set totalKm = totalKm + (report.km|default(0)) %}
+                                            {% set totalIk = totalIk + (report.total|default(0)) %}
                                         {% endif %}
                                     {% endfor %}
+
+                                    {% if memberHasActivity %}
+                                        {% set activeMembersCount = activeMembersCount + 1 %}
+                                    {% endif %}
                                 {% endfor %}
 
-                                {% set completionRate = totalReports > 0
-                                    ? ((onTimeReports / totalReports) * 100)|round
-                                    : 0
-                                %}
-
                                 <tr>
-                                    <td scope="row">
-                                        <div class="d-inline-flex align-items-center gap-2">
-                                            {% if isCurrentMonth %}
-                                                <span
-                                                    class="d-inline-block bg-primary rounded-pill"
-                                                    style="width: 0.22rem; height: 1.25rem;"
-                                                    title="{{ 'En cours'|trans }}"
-                                                >
-                                                    <span class="visually-hidden">{{ 'En cours'|trans }}</span>
-                                                </span>
-                                            {% endif %}
+                                    <td scope="row" class="py-3">
+                                        {{ monthDate|date('F')|trans }}
 
-                                            <span>
-                                                {{ monthDate|date('F')|trans }}
+                                        {% if isCurrentMonth %}
+                                            <span class="badge rounded-pill bg-body-secondary text-body-secondary fw-normal ms-1">
+                                                {{ 'Saisie en cours'|trans }}
                                             </span>
-                                        </div>
+                                        {% endif %}
                                     </td>
 
-                                    <td class="text-end fw-semibold">
-                                        {{ totalReports }}
+                                    <td class="text-end py-3 fw-semibold">
+                                        {{ activeMembersCount }}
                                     </td>
 
-                                    <td class="text-end">
-                                        {{ onTimeReports }}
+                                    <td class="text-end py-3">
+                                        {{ totalKm|number_format(0, ',', ' ') }}
                                     </td>
 
-                                    <td class="text-end {{ lateReports > 0 ? 'text-warning-emphasis' : 'text-muted' }}">
-                                        {{ lateReports }}
-                                    </td>
-
-                                    <td style="min-width: 180px;">
-                                        <div class="d-flex align-items-center gap-2">
-                                            <div
-                                                class="progress flex-grow-1"
-                                                style="height: 8px;"
-                                                role="progressbar"
-                                                aria-label="{{ 'Taux de complétude'|trans }}"
-                                                aria-valuenow="{{ completionRate }}"
-                                                aria-valuemin="0"
-                                                aria-valuemax="100"
-                                            >
-                                                <div
-                                                    class="progress-bar bg-success"
-                                                    style="width: {{ completionRate }}%;"
-                                                ></div>
-                                            </div>
-
-                                            <span class="text-muted text-end" style="width: 38px;">
-                                                {{ completionRate }}%
-                                            </span>
-                                        </div>
+                                    <td class="text-end py-3">
+                                        {{ totalIk|number_format(2, ',', ' ') }} €
                                     </td>
                                 </tr>
                             {% endfor %}
@@ -604,9 +742,9 @@
                     </table>
                 </div>
 
-                <p class="text-muted mt-2 mb-0">
-                    <i class="fa-solid fa-triangle-exclamation text-warning-emphasis me-1"></i>
-                    {{ 'Vue analytique, non contractuelle : un rapport de janvier saisi en avril est facturé en avril. La colonne « En retard » compte les rapports saisis après leur mois concerné.'|trans }}
+                <p class="text-muted small mt-3 mb-0">
+                    <i class="fa-solid fa-circle-info me-1"></i>
+                    {{ "Le mois en cours porte la mention « Saisie en cours » pendant que les collaborateurs déclarent leurs trajets."|trans }}
                 </p>
             </section>
         {% endfor %}
@@ -699,6 +837,79 @@
     </div>
 </div>
 
+<div
+    id="{{ actionModalId }}"
+    class="modal fade"
+    tabindex="-1"
+    aria-labelledby="{{ actionModalId }}-title"
+    aria-hidden="true"
+>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-sm">
+            <form method="post" action="" data-team-action-form>
+                <input type="hidden" name="_token" value="" data-team-action-token-input>
+
+                <input
+                    type="hidden"
+                    name="_redirect"
+                    value="{{ billingReturnUrl }}"
+                >
+
+                <div class="modal-header bg-body-tertiary">
+                    <h5
+                        id="{{ actionModalId }}-title"
+                        class="modal-title"
+                        data-team-action-title
+                    >
+                        {{ 'Confirmation'|trans }}
+                    </h5>
+
+                    <button
+                        type="button"
+                        class="btn-close"
+                        data-bs-dismiss="modal"
+                        aria-label="{{ 'Fermer'|trans }}"
+                    ></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="d-flex gap-3">
+                        <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-primary-subtle text-primary flex-shrink-0"
+                              style="width: 2.5rem; height: 2.5rem;">
+                            <i class="fa-solid fa-circle-question"></i>
+                        </span>
+
+                        <p class="mb-0" data-team-action-message>
+                            {{ 'Confirmer cette action ?'|trans }}
+                        </p>
+                    </div>
+                </div>
+
+                <div class="modal-footer bg-body-tertiary">
+                    <button
+                        type="button"
+                        class="btn btn-light"
+                        data-bs-dismiss="modal"
+                    >
+                        {{ 'Retour'|trans }}
+                    </button>
+
+                    <button
+                        type="submit"
+                        class="btn btn-primary"
+                        data-team-action-submit-button
+                    >
+                        <i class="fa-solid fa-check me-1" data-team-action-submit-icon></i>
+                        <span data-team-action-submit-label>
+                            {{ 'Confirmer'|trans }}
+                        </span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
     (() => {
         const initialize = () => {
@@ -743,6 +954,7 @@
             );
 
             const modalElement = component.querySelector('#{{ modalId }}');
+            const actionModalElement = document.getElementById('{{ actionModalId }}');
 
             const showSelectedBillingYear = (selectedYear) => {
                 billingSections.forEach((section) => {
@@ -822,7 +1034,88 @@
                 showSelectedActivityYear(activityYearSelect.value);
             }
 
-            showSelectedMainView('activity');
+            const urlParams = new URLSearchParams(window.location.search);
+            const requestedMainView = urlParams.get('teamMainView');
+
+            if (requestedMainView === 'billing') {
+                const parentTabPane = component.closest('.tab-pane');
+
+                if (parentTabPane && parentTabPane.id) {
+                    const tabTrigger = document.querySelector(
+                        `[data-bs-target="#${parentTabPane.id}"], a[href="#${parentTabPane.id}"]`,
+                    );
+
+                    if (tabTrigger) {
+                        if (window.bootstrap?.Tab) {
+                            window.bootstrap.Tab.getOrCreateInstance(tabTrigger).show();
+                        } else {
+                            tabTrigger.click();
+                        }
+                    }
+                }
+            }
+
+            showSelectedMainView(requestedMainView === 'billing' ? 'billing' : 'activity');
+
+            if (actionModalElement) {
+                actionModalElement.addEventListener('show.bs.modal', (event) => {
+                    const button = event.relatedTarget;
+
+                    if (!(button instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    const form = actionModalElement.querySelector('[data-team-action-form]');
+                    const tokenInput = actionModalElement.querySelector('[data-team-action-token-input]');
+                    const title = actionModalElement.querySelector('[data-team-action-title]');
+                    const message = actionModalElement.querySelector('[data-team-action-message]');
+                    const submitButton = actionModalElement.querySelector('[data-team-action-submit-button]');
+                    const submitIcon = actionModalElement.querySelector('[data-team-action-submit-icon]');
+                    const submitLabel = actionModalElement.querySelector('[data-team-action-submit-label]');
+
+                    if (form instanceof HTMLFormElement) {
+                        form.action = button.dataset.teamActionUrl ?? '';
+                    }
+
+                    if (tokenInput instanceof HTMLInputElement) {
+                        tokenInput.value = button.dataset.teamActionToken ?? '';
+                    }
+
+                    if (title) {
+                        title.textContent = button.dataset.teamActionTitle ?? '{{ 'Confirmation'|trans|e('js') }}';
+                    }
+
+                    if (message) {
+                        message.textContent = button.dataset.teamActionMessage ?? '{{ 'Confirmer cette action ?'|trans|e('js') }}';
+                    }
+
+                    if (submitButton instanceof HTMLButtonElement) {
+                        submitButton.className = 'btn ' + (button.dataset.teamActionSubmitClass ?? 'btn-primary');
+                        submitButton.disabled = false;
+                    }
+
+                    if (submitIcon) {
+                        submitIcon.className = (button.dataset.teamActionSubmitIcon ?? 'fa-solid fa-check') + ' me-1';
+                    }
+
+                    if (submitLabel) {
+                        submitLabel.textContent = button.dataset.teamActionSubmitLabel ?? '{{ 'Confirmer'|trans|e('js') }}';
+                    }
+                });
+
+                actionModalElement.addEventListener('submit', (event) => {
+                    const submitButton = actionModalElement.querySelector('[data-team-action-submit-button]');
+                    const submitLabel = actionModalElement.querySelector('[data-team-action-submit-label]');
+
+                    if (submitButton instanceof HTMLButtonElement) {
+                        submitButton.disabled = true;
+                    }
+
+                    if (submitLabel) {
+                        submitLabel.textContent = '{{ 'Traitement...'|trans|e('js') }}';
+                    }
+                });
+            }
 
             if (!modalElement) {
                 return;

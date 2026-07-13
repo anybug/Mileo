@@ -50,8 +50,12 @@ class Report
     #[ORM\Column(type: 'decimal', precision: 8, scale: 2, nullable: true)]
     private $total;
 
+    #[ORM\ManyToOne(targetEntity: Invoice::class, inversedBy: 'reports')]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?Invoice $invoice = null;
+
     /**
-     * @var \Doctrine\Common\Collections\Collection
+     * @var Collection
      */
     #[ORM\OneToMany(targetEntity: ReportLine::class, orphanRemoval: true, cascade: ['persist', 'remove'], mappedBy: 'report')]
     private $lines;
@@ -60,7 +64,7 @@ class Report
     private $month;
 
     /**
-     * @var \Doctrine\Common\Collections\Collection
+     * @var Collection
      */
     #[ORM\OneToMany(targetEntity: VehiculesReport::class, orphanRemoval: true, cascade: ['persist', 'remove'], mappedBy: 'report')]
     private $vehiculesReports;
@@ -444,5 +448,17 @@ class Report
     public function getLinesReportList(): string
     {
         return '';
+    }
+
+    public function getInvoice(): ?Invoice
+    {
+        return $this->invoice;
+    }
+
+    public function setInvoice(?Invoice $invoice): static
+    {
+        $this->invoice = $invoice;
+
+        return $this;
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Repository;
 
+use App\Entity\User;
 use App\Entity\Invoice;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -37,6 +38,21 @@ class InvoiceRepository extends ServiceEntityRepository
         if ($flush) {
             $this->getEntityManager()->flush();
         }
+    }
+
+    public function findTeamReportInvoice(User $manager, int $year, int $month): ?Invoice
+    {
+        return $this->createQueryBuilder('invoice')
+            ->andWhere('invoice.type = :type')
+            ->andWhere('invoice.teamManager = :manager')
+            ->andWhere('invoice.billingYear = :year')
+            ->andWhere('invoice.billingMonth = :month')
+            ->setParameter('type', Invoice::TYPE_TEAM_REPORT)
+            ->setParameter('manager', $manager)
+            ->setParameter('year', $year)
+            ->setParameter('month', $month)
+            ->getQuery()
+            ->getOneOrNullResult();
     }
 
 //    /**
