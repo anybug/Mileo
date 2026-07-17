@@ -9,6 +9,7 @@ use App\Entity\Vehicule;
 use App\Service\ReportService;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
+use App\Validator\Constraints\DateRange;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Assets;
@@ -195,8 +196,23 @@ class ReportLineSidebarCrudController extends AbstractCrudController
 
         yield FormField::addPanel();
 
+        $reportLine = $this->getContext()->getEntity()->getInstance();
+        $report = $reportLine->getReport();
+
         yield DateField::new('travel_date', 'Date')
-            ->onlyOnForms();
+            ->onlyOnForms()
+            ->setFormTypeOptions([
+                'widget' => 'single_text',
+                'html5' => true,
+                'constraints' => [
+                    new DateRange([
+                        'minDate' => $report->getStartDate()->format('Y-m-d'),
+                        'maxDate' => $report->getEndDate()->format('Y-m-d'),
+                        'message' => 'La date du trajet doit être bornée au mois du rapport.',
+                    ]),
+                ],
+                'attr' => ['min' => $report->getStartDate()->format('Y-m-d'), 'max' => $report->getEndDate()->format('Y-m-d')],
+            ]);
 
         yield AssociationField::new('vehicule', 'Véhicule')
             ->setFormTypeOptions([
