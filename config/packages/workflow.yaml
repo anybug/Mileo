@@ -1,0 +1,34 @@
+# config/packages/workflow.yaml
+framework:
+    workflows:
+        team_report_invoice_status:
+            type: 'state_machine'
+            audit_trail:
+                enabled: true
+            marking_store:
+                type: 'method'
+                property: 'statusAsString'
+            supports:
+                - App\Entity\Invoice
+            initial_marking: Draft
+            places:
+                - Draft
+                - Sent
+                - Paid
+                - Cancelled
+            transitions:
+                Sent:
+                    from: Draft
+                    to: Sent
+                    guard: "subject.isTeamReportInvoice()"
+
+                Paid:
+                    from: Sent
+                    to: Paid
+                    guard: "subject.isTeamReportInvoice()"
+
+                Cancelled:
+                    from:
+                        - Draft
+                    to: Cancelled
+                    guard: "subject.isTeamReportInvoice()"

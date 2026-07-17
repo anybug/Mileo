@@ -83,7 +83,7 @@ class UserAddress
         return $this;
     }
 
-    public function isIsDefault(): ?bool
+    public function isDefault(): ?bool
     {
         return $this->is_default;
     }
@@ -103,6 +103,11 @@ class UserAddress
         $this->reason = $reason;
 
         return $this;
+    }
+
+    public function isIsDefault(): ?bool
+    {
+        return $this->is_default;
     }
 
 }

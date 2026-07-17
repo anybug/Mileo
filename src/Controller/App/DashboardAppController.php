@@ -90,7 +90,7 @@ class DashboardAppController extends AbstractDashboardController
     public function configureAssets(): Assets
     {
         return Assets::new()
-        ->addAssetMapperEntry('app')
+            ->addAssetMapperEntry('app')
         ;
     }
 
@@ -172,6 +172,14 @@ class DashboardAppController extends AbstractDashboardController
             $yearSelected = $years[0];
         }
 
+        $vehiculeChart = null;
+
+        if (count($user->getVehicules()) > 1) {
+            $vehiculeChart = $this->createTripsAndAmountByVehiculeChart(
+                (int) $yearSelected
+            );
+        }
+
         $chartTripsByMonth = $this->createTripsByMonthChart($yearSelected);
         $chartTripsByYear = $this->createTripsByYearChart();
 
@@ -210,6 +218,7 @@ class DashboardAppController extends AbstractDashboardController
             'chartTripsByYear' => $chartTripsByYear,
             'chartAmountByMonth' => $chartAmountByMonth,
             'chartAmountByYear' => $chartAmountByYear,
+            'vehiculeChart' => $vehiculeChart,
             'topUsedAddressesChart' => $topUsedAddressesChart,
         ]);
     }
@@ -442,6 +451,171 @@ class DashboardAppController extends AbstractDashboardController
         });
 
         return array_slice($addresses, 0, $limit);
+    }
+
+    private function createTripsAndAmountByVehiculeChart(int $year): ?Chart
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        if (count($user->getVehicules()) <= 1) {
+            return null;
+        }
+
+        $vehiculeLabels = [];
+
+        foreach ($user->getVehicules() as $vehicule) {
+            $vehiculeLabels[$vehicule->getId()] = (string) $vehicule;
+        }
+
+        $rows = $this->entityManager->createQueryBuilder()
+            ->select(
+                'v.id AS vehiculeId',
+                'COUNT(rl.id) AS totalTrips',
+                'COALESCE(SUM(rl.amount), 0) AS totalAmount'
+            )
+            ->from(ReportLine::class, 'rl')
+            ->innerJoin('rl.vehicule', 'v')
+            ->innerJoin('rl.report', 'r')
+            ->where('r.user = :user')
+            ->andWhere('YEAR(rl.travel_date) = :year')
+            ->setParameter('user', $user)
+            ->setParameter('year', $year)
+            ->groupBy('v.id')
+            ->orderBy('totalAmount', 'DESC')
+            ->getQuery()
+            ->getArrayResult();
+
+        if ([] === $rows) {
+            return null;
+        }
+
+        $labels = [];
+        $amountData = [];
+        $backgroundColors = [];
+        $hoverBackgroundColors = [];
+
+        foreach ($rows as $index => $row) {
+            $vehiculeId = (int) $row['vehiculeId'];
+            $tripsCount = (int) $row['totalTrips'];
+
+            $vehiculeName = $vehiculeLabels[$vehiculeId] ?? 'Véhicule';
+
+            $labels[] = [
+                $this->chartService->truncateLabel($vehiculeName, 28),
+                sprintf(
+                    ' %d %s',
+                    $tripsCount,
+                    $tripsCount > 1 ? 'trajets' : 'trajet'
+                ),
+            ];
+
+            $amountData[] = (float) $row['totalAmount'];
+
+            // Le premier véhicule est le plus élevé grâce au orderBy DESC.
+            $backgroundColors[] = $index === 0
+                ? 'rgba(97, 116, 209, 0.95)'
+                : 'rgba(97, 116, 209, 0.62)';
+
+            $hoverBackgroundColors[] = 'rgba(72, 89, 190, 1)';
+        }
+
+        $chart = new Chart(Chart::TYPE_BAR);
+
+        $chart->setData([
+            'labels' => $labels,
+            'datasets' => [
+                [
+                    'label' => 'Montant IK',
+                    'data' => $amountData,
+                    'backgroundColor' => $backgroundColors,
+                    'hoverBackgroundColor' => $hoverBackgroundColors,
+                    'borderWidth' => 0,
+                    'borderRadius' => 0,
+                    'borderSkipped' => false,
+                    'barPercentage' => 0.68,
+                    'categoryPercentage' => 0.82,
+                    'maxBarThickness' => 42,
+                ],
+            ],
+        ]);
+
+        $chart->setOptions([
+            'responsive' => true,
+            'maintainAspectRatio' => false,
+            'indexAxis' => 'y',
+            'locale' => 'fr-FR',
+            'layout' => [
+                'padding' => [
+                    'top' => 8,
+                    'right' => 12,
+                    'bottom' => 4,
+                    'left' => 4,
+                ],
+            ],
+            'animation' => [
+                'duration' => 500,
+                'easing' => 'easeOutQuart',
+            ],
+            'interaction' => [
+                'mode' => 'nearest',
+                'intersect' => false,
+            ],
+            'plugins' => [
+                'legend' => [
+                    'display' => false,
+                ],
+                'tooltip' => [
+                    'backgroundColor' => 'rgba(36, 47, 81, 0.96)',
+                    'titleColor' => '#ffffff',
+                    'bodyColor' => '#ffffff',
+                    'padding' => 12,
+                    'cornerRadius' => 10,
+                    'displayColors' => false,
+                ],
+            ],
+            'scales' => [
+                'x' => [
+                    'beginAtZero' => true,
+                    'grace' => '10%',
+                    'border' => [
+                        'display' => false,
+                    ],
+                    'grid' => [
+                        'color' => 'rgba(97, 116, 209, 0.10)',
+                        'drawTicks' => false,
+                    ],
+                    'ticks' => [
+                        'padding' => 10,
+                        'maxTicksLimit' => 5,
+                        'format' => [
+                            'style' => 'currency',
+                            'currency' => 'EUR',
+                            'minimumFractionDigits' => 0,
+                            'maximumFractionDigits' => 0,
+                        ],
+                    ],
+                ],
+                'y' => [
+                    'border' => [
+                        'display' => false,
+                    ],
+                    'grid' => [
+                        'display' => false,
+                        'drawTicks' => false,
+                    ],
+                    'ticks' => [
+                        'padding' => 14,
+                        'font' => [
+                            'size' => 12,
+                            'weight' => '500',
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        return $chart;
     }
 
     private function createTopUsedAddressesChart(int $year): ?Chart

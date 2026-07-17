@@ -33,6 +33,76 @@ import TomSelect from 'tom-select';
         initTooltips();
     }
 
+    const MONTH_ORDER = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+
+    function initNewReportPeriodFilter() {
+        const yearSelect = document.getElementById('Report_Year_year');
+        const periodSelect = document.getElementById('Report_Period');
+
+        if (!yearSelect || !periodSelect) {
+            return;
+        }
+
+        let existingPeriods = {};
+
+        try {
+            existingPeriods = JSON.parse(periodSelect.dataset.existingPeriods || '{}');
+        } catch (e) {
+            existingPeriods = {};
+        }
+
+        const monthLabels = {
+            January: 'Janvier', February: 'Février', March: 'Mars', April: 'Avril',
+            May: 'Mai', June: 'Juin', July: 'Juillet', August: 'Août',
+            September: 'Septembre', October: 'Octobre', November: 'Novembre', December: 'Décembre'
+        };
+
+        const MONTH_ORDER = Object.keys(monthLabels);
+
+        function applyFilter(retries = 0) {
+            const ts = periodSelect.tomselect;
+
+            // Le widget EasyAdmin s'initialise après le DOMContentLoaded,
+            // on retente quelques fois si besoin.
+            if (!ts) {
+                if (retries < 20) {
+                    setTimeout(() => applyFilter(retries + 1), 100);
+                }
+                return;
+            }
+
+            const takenMonths = existingPeriods[yearSelect.value] || [];
+            const currentValue = ts.getValue();
+
+            // On réinitialise la liste complète des mois...
+            ts.clearOptions();
+            MONTH_ORDER.forEach((value) => {
+                ts.addOption({ value, text: monthLabels[value] });
+            });
+
+            // ...puis on retire ceux déjà utilisés pour l'année sélectionnée
+            takenMonths.forEach((monthIndex) => {
+                const value = MONTH_ORDER[monthIndex - 1];
+                if (value) {
+                    ts.removeOption(value);
+                }
+            });
+
+            // Si le mois actuellement sélectionné devient indisponible, on vide le champ
+            if (currentValue && takenMonths.includes(MONTH_ORDER.indexOf(currentValue) + 1)) {
+                ts.clear();
+            }
+
+            ts.refreshOptions(false);
+        }
+
+        yearSelect.addEventListener('change', () => applyFilter());
+        applyFilter();
+    }
+
     function initReportFeatures() {
 
         initAssistantTomSelect(document);
@@ -40,6 +110,7 @@ import TomSelect from 'tom-select';
 
         hideAndPresetDateFields();
         hideFavoritesField();
+        initNewReportPeriodFilter();
 
         waitForGoogleMaps(() => {
             initAutocomplete(document);
@@ -155,6 +226,23 @@ import TomSelect from 'tom-select';
             const field = form?.querySelector('.lines_start');
 
             favoriteModal(target, url_popup_fav_start, field, null);
+        });
+
+        delegate(document, 'click', '.js-use-default-start', (e, target) => {
+            e.preventDefault();
+
+            const address = (target.dataset.defaultAddress || '').trim();
+            const line = getLineContainer(target);
+
+            const startField =
+                line?.querySelector('.report_lines_start')
+                ?? target.closest('form')?.querySelector('.lines_start');
+
+            if (!address || !startField) {
+                return;
+            }
+
+            setFavoriteValue(startField, address);
         });
 
         delegate(document, 'click', '.popup-fav-lines-start', (e, target) => {

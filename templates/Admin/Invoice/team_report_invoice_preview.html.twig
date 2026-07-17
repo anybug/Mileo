@@ -1,0 +1,72 @@
+{% set invoice = ea.entity.instance %}
+
+{% set pdfUrl = ea_url()
+    .unsetAll()
+    .setDashboard('App\\Controller\\Admin\\DashboardController')
+    .setController('App\\Controller\\Admin\\InvoiceCrudController')
+    .setAction('previewPdf')
+    .setEntityId(invoice.id)
+    .set('inline', true)
+    .generateUrl()
+%}
+
+<div class="content-panel">
+    <div class="content-panel-body">
+        <div class="mb-3">
+            <a
+                href="{{ pdfUrl }}"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="btn btn-outline-primary"
+            >
+                <i class="fa-solid fa-up-right-from-square me-1"></i>
+                Ouvrir le PDF dans un nouvel onglet
+            </a>
+        </div>
+
+        <div style="border: 1px solid #ddd; border-radius: 6px; overflow: hidden; background: #fff;">
+            <iframe
+                src="{{ pdfUrl }}"
+                style="width: 100%; height: 900px; border: 0;"
+                loading="lazy"
+            ></iframe>
+        </div>
+    </div>
+</div>
+<script>
+    (() => {
+        const params = new URLSearchParams(window.location.search);
+
+        if (params.get('invoiceTab') !== 'preview') {
+            return;
+        }
+
+        const openPreviewTab = () => {
+            const tabLinks = document.querySelectorAll(
+                '[data-bs-toggle="tab"], [data-bs-toggle="pill"]'
+            );
+
+            for (const tabLink of tabLinks) {
+                const label = tabLink.textContent.trim().toLowerCase();
+
+                if (!label.includes('prévisualisation')) {
+                    continue;
+                }
+
+                if (window.bootstrap?.Tab) {
+                    window.bootstrap.Tab.getOrCreateInstance(tabLink).show();
+                } else {
+                    tabLink.click();
+                }
+
+                break;
+            }
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', openPreviewTab);
+        } else {
+            openPreviewTab();
+        }
+    })();
+</script>

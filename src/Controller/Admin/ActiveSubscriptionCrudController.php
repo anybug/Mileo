@@ -2,13 +2,13 @@
 
 namespace App\Controller\Admin;
 
-use App\Form\Filter\SubscriptionExpiryFilter;
 use App\Entity\Subscription;
+use App\Form\Filter\SubscriptionExpiryFilter;
 use Doctrine\ORM\QueryBuilder;
-use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
-use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FieldCollection;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FilterCollection;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Filters;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
@@ -17,6 +17,7 @@ use EasyCorp\Bundle\EasyAdminBundle\Dto\SearchDto;
 use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\DateTimeField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IdField;
+use EasyCorp\Bundle\EasyAdminBundle\Filter\DateTimeFilter;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted('ROLE_ADMIN')]
@@ -49,7 +50,7 @@ final class ActiveSubscriptionCrudController extends AbstractCrudController
         yield AssociationField::new('user', 'Utilisateur')
             ->autocomplete();
 
-        yield DateTimeField::new('user.lastLogin', 'Last login')
+        yield DateTimeField::new('user.lastLogin', 'Dernière connexion')
             ->hideOnForm();
 
         yield AssociationField::new('plan', 'Offre');
