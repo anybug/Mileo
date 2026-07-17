@@ -946,7 +946,16 @@ class ReportAppCrudController extends AbstractCrudController
         $minYear = $currentYear - 4;
         $maxYear = $currentYear + 1;
 
-        if ($pageName === Crud::PAGE_NEW) {
+        if ($pageName === Crud::PAGE_NEW) 
+        {
+
+            $existingPeriods = $this->getExistingReportPeriodsForUser($minYear, $maxYear);
+
+            // On ne garde que les années où il reste au moins un mois libre
+            $availableYears = array_values(array_filter(
+                range($minYear, $maxYear),
+                fn (int $year) => count($existingPeriods[$year] ?? []) < 12
+            ));
 
             yield DateField::new('Year', 'Année')
                 ->renderAsChoice()
@@ -954,27 +963,34 @@ class ReportAppCrudController extends AbstractCrudController
                 ->hideWhenUpdating()
                 ->setFormTypeOptions([
                     'required' => true,
-                    'years' => range($minYear, $maxYear),
+                    'years' => $availableYears,
                 ]);
 
+            $monthChoices = [
+                'Janvier' => 'January',
+                'Février' => 'February',
+                'Mars' => 'March',
+                'Avril' => 'April',
+                'Mai' => 'May',
+                'Juin' => 'June',
+                'Juillet' => 'July',
+                'Août' => 'August',
+                'Septembre' => 'September',
+                'Octobre' => 'October',
+                'Novembre' => 'November',
+                'Décembre' => 'December',
+            ];
+
             yield ChoiceField::new('Period', 'Mois')
-                ->setChoices([
-                    'Janvier' => 'January',
-                    'Février' => 'February',
-                    'Mars' => 'March',
-                    'Avril' => 'April',
-                    'Mai' => 'May',
-                    'Juin' => 'June',
-                    'Juillet' => 'July',
-                    'Août' => 'August',
-                    'Septembre' => 'September',
-                    'Octobre' => 'October',
-                    'Novembre' => 'November',
-                    'Décembre' => 'December'
-                ])
+                ->setChoices($monthChoices)
                 ->onlyOnForms()
                 ->hideWhenUpdating()
-                ->setFormTypeOptions(['required' => true]);
+                ->setFormTypeOptions([
+                    'required' => true,
+                    'attr' => [
+                        'data-existing-periods' => json_encode($existingPeriods, JSON_THROW_ON_ERROR),
+                    ],
+                ]);
         }
 
         if ($pageName === Crud::PAGE_INDEX) {
@@ -1113,6 +1129,40 @@ class ReportAppCrudController extends AbstractCrudController
             'startDate' => $startDate,
             'endDate' => $endDate,
         ];
+    }
+
+    private function getExistingReportPeriodsForUser(int $minYear, int $maxYear): array
+    {
+        $user = $this->getUser();
+
+        if (!$user) {
+            return [];
+        }
+
+        $rows = $this->entityManager->getRepository(Report::class)
+            ->createQueryBuilder('r')
+            ->select('r.start_date')
+            ->where('r.user = :user')
+            ->andWhere('YEAR(r.start_date) >= :minYear')
+            ->andWhere('YEAR(r.start_date) <= :maxYear')
+            ->setParameter('user', $user)
+            ->setParameter('minYear', $minYear)
+            ->setParameter('maxYear', $maxYear)
+            ->getQuery()
+            ->getResult();
+
+        $periods = [];
+
+        foreach ($rows as $row) {
+            /** @var \DateTimeInterface $date */
+            $date = $row['start_date'];
+            $year = (int) $date->format('Y');
+            $month = (int) $date->format('n'); // 1-12
+
+            $periods[$year][] = $month;
+        }
+
+        return $periods;
     }
 
     private function findExistingReport(EntityManagerInterface $entityManager, \DateTimeInterface $startDate): ?Report

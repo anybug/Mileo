@@ -33,7 +33,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted('ROLE_ADMIN')]
-class UserManagerCrudController extends AbstractCrudController
+class UserTeamCrudController extends AbstractCrudController
 {
     public function __construct(
         private UserPasswordHasherInterface $passwordHasher,
@@ -50,7 +50,7 @@ class UserManagerCrudController extends AbstractCrudController
     {
         return $crud
             ->setEntityPermission('ROLE_ADMIN')
-            ->setPageTitle(Crud::PAGE_INDEX, 'Manager users');
+            ->setPageTitle(Crud::PAGE_INDEX, 'Team users');
     }
 
     public function configureActions(Actions $actions): Actions

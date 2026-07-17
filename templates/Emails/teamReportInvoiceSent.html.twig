@@ -1,0 +1,17 @@
+<p>Bonjour {{ manager.firstName|default('') }},</p>
+
+<p>
+    Veuillez trouver en pièce jointe votre facture Mileo
+    n° <strong>{{ invoice.num }}</strong>
+    pour la période <strong>{{ period }}</strong>.
+</p>
+
+<p>
+    Montant total :
+    <strong>{{ totalTtc|number_format(2, ',', ' ') }} € TTC</strong>
+</p>
+
+<p>
+    Cordialement,<br>
+    L’équipe Mileo
+</p>
