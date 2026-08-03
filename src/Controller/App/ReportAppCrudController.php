@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Entity\UserAddress;
 use App\Entity\Vehicule;
 use App\Entity\VehiculesReport;
+use App\Enum\ReportStatus;
 use App\Form\AssistantAIType;
 use App\Form\ReportTotalScaleType;
 use App\Service\CalendarReportImporter;
@@ -19,7 +20,6 @@ use App\Utils\ReportPdf;
 use App\Validator\Constraints\NewReport;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\QueryBuilder;
-use Symfony\Component\Form\FormError;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FieldCollection;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FilterCollection;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
@@ -44,6 +44,9 @@ use EasyCorp\Bundle\EasyAdminBundle\Field\NumberField;
 use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\Form\Extension\Core\Type\PasswordType;
+use Symfony\Component\Form\Extension\Core\Type\TextType;
+use Symfony\Component\Form\FormError;
 use Symfony\Component\Form\FormFactoryInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -54,8 +57,6 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\String\Slugger\SluggerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
-use Symfony\Component\Form\Extension\Core\Type\TextType;
-use Symfony\Component\Form\Extension\Core\Type\PasswordType;
 
 class ReportAppCrudController extends AbstractCrudController
 {
@@ -243,6 +244,17 @@ class ReportAppCrudController extends AbstractCrudController
             ->reorder(Crud::PAGE_NEW, [Action::SAVE_AND_CONTINUE, Action::INDEX])
             ->reorder(Crud::PAGE_EDIT, [Action::SAVE_AND_RETURN, Action::SAVE_AND_CONTINUE, 'assistant', Action::INDEX])
         ;
+
+        if (!$this->canCurrentUserManageIkReports()) {
+            $actions
+                ->remove(Crud::PAGE_INDEX, Action::NEW)
+                ->remove(Crud::PAGE_INDEX, Action::EDIT)
+                ->remove(Crud::PAGE_INDEX, Action::DELETE)
+                ->remove(Crud::PAGE_INDEX, 'assistant')
+                ->remove(Crud::PAGE_EDIT, 'assistant');
+        }
+
+        return $actions;
 
         return $actions;
 
@@ -757,6 +769,24 @@ class ReportAppCrudController extends AbstractCrudController
             throw new \Exception("Rapport introuvable.");
         }
 
+        $user = $vehiculesReport->getVehicule()->getUser();
+
+        if (!$user->canManageIkReports()) {
+            $this->addFlash(
+                'danger',
+                'Le barème ne peut plus être modifié car le collaborateur possède une date de sortie effective.'
+            );
+
+            $url = $this->adminUrlGenerator
+                ->setController(self::class)
+                ->setAction(Action::INDEX)
+                ->set('filters[Period][value]', $periodFilter)
+                ->unset('vrid')
+                ->generateUrl();
+
+            return $this->redirect($url);
+        }
+
         // Chargement des choix possibles
         $choices = $this->getChoicesForVehiculeReport($vehiculesReport);
 
@@ -1000,6 +1030,11 @@ class ReportAppCrudController extends AbstractCrudController
         }
 
         yield FormField::addRow();
+
+        /*yield ChoiceField::new('status', 'Statut')
+            ->setChoices(ReportStatus::choices())
+            ->renderAsBadges(ReportStatus::badges())
+            ->onlyOnIndex();*/
 
         yield IntegerField::new('km', 'Distance')
             //->setNumberFormat('%s km')
@@ -1487,4 +1522,13 @@ class ReportAppCrudController extends AbstractCrudController
         $this->entityManager->persist($user);
         $this->entityManager->flush();
     }
+
+    private function canCurrentUserManageIkReports(): bool
+    {
+        $user = $this->getUser();
+
+        return $user instanceof User
+            && $user->canManageIkReports();
+    }
+
 }

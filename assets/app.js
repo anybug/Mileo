@@ -16,4 +16,10 @@ import './js/calendar.js';
 
 import { startStimulusApp } from '@symfony/stimulus-bundle';
 
+import QuillEditorController from './controllers/quill_editor_controller.js';
+import VehiculePaginationController from './controllers/vehicule_pagination_controller.js';
+
 const app = startStimulusApp();
+
+app.register('quill-editor', QuillEditorController);
+app.register('vehicule-pagination', VehiculePaginationController);

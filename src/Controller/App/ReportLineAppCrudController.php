@@ -2,6 +2,7 @@
 
 namespace App\Controller\App;
 
+use App\Entity\User;
 use App\Controller\App\Filter\LineDateFilter;
 use App\Entity\Brand;
 use App\Entity\Report;
@@ -138,40 +139,131 @@ class ReportLineAppCrudController extends AbstractCrudController
     {
         $actions = parent::configureActions($actions);
 
-        $duplicateAction = Action::new('duplicate', 'Duplicate')
-            ->linkToCrudAction('duplicateLine')
-            ->setIcon("fa fa-copy")
-            ;
-
-        if (count($this->getUser()->getVehicules()) == 0) {
-            $actions->remove(Crud::PAGE_INDEX, Action::NEW);
-        }
+        $duplicateAction = Action::new(
+            'duplicate',
+            'Dupliquer',
+            'fa fa-copy'
+        )
+            ->linkToCrudAction('duplicateLine');
 
         $actions
             ->add(Crud::PAGE_INDEX, $duplicateAction)
-            ->add(Crud::PAGE_EDIT, Action::DELETE)
-        ;  
-        
+            ->add(Crud::PAGE_EDIT, Action::DELETE);
+
+        $user = $this->getUser();
+
+        if (
+            !$user instanceof User
+            || count($user->getVehicules()) === 0
+        ) {
+            $actions->remove(
+                Crud::PAGE_INDEX,
+                Action::NEW
+            );
+        }
+
+        if (
+            !$user instanceof User
+            || !$user->canManageIkReports()
+        ) {
+            $actions
+                ->remove(Crud::PAGE_INDEX, Action::NEW)
+                ->remove(Crud::PAGE_INDEX, Action::EDIT)
+                ->remove(Crud::PAGE_INDEX, Action::DELETE)
+                ->remove(Crud::PAGE_INDEX, 'duplicate')
+                ->remove(Crud::PAGE_EDIT, Action::DELETE);
+        }
+
         return $actions;
+    }
+
+    public function new(
+        AdminContext $context
+    ): KeyValueStore|Response {
+        $user = $this->getCurrentUserOrDeny();
+
+        $this->denyIkWriteAccess($user);
+
+        return parent::new($context);
     }
 
     public function edit(AdminContext $context)
     {
-        $reportLine = $context->getEntity()->getInstance();
-        $currentUser = $this->getUser();
+        $reportLine = $context
+            ->getEntity()
+            ->getInstance();
 
-        if ($reportLine->getReport()->getUser() !== $currentUser) {
+        if (!$reportLine instanceof ReportLine) {
             throw new AccessDeniedHttpException();
         }
+
+        $reportUser = $reportLine
+            ->getReport()
+            ?->getUser();
+
+        if (
+            !$reportUser instanceof User
+            || $reportUser !== $this->getUser()
+        ) {
+            throw new AccessDeniedHttpException();
+        }
+
+        $this->denyIkWriteAccess($reportUser);
 
         return parent::edit($context);
     }
 
-    public function duplicateLine(AdminContext $context)
+    public function delete(AdminContext $context)
     {
-        $reportLine = $context->getEntity()->getInstance();
-        
-        $url = $this->adminUrlGenerator
+        $reportLine = $context
+            ->getEntity()
+            ->getInstance();
+
+        if (!$reportLine instanceof ReportLine) {
+            throw new AccessDeniedHttpException();
+        }
+
+        $reportUser = $reportLine
+            ->getReport()
+            ?->getUser();
+
+        if (
+            !$reportUser instanceof User
+            || $reportUser !== $this->getUser()
+        ) {
+            throw new AccessDeniedHttpException();
+        }
+
+        $this->denyIkWriteAccess($reportUser);
+
+        return parent::delete($context);
+    }
+
+    public function duplicateLine(
+        AdminContext $context
+    ): Response {
+        $reportLine = $context
+            ->getEntity()
+            ->getInstance();
+
+        if (!$reportLine instanceof ReportLine) {
+            throw new AccessDeniedHttpException();
+        }
+
+        $reportUser = $reportLine
+            ->getReport()
+            ?->getUser();
+
+        if (
+            !$reportUser instanceof User
+            || $reportUser !== $this->getUser()
+        ) {
+            throw new AccessDeniedHttpException();
+        }
+
+        $this->denyIkWriteAccess($reportUser);
+
+        $url = (clone $this->adminUrlGenerator)
             ->setController(self::class)
             ->setAction(Action::NEW)
             ->set('sourceId', $reportLine->getId())
@@ -649,19 +741,69 @@ class ReportLineAppCrudController extends AbstractCrudController
         ]);
     }
 
-    public function persistEntity(EntityManagerInterface $entityManager, $entityInstance): void
-    {
-        $this->getReportForTravel($entityManager, $entityInstance);
+    public function persistEntity(
+        EntityManagerInterface $entityManager,
+        $entityInstance
+    ): void {
+        if (!$entityInstance instanceof ReportLine) {
+            parent::persistEntity(
+                $entityManager,
+                $entityInstance
+            );
 
-        parent::persistEntity($entityManager, $entityInstance);
+            return;
+        }
+
+        $user = $this->getCurrentUserOrDeny();
+
+        $this->denyIkWriteAccess($user);
+
+        $this->getReportForTravel(
+            $entityManager,
+            $entityInstance
+        );
+
+        parent::persistEntity(
+            $entityManager,
+            $entityInstance
+        );
     }
     
-    public function updateEntity(EntityManagerInterface $entityManager, $entityInstance): void
-    {
-        //ne devrait pas servir ici mais just in case
-        $this->getReportForTravel($entityManager, $entityInstance);
+    public function updateEntity(
+        EntityManagerInterface $entityManager,
+        $entityInstance
+    ): void {
+        if (!$entityInstance instanceof ReportLine) {
+            parent::updateEntity(
+                $entityManager,
+                $entityInstance
+            );
 
-        parent::updateEntity($entityManager, $entityInstance);
+            return;
+        }
+
+        $reportUser = $entityInstance
+            ->getReport()
+            ?->getUser();
+
+        if (
+            !$reportUser instanceof User
+            || $reportUser !== $this->getUser()
+        ) {
+            throw new AccessDeniedHttpException();
+        }
+
+        $this->denyIkWriteAccess($reportUser);
+
+        $this->getReportForTravel(
+            $entityManager,
+            $entityInstance
+        );
+
+        parent::updateEntity(
+            $entityManager,
+            $entityInstance
+        );
     }
 
     private function getReportForTravel(EntityManagerInterface $entityManager, $entityInstance): void
@@ -769,20 +911,64 @@ class ReportLineAppCrudController extends AbstractCrudController
         return parent::getRedirectResponseAfterSave($context, $action);
     }
 
-    #[Route('/admin/report-line/{id}/delete', name: 'admin_report_line_delete', methods: ['POST'])]
-    public function deleteReportLineAjax(ReportLine $reportLine, Request $request): JsonResponse
-    {
-        if ($reportLine->getReport()->getUser() !== $this->getUser()) {
+    #[Route(
+        '/admin/report-line/{id}/delete',
+        name: 'admin_report_line_delete',
+        methods: ['POST']
+    )]
+    public function deleteReportLineAjax(
+        ReportLine $reportLine,
+        Request $request
+    ): JsonResponse {
+        $reportUser = $reportLine
+            ->getReport()
+            ?->getUser();
+
+        if (
+            !$reportUser instanceof User
+            || $reportUser !== $this->getUser()
+        ) {
             throw new AccessDeniedHttpException();
         }
 
-        if (!$this->isCsrfTokenValid('delete' . $reportLine->getId(), $request->request->get('_token'))) {
-            return new JsonResponse(['error' => 'Invalid CSRF token'], 400);
+        $this->denyIkWriteAccess($reportUser);
+
+        if (
+            !$this->isCsrfTokenValid(
+                'delete'.$reportLine->getId(),
+                $request->request->get('_token')
+            )
+        ) {
+            return new JsonResponse([
+                'error' => 'Invalid CSRF token',
+            ], 400);
         }
 
         $this->entityManager->remove($reportLine);
         $this->entityManager->flush();
 
-        return new JsonResponse(['success' => true]);
+        return new JsonResponse([
+            'success' => true,
+        ]);
+    }
+
+    private function getCurrentUserOrDeny(): User
+    {
+        $user = $this->getUser();
+
+        if (!$user instanceof User) {
+            throw new AccessDeniedHttpException();
+        }
+
+        return $user;
+    }
+
+    private function denyIkWriteAccess(User $user): void
+    {
+        if (!$user->canManageIkReports()) {
+            throw new AccessDeniedHttpException(
+                'Ce compte est en lecture seule. Les trajets restent consultables, mais ne peuvent plus être créés, modifiés ou supprimés.'
+            );
+        }
     }
 }

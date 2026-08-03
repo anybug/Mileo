@@ -9,6 +9,7 @@ use App\Entity\User;
 use App\Form\CalendarConnectionType;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\QueryBuilder;
+use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FieldCollection;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FilterCollection;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
@@ -31,6 +32,10 @@ use Symfony\Component\Form\Extension\Core\Type\RepeatedType;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use EasyCorp\Bundle\EasyAdminBundle\Attribute\AdminRoute;
+use App\Form\CollaboratorExitType;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 #[IsGranted('ROLE_MANAGER')]
 class TeamUserCrudController extends AbstractCrudController
@@ -40,6 +45,7 @@ class TeamUserCrudController extends AbstractCrudController
     public function __construct(
         UserPasswordHasherInterface $passwordHasher,
         private readonly AdminUrlGenerator $adminUrlGenerator,
+        private readonly EntityManagerInterface $entityManager,
     ) {
         $this->passwordHasher = $passwordHasher;
     }
@@ -66,27 +72,92 @@ class TeamUserCrudController extends AbstractCrudController
 
     public function configureActions(Actions $actions): Actions
     {
-        $impersonate = Action::new('impersonate', 'Se connecter', 'fa-solid fa-person-walking-arrow-right')
-            ->linkToUrl(function (User $user) {
+        $impersonate = Action::new(
+            'impersonate',
+            'Se connecter',
+            'fa-solid fa-person-walking-arrow-right'
+        )
+            ->linkToUrl(function (User $user): string {
                 return $this->generateUrl('app', [
                     '_switch_user' => $user->getEmail(),
                 ]);
+            })
+            ->displayIf(function (User $user): bool {
+                /** @var User $manager */
+                $manager = $this->getUser();
+
+                return $user->getManagedBy()?->getId()
+                    === $manager->getId();
             });
 
+        $leaveWorkforce = Action::new(
+            'leaveWorkforce',
+            'Sortir de l’effectif',
+            'fa-solid fa-user-minus'
+        )
+            ->linkToCrudAction('leaveWorkforce')
+            ->addCssClass('btn btn-danger')
+            ->displayIf(function (User $user): bool {
+                /** @var User $manager */
+                $manager = $this->getUser();
+
+                return $user->getManagedBy()?->getId()
+                    === $manager->getId()
+                    && null === $user->getWorkforceExitDate();
+            });
+
+        $restoreWorkforce = Action::new(
+            'restoreWorkforce',
+            'Réintégrer dans l’effectif',
+            'fa-solid fa-user-check'
+        )
+            ->linkToCrudAction('restoreWorkforce')
+            ->addCssClass('btn btn-success')
+            ->askConfirmation(
+                'Voulez-vous réactiver ce collaborateur et le réintégrer dans l’effectif ?',
+                'Réactiver'
+            )
+            ->displayIf(function (User $user): bool {
+                /** @var User $manager */
+                $manager = $this->getUser();
+
+                return $user->getManagedBy()?->getId()
+                    === $manager->getId()
+                    && null !== $user->getWorkforceExitDate();
+            });
+
+        $canEdit = function (User $user): bool {
+            /** @var User $manager */
+            $manager = $this->getUser();
+
+            return $user->getId() !== $manager->getId()
+                && $user->getManagedBy()?->getId() === $manager->getId()
+                && null === $user->getWorkforceExitDate();
+        };
+
         return $actions
+            ->add(Crud::PAGE_INDEX, Action::DETAIL)
             ->add(Crud::PAGE_INDEX, $impersonate)
+
+            ->add(Crud::PAGE_DETAIL, $leaveWorkforce)
+            ->add(Crud::PAGE_DETAIL, $restoreWorkforce)
+
             ->remove(Crud::PAGE_EDIT, Action::SAVE_AND_CONTINUE)
-            ->update(Crud::PAGE_INDEX, Action::DELETE, function (Action $action) {
-                return $action->displayIf(function ($entity) {
-                    return $entity != $this->getUser();
-                });
-            })
-            ->update(Crud::PAGE_INDEX, Action::EDIT, function (Action $action) {
-                return $action->displayIf(function ($entity) {
-                    return $entity != $this->getUser();
-                });
-            })
-            ;
+            ->disable(Action::DELETE)
+
+            ->update(
+                Crud::PAGE_INDEX,
+                Action::EDIT,
+                static fn (Action $action): Action =>
+                    $action->displayIf($canEdit)
+            )
+
+            ->update(
+                Crud::PAGE_DETAIL,
+                Action::EDIT,
+                static fn (Action $action): Action =>
+                    $action->displayIf($canEdit)
+            );
     }
 
     public function createIndexQueryBuilder(
@@ -132,6 +203,29 @@ class TeamUserCrudController extends AbstractCrudController
         }
 
         return parent::edit($context);
+    }
+
+    public function detail(AdminContext $context)
+    {
+        $target = $context->getEntity()->getInstance();
+
+        if (!$target instanceof User) {
+            throw new AccessDeniedHttpException();
+        }
+
+        /** @var User $manager */
+        $manager = $this->getUser();
+
+        $isManagerHimself = $target->getId() === $manager->getId();
+
+        $isManagedMember = $target->getManagedBy()?->getId()
+            === $manager->getId();
+
+        if (!$isManagerHimself && !$isManagedMember) {
+            throw new AccessDeniedHttpException();
+        }
+
+        return parent::detail($context);
     }
 
     public function delete(AdminContext $context)
@@ -222,6 +316,15 @@ class TeamUserCrudController extends AbstractCrudController
             yield Field::new('first_name', 'Prénom');
             yield Field::new('last_name', 'Nom');
             yield EmailField::new('email', 'E-mail');
+
+            if ($pageName === Crud::PAGE_INDEX) {
+                yield BooleanField::new(
+                    'inWorkforce',
+                    'Dans l’effectif'
+                )
+                    ->renderAsSwitch(false);
+            }
+
             yield DateTimeField::new('last_login', 'Dernière connexion');
             yield CollectionField::new('reports', 'Nb reports');
             return;
@@ -280,7 +383,7 @@ class TeamUserCrudController extends AbstractCrudController
                         ? 'Laissez vide pour conserver le mot de passe actuel.'
                         : ''
                 );
-            yield BooleanField::new('is_active', 'Profil activé')->setHelp("Si désactivé, l'utilisateur ne peut pas se connecter à la plateforme");
+            yield BooleanField::new('active', 'Profil activé')->setHelp("Si désactivé, l'utilisateur ne peut pas se connecter à la plateforme");
 
             $context = $this->getContext();
             $editedUser = $context?->getEntity()?->getInstance();
@@ -411,5 +514,244 @@ class TeamUserCrudController extends AbstractCrudController
         // Temporaire : stocke en clair, à remplacer par un vrai chiffrement.
         $user->setCalendarEncryptedPassword($user->getPlainCalendarPassword());
         $user->setPlainCalendarPassword(null);
+    }
+
+    #[AdminRoute(
+        path: '/{entityId}/reintegration-effectif',
+        name: 'restore_workforce'
+    )]
+    public function restoreWorkforce(
+        Request $request
+    ): Response {
+        $entityId = (int) $request->attributes->get(
+            'entityId',
+            0
+        );
+
+        if ($entityId <= 0) {
+            throw $this->createNotFoundException(
+                'Identifiant du collaborateur invalide.'
+            );
+        }
+
+        $collaborator = $this->entityManager
+            ->getRepository(User::class)
+            ->find($entityId);
+
+        if (!$collaborator instanceof User) {
+            throw $this->createNotFoundException(
+                'Collaborateur introuvable.'
+            );
+        }
+
+        /** @var User $manager */
+        $manager = $this->getUser();
+
+        /*
+        * Le manager ne peut réintégrer que l’un de ses propres
+        * collaborateurs.
+        */
+        if (
+            $collaborator->getManagedBy()?->getId()
+            !== $manager->getId()
+        ) {
+            throw new AccessDeniedHttpException();
+        }
+
+        if (null === $collaborator->getWorkforceExitDate()) {
+            $this->addFlash(
+                'warning',
+                'Ce collaborateur fait déjà partie de l’effectif.'
+            );
+
+            return $this->redirectToCollaboratorDetail(
+                $collaborator
+            );
+        }
+
+        $collaborator
+            ->setWorkforceExitDate(null)
+            ->setActive(true);
+
+        $this->entityManager->flush();
+
+        $this->addFlash(
+            'success',
+            sprintf(
+                '%s a été réintégré dans l’effectif et son compte a été réactivé.',
+                (string) $collaborator
+            )
+        );
+
+        return $this->redirectToCollaboratorDetail(
+            $collaborator
+        );
+    }
+
+    #[AdminRoute(
+        path: '/{entityId}/sortie-effectif',
+        name: 'leave_workforce'
+    )]
+    public function leaveWorkforce(
+        Request $request
+    ): Response {
+        $entityId = $request->attributes->get('entityId');
+
+        if (
+            !is_string($entityId)
+            && !is_int($entityId)
+        ) {
+            throw $this->createNotFoundException(
+                'Identifiant du collaborateur manquant.'
+            );
+        }
+
+        if (
+            !ctype_digit((string) $entityId)
+            || (int) $entityId <= 0
+        ) {
+            throw $this->createNotFoundException(
+                'Identifiant du collaborateur invalide.'
+            );
+        }
+
+        $collaborator = $this->entityManager
+            ->getRepository(User::class)
+            ->find((int) $entityId);
+
+        if (!$collaborator instanceof User) {
+            throw $this->createNotFoundException(
+                'Collaborateur introuvable.'
+            );
+        }
+
+        /** @var User $manager */
+        $manager = $this->getUser();
+
+        if (
+            $collaborator->getManagedBy()?->getId()
+            !== $manager->getId()
+        ) {
+            throw new AccessDeniedHttpException();
+        }
+
+        if (null !== $collaborator->getWorkforceExitDate()) {
+            $this->addFlash(
+                'warning',
+                'Ce collaborateur est déjà sorti de l’effectif.'
+            );
+
+            return $this->redirectToCollaboratorDetail(
+                $collaborator
+            );
+        }
+
+        $lastReportEndDate = $this->getLastReportEndDate(
+            $collaborator
+        );
+
+        $form = $this->createForm(
+            CollaboratorExitType::class,
+            null,
+            [
+                'minimum_exit_date' => $lastReportEndDate,
+            ]
+        );
+
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            /** @var array{exitDate?: \DateTimeImmutable}|null $data */
+            $data = $form->getData();
+
+            $exitDate = is_array($data)
+                ? ($data['exitDate'] ?? null)
+                : null;
+
+            if (!$exitDate instanceof \DateTimeImmutable) {
+                $this->addFlash(
+                    'danger',
+                    'La date de sortie est invalide.'
+                );
+            } elseif (
+                null !== $lastReportEndDate
+                && $exitDate <= $lastReportEndDate
+            ) {
+                $this->addFlash(
+                    'danger',
+                    sprintf(
+                        'La date de sortie doit être postérieure au %s.',
+                        $lastReportEndDate->format('d/m/Y')
+                    )
+                );
+            } else {
+                $collaborator
+                    ->setWorkforceExitDate($exitDate);
+
+                $this->entityManager->flush();
+
+                $this->addFlash(
+                    'success',
+                    sprintf(
+                        '%s est sorti de l’effectif le %s.',
+                        (string) $collaborator,
+                        $exitDate->format('d/m/Y')
+                    )
+                );
+
+                return $this->redirectToCollaboratorDetail(
+                    $collaborator
+                );
+            }
+        }
+
+        return $this->render(
+            'Team/Collaborator/leave_workforce.html.twig',
+            [
+                'collaborator' => $collaborator,
+                'lastReportEndDate' => $lastReportEndDate,
+                'form' => $form,
+            ]
+        );
+    }
+
+    private function getLastReportEndDate(
+        User $collaborator
+    ): ?\DateTimeImmutable {
+        $lastReportEndDate = null;
+
+        foreach ($collaborator->getReports() as $report) {
+            $endDate = $report->getEndDate();
+
+            if (!$endDate instanceof \DateTimeInterface) {
+                continue;
+            }
+
+            $immutableEndDate = \DateTimeImmutable::createFromInterface(
+                $endDate
+            )->setTime(0, 0);
+
+            if (
+                null === $lastReportEndDate
+                || $immutableEndDate > $lastReportEndDate
+            ) {
+                $lastReportEndDate = $immutableEndDate;
+            }
+        }
+
+        return $lastReportEndDate;
+    }
+
+    private function redirectToCollaboratorDetail(
+        User $collaborator
+    ): Response {
+        $url = (clone $this->adminUrlGenerator)
+            ->unsetAll()
+            ->setController(self::class)
+            ->setAction(Crud::PAGE_DETAIL)
+            ->setEntityId($collaborator->getId())
+            ->generateUrl();
+
+        return $this->redirect($url);
     }
 }

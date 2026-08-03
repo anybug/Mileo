@@ -5,6 +5,7 @@ namespace App\Entity;
 use App\Entity\ReportLine;
 use App\Entity\User;
 use App\Entity\Vehicule;
+use App\Enum\ReportStatus;
 use App\Repository\ReportRepository;
 use App\Repository\ScaleRepository;
 use App\Validator\Constraints as AppAssert;
@@ -68,6 +69,9 @@ class Report
      */
     #[ORM\OneToMany(targetEntity: VehiculesReport::class, orphanRemoval: true, cascade: ['persist', 'remove'], mappedBy: 'report')]
     private $vehiculesReports;
+
+    #[ORM\Column(enumType: ReportStatus::class, nullable: true)]
+    private ?ReportStatus $status = null;
 
     /**
      * Constructor
@@ -458,6 +462,42 @@ class Report
     public function setInvoice(?Invoice $invoice): static
     {
         $this->invoice = $invoice;
+
+        return $this;
+    }
+
+    public function getStatus(): ?ReportStatus
+    {
+        return $this->status;
+    }
+
+    public function setStatus(?ReportStatus $status): static
+    {
+        $this->status = $status;
+
+        return $this;
+    }
+
+    /**
+     * Utilisé par le Workflow Symfony.
+     */
+    public function getStatusAsString(): ?string
+    {
+        return $this->status?->value;
+    }
+
+    /**
+     * Utilisé par le Workflow Symfony.
+     *
+     * @param array<string, mixed> $context
+     */
+    public function setStatusAsString(
+        ?string $statusAsString,
+        array $context = [],
+    ): static {
+        $this->status = $statusAsString !== null
+            ? ReportStatus::from($statusAsString)
+            : null;
 
         return $this;
     }

@@ -9,5 +9,7 @@ twig:
         decimal_point: ','
         thousands_separator: ' '
     paths: []
-    form_themes: []
     strict_variables: false
+
+    form_themes:
+        - 'form/quill_editor.html.twig'

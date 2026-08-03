@@ -121,7 +121,7 @@ final class InvoiceCrudController extends AbstractCrudController
                     ->setLabel('Modifier')
                     ->displayIf(static fn (Invoice $invoice): bool => in_array(
                         $invoice->getStatus(),
-                        [InvoiceStatus::DRAFT, InvoiceStatus::CANCELLED],
+                        [InvoiceStatus::CANCELLED],
                         true,
                     ));
             })
@@ -130,7 +130,7 @@ final class InvoiceCrudController extends AbstractCrudController
                     ->setLabel('Modifier')
                     ->displayIf(static fn (Invoice $invoice): bool => in_array(
                         $invoice->getStatus(),
-                        [InvoiceStatus::DRAFT, InvoiceStatus::CANCELLED],
+                        [InvoiceStatus::CANCELLED],
                         true,
                     ));
             })

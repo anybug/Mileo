@@ -124,4 +124,15 @@ class ReportRepository extends ServiceEntityRepository
         ;
     }
     
+    public function findLastPeriodReportForUser(
+        User $user
+    ): ?Report {
+        return $this->createQueryBuilder('report')
+            ->andWhere('report.user = :user')
+            ->setParameter('user', $user)
+            ->orderBy('report.end_date', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
 }
