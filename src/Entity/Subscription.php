@@ -226,4 +226,12 @@ class Subscription
             && $this->isValid($at)
             && $at < $this->trialEndsAt;
     }
+
+    public function resetWarningMails(): static
+    {
+        $this->warningMailThirtyDaysSentAt = null;
+        $this->warningMailSevenDaysSentAt = null;
+
+        return $this;
+    }
 }

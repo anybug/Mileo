@@ -106,58 +106,22 @@
                     </div>
  
                 </div>
-                {% if vehiculeChart is defined and vehiculeChart is not null %}
-                    {% set vehicleCount = vehiculeChart.data.labels|length %}
-
-                    {% if vehicleCount > 1 %}
-                        {% set chartHeight = vehicleCount <= 3 ? 300 : (vehicleCount <= 6 ? 410 : 520) %}
-
-                        <section class="mt-2 mb-4">
-                            <div class="card border-0 shadow-sm overflow-hidden">
-                                <div class="card-header bg-body-tertiary border-bottom py-3 px-4">
-                                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
-                                        <div>
-                                            <h5 class="mb-1 text-primary">
-                                                <i class="fa-solid fa-car me-2"></i>
-                                                {{ 'Indemnités par véhicule'|trans }}
-                                            </h5>
-
-                                            <p class="text-muted small mb-0">
-                                                {{ 'Montant IK annuel et nombre de trajets pour chaque véhicule.'|trans }}
-                                            </p>
-                                        </div>
-
-                                        <span class="badge rounded-pill bg-primary-subtle text-primary-emphasis fw-normal px-3 py-2">
-                                            <i class="fa-solid fa-car-side me-1"></i>
-                                            {{ vehicleCount }}
-                                            {{ vehicleCount > 1 ? 'véhicules'|trans : 'véhicule'|trans }}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div class="card-body p-3 p-md-4">
-                                    <div class="d-flex flex-wrap gap-3 mb-3 small text-muted">
-                                        <span>
-                                            <i class="fa-solid fa-circle text-primary me-1"></i>
-                                            {{ 'La longueur indique le montant IK.'|trans }}
-                                        </span>
-
-                                        <span>
-                                            <i class="fa-solid fa-circle-info me-1"></i>
-                                            {{ 'Le nombre de trajets apparaît sous le nom du véhicule.'|trans }}
-                                        </span>
-                                    </div>
-
-                                    <div class="position-relative" style="height: {{ chartHeight }}px;">
-                                        {{ render_chart(vehiculeChart, {
-                                            class: 'w-100 h-100'
-                                        }) }}
-                                    </div>
-                                </div>
-                            </div>
-                        </section>
-                    {% endif %}
-                {% endif %}
+                {#
+                <div
+                    id="vehicule-chart"
+                    data-controller="vehicule-pagination"
+                    data-vehicule-pagination-url-value="{{ path('app_dashboard_vehicules_chart') }}"
+                    data-vehicule-pagination-year-value="{{ yearSelected }}"
+                >
+                    <div data-vehicule-pagination-target="content">
+                        {% include 'App/Dashboard/_vehicule_chart.html.twig' with {
+                            vehiculeChart: vehiculeChart,
+                            vehiculePagination: vehiculePagination,
+                            yearSelected: yearSelected
+                        } only %}
+                    </div>
+                </div>
+                #}
 
                 <hr />
 

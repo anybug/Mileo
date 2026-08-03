@@ -173,11 +173,29 @@ class DashboardAppController extends AbstractDashboardController
         }
 
         $vehiculeChart = null;
+        $vehiculePagination = null;
+
+        $vehiculePage = max(
+            1,
+            (int) $request->query->get('vehiculePage', 1)
+        );
 
         if (count($user->getVehicules()) > 1) {
-            $vehiculeChart = $this->createTripsAndAmountByVehiculeChart(
-                (int) $yearSelected
+            $vehiculeChartResult = $this->createTripsAndAmountByVehiculeChart(
+                $yearSelected,
+                $vehiculePage,
+                5
             );
+
+            if ($vehiculeChartResult !== null) {
+                $vehiculeChart = $vehiculeChartResult['chart'];
+
+                $vehiculePagination = [
+                    'page' => $vehiculeChartResult['page'],
+                    'totalPages' => $vehiculeChartResult['totalPages'],
+                    'totalVehicles' => $vehiculeChartResult['totalVehicles'],
+                ];
+            }
         }
 
         $chartTripsByMonth = $this->createTripsByMonthChart($yearSelected);
@@ -219,6 +237,7 @@ class DashboardAppController extends AbstractDashboardController
             'chartAmountByMonth' => $chartAmountByMonth,
             'chartAmountByYear' => $chartAmountByYear,
             'vehiculeChart' => $vehiculeChart,
+            'vehiculePagination' => $vehiculePagination,
             'topUsedAddressesChart' => $topUsedAddressesChart,
         ]);
     }
@@ -453,14 +472,26 @@ class DashboardAppController extends AbstractDashboardController
         return array_slice($addresses, 0, $limit);
     }
 
-    private function createTripsAndAmountByVehiculeChart(int $year): ?Chart
-    {
-        /** @var User $user */
+    /**
+     * @return array{
+     *     chart: Chart,
+     *     page: int,
+     *     totalPages: int,
+     *     totalVehicles: int
+     * }|null
+     */
+    private function createTripsAndAmountByVehiculeChart(
+        int $year,
+        int $page = 1,
+        int $perPage = 5,
+    ): ?array {
         $user = $this->getUser();
 
-        if (count($user->getVehicules()) <= 1) {
+        if (!$user instanceof User || count($user->getVehicules()) <= 1) {
             return null;
         }
+
+        $perPage = max(1, $perPage);
 
         $vehiculeLabels = [];
 
@@ -468,7 +499,48 @@ class DashboardAppController extends AbstractDashboardController
             $vehiculeLabels[$vehicule->getId()] = (string) $vehicule;
         }
 
-        $rows = $this->entityManager->createQueryBuilder()
+        /*
+        * Nombre total de véhicules ayant des trajets
+        * pour l'année sélectionnée.
+        */
+        $totalVehicles = (int) $this->entityManager
+            ->createQueryBuilder()
+            ->select('COUNT(DISTINCT v.id)')
+            ->from(ReportLine::class, 'rl')
+            ->innerJoin('rl.vehicule', 'v')
+            ->innerJoin('rl.report', 'r')
+            ->where('r.user = :user')
+            ->andWhere('rl.travel_date IS NOT NULL')
+            ->andWhere('YEAR(rl.travel_date) = :year')
+            ->setParameter('user', $user)
+            ->setParameter('year', $year)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        if ($totalVehicles === 0) {
+            return null;
+        }
+
+        /*
+        * Calcul de la pagination.
+        */
+        $totalPages = max(
+            1,
+            (int) ceil($totalVehicles / $perPage)
+        );
+
+        $page = min(
+            max(1, $page),
+            $totalPages
+        );
+
+        $offset = ($page - 1) * $perPage;
+
+        /*
+        * Récupération des véhicules de la page courante.
+        */
+        $rows = $this->entityManager
+            ->createQueryBuilder()
             ->select(
                 'v.id AS vehiculeId',
                 'COUNT(rl.id) AS totalTrips',
@@ -478,15 +550,19 @@ class DashboardAppController extends AbstractDashboardController
             ->innerJoin('rl.vehicule', 'v')
             ->innerJoin('rl.report', 'r')
             ->where('r.user = :user')
+            ->andWhere('rl.travel_date IS NOT NULL')
             ->andWhere('YEAR(rl.travel_date) = :year')
             ->setParameter('user', $user)
             ->setParameter('year', $year)
             ->groupBy('v.id')
             ->orderBy('totalAmount', 'DESC')
+            ->addOrderBy('v.id', 'ASC')
+            ->setFirstResult($offset)
+            ->setMaxResults($perPage)
             ->getQuery()
             ->getArrayResult();
 
-        if ([] === $rows) {
+        if ($rows === []) {
             return null;
         }
 
@@ -498,13 +574,12 @@ class DashboardAppController extends AbstractDashboardController
         foreach ($rows as $index => $row) {
             $vehiculeId = (int) $row['vehiculeId'];
             $tripsCount = (int) $row['totalTrips'];
-
             $vehiculeName = $vehiculeLabels[$vehiculeId] ?? 'Véhicule';
 
             $labels[] = [
                 $this->chartService->truncateLabel($vehiculeName, 28),
                 sprintf(
-                    ' %d %s',
+                    '%d %s',
                     $tripsCount,
                     $tripsCount > 1 ? 'trajets' : 'trajet'
                 ),
@@ -512,8 +587,13 @@ class DashboardAppController extends AbstractDashboardController
 
             $amountData[] = (float) $row['totalAmount'];
 
-            // Le premier véhicule est le plus élevé grâce au orderBy DESC.
-            $backgroundColors[] = $index === 0
+            /*
+            * Seul le véhicule en tête du classement général
+            * est affiché avec la couleur renforcée.
+            */
+            $isFirstVehicle = $page === 1 && $index === 0;
+
+            $backgroundColors[] = $isFirstVehicle
                 ? 'rgba(97, 116, 209, 0.95)'
                 : 'rgba(97, 116, 209, 0.62)';
 
@@ -545,6 +625,7 @@ class DashboardAppController extends AbstractDashboardController
             'maintainAspectRatio' => false,
             'indexAxis' => 'y',
             'locale' => 'fr-FR',
+
             'layout' => [
                 'padding' => [
                     'top' => 8,
@@ -553,18 +634,22 @@ class DashboardAppController extends AbstractDashboardController
                     'left' => 4,
                 ],
             ],
+
             'animation' => [
                 'duration' => 500,
                 'easing' => 'easeOutQuart',
             ],
+
             'interaction' => [
                 'mode' => 'nearest',
                 'intersect' => false,
             ],
+
             'plugins' => [
                 'legend' => [
                     'display' => false,
                 ],
+
                 'tooltip' => [
                     'backgroundColor' => 'rgba(36, 47, 81, 0.96)',
                     'titleColor' => '#ffffff',
@@ -574,17 +659,21 @@ class DashboardAppController extends AbstractDashboardController
                     'displayColors' => false,
                 ],
             ],
+
             'scales' => [
                 'x' => [
                     'beginAtZero' => true,
                     'grace' => '10%',
+
                     'border' => [
                         'display' => false,
                     ],
+
                     'grid' => [
                         'color' => 'rgba(97, 116, 209, 0.10)',
                         'drawTicks' => false,
                     ],
+
                     'ticks' => [
                         'padding' => 10,
                         'maxTicksLimit' => 5,
@@ -596,14 +685,17 @@ class DashboardAppController extends AbstractDashboardController
                         ],
                     ],
                 ],
+
                 'y' => [
                     'border' => [
                         'display' => false,
                     ],
+
                     'grid' => [
                         'display' => false,
                         'drawTicks' => false,
                     ],
+
                     'ticks' => [
                         'padding' => 14,
                         'font' => [
@@ -615,7 +707,12 @@ class DashboardAppController extends AbstractDashboardController
             ],
         ]);
 
-        return $chart;
+        return [
+            'chart' => $chart,
+            'page' => $page,
+            'totalPages' => $totalPages,
+            'totalVehicles' => $totalVehicles,
+        ];
     }
 
     private function createTopUsedAddressesChart(int $year): ?Chart
@@ -793,5 +890,56 @@ class DashboardAppController extends AbstractDashboardController
         $qb
             ->andWhere('r.user = :user')
             ->setParameter('user', $user);
+    }
+
+    #[Route(
+        path: '/dashboard/vehicules-chart',
+        name: 'app_dashboard_vehicules_chart',
+        methods: ['GET']
+    )]
+    public function vehiculesChart(Request $request): Response
+    {
+        $user = $this->getUser();
+
+        if (!$user instanceof User) {
+            throw $this->createAccessDeniedException();
+        }
+
+        $yearSelected = (int) $request->query->get(
+            'yearSelected',
+            (int) date('Y')
+        );
+
+        $vehiculePage = max(
+            1,
+            (int) $request->query->get('vehiculePage', 1)
+        );
+
+        $vehiculeChart = null;
+        $vehiculePagination = null;
+
+        if (count($user->getVehicules()) > 1) {
+            $result = $this->createTripsAndAmountByVehiculeChart(
+                $yearSelected,
+                $vehiculePage,
+                5
+            );
+
+            if ($result !== null) {
+                $vehiculeChart = $result['chart'];
+
+                $vehiculePagination = [
+                    'page' => $result['page'],
+                    'totalPages' => $result['totalPages'],
+                    'totalVehicles' => $result['totalVehicles'],
+                ];
+            }
+        }
+
+        return $this->render('App/Dashboard/_vehicule_chart.html.twig', [
+            'vehiculeChart' => $vehiculeChart,
+            'vehiculePagination' => $vehiculePagination,
+            'yearSelected' => $yearSelected,
+        ]);
     }
 }

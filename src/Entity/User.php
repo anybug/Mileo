@@ -63,6 +63,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(type: 'string', length: 255, nullable: true)]
     private $company;
 
+    #[ORM\Column(length: 14, nullable: true)]
+    #[Assert\Regex(
+        pattern: '/^\d{14}$/',
+        message: 'Le numéro SIRET doit contenir exactement 14 chiffres.'
+    )]
+    private ?string $siret = null;
+
     #[ORM\Column(type: 'string', length: 20, nullable: true)]
     private $balanceStartPeriod;
 
@@ -71,6 +78,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column]
     private bool $active = true;
+
+    #[ORM\Column(type: Types::DATE_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $workforceExitDate = null;
 
     public $captcha;
 
@@ -988,17 +998,96 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->subscription?->getSubscriptionEnd();
     }
 
-    public function getMonthlyCollaboratorsCount(): int
-    {
+    public function getMonthlyCollaboratorsCount(
+        ?\DateTimeInterface $date = null
+    ): int {
         return $this->members
-            ->filter(static fn (self $member): bool => $member->isActive())
+            ->filter(
+                static fn (self $member): bool =>
+                    $member->isInWorkforceAt($date)
+            )
             ->count();
     }
 
-    public function getActiveMembers(): Collection
-    {
+    /**
+     * @return Collection<int, User>
+     */
+    public function getActiveMembers(
+        ?\DateTimeInterface $date = null
+    ): Collection {
         return $this->members
-            ->filter(static fn (self $member): bool => $member->isActive());
+            ->filter(
+                static fn (self $member): bool =>
+                    $member->isInWorkforceAt($date)
+            );
+    }
+
+    public function getSiret(): ?string
+    {
+        return $this->siret;
+    }
+
+    public function setSiret(?string $siret): static
+    {
+        $this->siret = $siret;
+
+        return $this;
+    }
+
+    public function getWorkforceExitDate(): ?\DateTimeImmutable
+    {
+        return $this->workforceExitDate;
+    }
+
+    public function setWorkforceExitDate(?\DateTimeImmutable $workforceExitDate): static
+    {
+        $this->workforceExitDate = $workforceExitDate;
+
+        return $this;
+    }
+
+    public function hasLeftWorkforce(): bool
+    {
+        return null !== $this->workforceExitDate;
+    }
+
+    public function canManageIkReports(): bool
+    {
+        return true === $this->isActive()
+            && null === $this->getWorkforceExitDate();
+    }
+
+    public function leaveWorkforce(
+        \DateTimeImmutable $workforceExitDate
+    ): static {
+        $this->workforceExitDate = $workforceExitDate;
+
+        return $this;
+    }
+
+    public function isInWorkforceAt(
+        ?\DateTimeInterface $date = null
+    ): bool {
+        if (!$this->active) {
+            return false;
+        }
+
+        if (null === $this->workforceExitDate) {
+            return true;
+        }
+
+        $referenceDate = null !== $date
+            ? \DateTimeImmutable::createFromInterface($date)
+            : new \DateTimeImmutable('today');
+
+        $referenceDate = $referenceDate->setTime(0, 0);
+
+        return $this->workforceExitDate >= $referenceDate;
+    }
+
+    public function isInWorkforce(): bool
+    {
+        return null === $this->workforceExitDate;
     }
 
 }
