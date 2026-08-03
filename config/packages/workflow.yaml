@@ -32,3 +32,39 @@ framework:
                         - Draft
                     to: Cancelled
                     guard: "subject.isTeamReportInvoice()"
+
+        report_status:
+            type: state_machine
+
+            audit_trail:
+                enabled: true
+
+            marking_store:
+                type: method
+                property: statusAsString
+
+            supports:
+                - App\Entity\Report
+
+            initial_marking: Draft
+
+            places:
+                - Draft
+                - Sent
+                - Validated
+                - Invalidated
+
+            transitions:
+                Send:
+                    from:
+                        - Draft
+                        - Invalidated
+                    to: Sent
+
+                Validated:
+                    from: Sent
+                    to: Validated
+
+                Invalidated:
+                    from: Sent
+                    to: Invalidated

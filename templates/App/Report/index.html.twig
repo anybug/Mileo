@@ -75,7 +75,31 @@
             {{ vt.amount|number_format(2, ',', ' ') }} {{ 'EUR'|currency_symbol }}
             
         </td>
-        <td>{{ form(vt.form) }}</td>
+        <td>
+            {% set workforceExitDate = vt.Vehicule.user.workforceExitDate %}
+
+            {% if workforceExitDate is not null %}
+                <div class="d-flex flex-column align-items-start gap-1">
+                    <div class="fw-semibold text-dark">
+                        <i class="fa-solid fa-gauge-high me-1 text-primary"></i>
+                        Barème :
+                        {{ vt.Scale }}
+                    </div>
+
+                    <span
+                        class="badge text-bg-secondary"
+                        data-bs-toggle="tooltip"
+                        title="{{ 'Le barème est conservé mais ne peut plus être modifié car le collaborateur possède une date de sortie effective.'|trans }}"
+                    >
+                        <i class="fa-solid fa-lock me-1"></i>
+                        Modification bloquée depuis le
+                        {{ workforceExitDate|date('d/m/Y') }}
+                    </span>
+                </div>
+            {% else %}
+                {{ form(vt.form) }}
+            {% endif %}
+        </td>
     </tr>
 
     {% endfor %}

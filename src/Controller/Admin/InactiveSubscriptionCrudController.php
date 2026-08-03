@@ -4,6 +4,7 @@ namespace App\Controller\Admin;
 
 use App\Entity\Subscription;
 use Doctrine\ORM\QueryBuilder;
+use App\Form\Filter\SubscriptionInactiveSinceFilter;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FieldCollection;
@@ -66,7 +67,12 @@ final class InactiveSubscriptionCrudController extends AbstractCrudController
         return $filters
             ->add('user')
             ->add('plan')
-            ->add(DateTimeFilter::new('subscription_end', 'Date d’expiration'));
+            ->add(
+                SubscriptionInactiveSinceFilter::new(
+                    'subscription_end',
+                    'Inactif depuis'
+                )
+            );
     }
 
     public function createIndexQueryBuilder(

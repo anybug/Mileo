@@ -1,22 +1,32 @@
 {% extends 'Team/advanced_layout.html.twig' %}
 
 {% block page_title %}
-{% apply spaceless %}
-{{ dashboard.title|default('Welcome')|trans }}
-{% endapply %}
+    {% apply spaceless %}
+        {{ dashboard.title|default('Welcome')|trans }}
+    {% endapply %}
 {% endblock %}
 
-{% block main %} 
-    <div class="dashboard-content row m-1"> 
-        <div class="mt-3 pb-3 col-12"> 
-            <h3 class="text-primary mb-4"> 
+{% block main %}
+    <div class="dashboard-content row m-1">
+        <div class="mt-3 pb-3 col-12">
+            <h3 class="text-primary mb-4">
                 <i class="fa-solid fa-chart-line me-2"></i>
                 {{ 'Suivi des abonnements'|trans }}
             </h3>
 
+            {# Abonnements actifs #}
+            <div class="d-flex align-items-center mb-3">
+                <span
+                    class="d-inline-block rounded-circle bg-success me-2"
+                    style="width: 10px; height: 10px;"
+                ></span>
 
-            <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 row-cols-xl-5 g-3 mb-4">
+                <h5 class="mb-0">
+                    {{ 'Abonnements actifs'|trans }}
+                </h5>
+            </div>
 
+            <div class="row row-cols-1 row-cols-sm-2 row-cols-xl-4 g-3 mb-5">
                 <div class="col">
                     <div class="card h-100 border-success shadow-sm">
                         <div class="card-body py-3 px-3 d-flex flex-column">
@@ -87,7 +97,7 @@
                     <div class="card h-100 border-warning shadow-sm">
                         <div class="card-body py-3 px-3 d-flex flex-column">
                             <span class="text-muted small">
-                                {{ "Expire aujourd’hui"|trans }}
+                                {{ 'Expire aujourd’hui'|trans }}
                             </span>
 
                             <strong class="d-block fs-4 text-warning-emphasis mb-3">
@@ -104,12 +114,26 @@
                         </div>
                     </div>
                 </div>
+            </div>
 
+            {# Abonnements expirés #}
+            <div class="d-flex align-items-center mb-3">
+                <span
+                    class="d-inline-block rounded-circle bg-danger me-2"
+                    style="width: 10px; height: 10px;"
+                ></span>
+
+                <h5 class="mb-0">
+                    {{ 'Abonnements expirés'|trans }}
+                </h5>
+            </div>
+
+            <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 row-cols-xl-5 g-3 mb-4">
                 <div class="col">
                     <div class="card h-100 border-danger shadow-sm">
                         <div class="card-body py-3 px-3 d-flex flex-column">
                             <span class="text-muted small">
-                                {{ 'Expirés'|trans }}
+                                {{ 'Total expiré'|trans }}
                             </span>
 
                             <strong class="d-block fs-4 text-danger mb-3">
@@ -121,7 +145,95 @@
                                 class="btn btn-danger w-100 mt-auto"
                             >
                                 <i class="fa-solid fa-list me-1"></i>
-                                {{ 'Voir la liste des expirés'|trans }}
+                                {{ 'Voir tous les expirés'|trans }}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col">
+                    <div class="card h-100 border-danger shadow-sm">
+                        <div class="card-body py-3 px-3 d-flex flex-column">
+                            <span class="text-muted small">
+                                {{ 'Expirés aujourd’hui'|trans }}
+                            </span>
+
+                            <strong class="d-block fs-4 text-danger mb-3">
+                                {{ subscriptionMetrics.expiredToday }}
+                            </strong>
+
+                            <a
+                                href="{{ subscriptionMetrics.expiredTodayUrl }}"
+                                class="btn btn-danger w-100 mt-auto"
+                            >
+                                <i class="fa-solid fa-list me-1"></i>
+                                {{ 'Voir les expirés du jour'|trans }}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col">
+                    <div class="card h-100 border-warning shadow-sm">
+                        <div class="card-body py-3 px-3 d-flex flex-column">
+                            <span class="text-muted small">
+                                {{ 'Expirés depuis 7 jours'|trans }}
+                            </span>
+
+                            <strong class="d-block fs-4 text-warning-emphasis mb-3">
+                                {{ subscriptionMetrics.expiredWithin7Days }}
+                            </strong>
+
+                            <a
+                                href="{{ subscriptionMetrics.expiredWithin7DaysUrl }}"
+                                class="btn btn-warning w-100 mt-auto"
+                            >
+                                <i class="fa-solid fa-list me-1"></i>
+                                {{ 'Voir les expirés sous 7 jours'|trans }}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col">
+                    <div class="card h-100 border-primary shadow-sm">
+                        <div class="card-body py-3 px-3 d-flex flex-column">
+                            <span class="text-muted small">
+                                {{ 'Expirés depuis 30 jours'|trans }}
+                            </span>
+
+                            <strong class="d-block fs-4 text-primary mb-3">
+                                {{ subscriptionMetrics.expiredWithin30Days }}
+                            </strong>
+
+                            <a
+                                href="{{ subscriptionMetrics.expiredWithin30DaysUrl }}"
+                                class="btn btn-secondary w-100 mt-auto"
+                            >
+                                <i class="fa-solid fa-list me-1"></i>
+                                {{ 'Voir les expirés sous 30 jours'|trans }}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col">
+                    <div class="card h-100 border-secondary shadow-sm">
+                        <div class="card-body py-3 px-3 d-flex flex-column">
+                            <span class="text-muted small">
+                                {{ 'Expirés depuis plus de 30 jours'|trans }}
+                            </span>
+
+                            <strong class="d-block fs-4 text-secondary mb-3">
+                                {{ subscriptionMetrics.expiredMoreThan30Days }}
+                            </strong>
+
+                            <a
+                                href="{{ subscriptionMetrics.expiredMoreThan30DaysUrl }}"
+                                class="btn btn-secondary w-100 mt-auto"
+                            >
+                                <i class="fa-solid fa-list me-1"></i>
+                                {{ 'Voir les expirés de plus de 30 jours'|trans }}
                             </a>
                         </div>
                     </div>
@@ -131,6 +243,4 @@
     </div>
 
     {{ parent() }}
-
-
 {% endblock %}

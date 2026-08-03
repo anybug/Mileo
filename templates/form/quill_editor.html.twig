@@ -1,0 +1,55 @@
+{% block quill_editor_widget %}
+    {% set attr = attr|merge({
+        class: (attr.class|default('') ~ ' d-none')|trim
+    }) %}
+
+    <div
+        data-controller="quill-editor"
+        data-quill-editor-upload-url-value="{{ attr['data-quill-editor-upload-url-value']|default('') }}"
+    >
+        <div
+            data-quill-editor-toolbar
+            class="bg-body-tertiary border rounded-top px-2 py-2"
+        >
+            <span class="ql-formats">
+                <select class="ql-header">
+                    <option selected></option>
+                    <option value="2"></option>
+                    <option value="3"></option>
+                </select>
+            </span>
+
+            <span class="ql-formats">
+                <button type="button" class="ql-bold"></button>
+                <button type="button" class="ql-italic"></button>
+                <button type="button" class="ql-underline"></button>
+                <button type="button" class="ql-strike"></button>
+            </span>
+
+            <span class="ql-formats">
+                <button type="button" class="ql-list" value="ordered"></button>
+                <button type="button" class="ql-list" value="bullet"></button>
+            </span>
+
+            <span class="ql-formats">
+                <button type="button" class="ql-link"></button>
+                <button type="button" class="ql-image"></button>
+            </span>
+
+            <span class="ql-formats">
+                <button type="button" class="ql-clean"></button>
+            </span>
+        </div>
+
+        <div
+            data-quill-editor-editor
+            class="bg-body border border-top-0 rounded-bottom"
+            style="min-height: 260px;"
+        ></div>
+
+        <textarea
+            {{ block('widget_attributes') }}
+            data-quill-editor-input
+        >{{ value }}</textarea>
+    </div>
+{% endblock %}

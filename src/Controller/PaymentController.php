@@ -111,7 +111,7 @@ class PaymentController extends AbstractController
             $end = $start->modify('+'.$plan->getPlanPeriod().' month');
             $subscription->setSubscriptionEnd($end);
 
-            $subscription->setWarningMailSentAt(null);
+            $subscription->resetWarningMails(null);
             $subscription->setExpiredMailSentAt(null);
 
             $order->setSubscriptionEnd($subscription->getSubscriptionEnd());

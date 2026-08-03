@@ -70,21 +70,6 @@ class Invoice
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $modificationReason = null;
 
-    #[ORM\Column(type: 'text', nullable: true)]
-    private ?string $paymentTerms = null;
-
-    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
-    private ?\DateTimeImmutable $paymentDueDate = null;
-
-    #[ORM\Column(type: 'string', length: 255, nullable: true)]
-    private ?string $bankAccountOwner = null;
-
-    #[ORM\Column(type: 'string', length: 34, nullable: true)]
-    private ?string $bankIban = null;
-
-    #[ORM\Column(type: 'string', length: 11, nullable: true)]
-    private ?string $bankBic = null;
-
     public function __construct()
     {
         $this->reports = new ArrayCollection();
@@ -354,63 +339,4 @@ class Invoice
         return $this;
     }
 
-    public function getPaymentTerms(): ?string
-    {
-        return $this->paymentTerms;
-    }
-
-    public function setPaymentTerms(?string $paymentTerms): static
-    {
-        $this->paymentTerms = $paymentTerms;
-
-        return $this;
-    }
-
-    public function getPaymentDueDate(): ?\DateTimeImmutable
-    {
-        return $this->paymentDueDate;
-    }
-
-    public function setPaymentDueDate(?\DateTimeImmutable $paymentDueDate): static
-    {
-        $this->paymentDueDate = $paymentDueDate;
-
-        return $this;
-    }
-
-    public function getBankAccountOwner(): ?string
-    {
-        return $this->bankAccountOwner;
-    }
-
-    public function setBankAccountOwner(?string $bankAccountOwner): static
-    {
-        $this->bankAccountOwner = $bankAccountOwner;
-
-        return $this;
-    }
-
-    public function getBankIban(): ?string
-    {
-        return $this->bankIban;
-    }
-
-    public function setBankIban(?string $bankIban): static
-    {
-        $this->bankIban = $bankIban;
-
-        return $this;
-    }
-
-    public function getBankBic(): ?string
-    {
-        return $this->bankBic;
-    }
-
-    public function setBankBic(?string $bankBic): static
-    {
-        $this->bankBic = $bankBic;
-
-        return $this;
-    }
 }

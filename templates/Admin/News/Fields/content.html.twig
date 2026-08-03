@@ -1,0 +1,7 @@
+{% if field.value is empty %}
+    <span class="text-muted">—</span>
+{% else %}
+    <div class="ea-text-editor-content">
+        {{ field.value|raw }}
+    </div>
+{% endif %}
