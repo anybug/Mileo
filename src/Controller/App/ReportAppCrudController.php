@@ -797,35 +797,40 @@ class ReportAppCrudController extends AbstractCrudController
         $form->handleRequest($context->getRequest());
 
         if ($form->isSubmitted() && $form->isValid()) {
-
+            /** @var VehiculesReport $vehiculesReport */
             $vehiculesReport = $form->getData();
+
             $newScale = $vehiculesReport->getScale();
             $vehicle = $vehiculesReport->getVehicule();
-            $reportsToUpdate = [];
 
-            // Mise à jour de tous les rapports de l'année fiscale
-            foreach ($reports as $report) 
-            {
-                foreach ($report->getVehiculesReports() as $vr) 
-                {
-                    if ($vr->getVehicule() === $vehicle) {
-                        $vr->setScale($newScale);
-                        $vr->calculateTotal();
+            $vehicle->setScale($newScale);
+            $entityManager->flush();
+
+            foreach ($reports as $report) {
+
+                foreach ($report->getVehiculesReports() as $vr) {
+                    if ($vr->getVehicule()?->getId() !== $vehicle->getId()) {
+                        continue;
                     }
+
+                    /*
+                    * Important : c'est cette valeur que ReportService utilise
+                    * comme source de vérité.
+                    */
+                    $vr->setScale($newScale);
                 }
 
-                $entityManager->flush();
-
-                $this->dispatcher->dispatch(new AfterEntityUpdatedEvent($report));
-                
+                $this->dispatcher->dispatch(
+                    new AfterEntityUpdatedEvent($report)
+                );
             }
 
             $url = $this->adminUrlGenerator
                 ->setController(self::class)
                 ->setAction(Action::INDEX)
-                ->set("filters[Period][value]", $periodFilter)
-                ->generateUrl()
-                ;
+                ->set('filters[Period][value]', $periodFilter)
+                ->unset('vrid')
+                ->generateUrl();
 
             return $this->redirect($url);
         }

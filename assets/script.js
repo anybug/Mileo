@@ -895,20 +895,13 @@ import TomSelect from 'tom-select';
     }
 
     function updateReadonlyStats() {
-
         const allItems = getReadonlyTripItems();
 
         let totalKm = 0;
-        let totalAmount = 0;
 
         allItems.forEach((item) => {
-
             totalKm += parseNumber(
                 item.dataset.km ?? 0
-            );
-
-            totalAmount += parseNumber(
-                item.dataset.amount ?? 0
             );
         });
 
@@ -920,10 +913,6 @@ import TomSelect from 'tom-select';
             '.js-report-stat-km'
         );
 
-        const totalEl = document.querySelector(
-            '.js-report-stat-total'
-        );
-
         if (linesEl) {
             linesEl.textContent = String(allItems.length);
         }
@@ -932,12 +921,13 @@ import TomSelect from 'tom-select';
             kmEl.textContent = String(Math.round(totalKm));
         }
 
-        if (totalEl) {
-
-            totalEl.textContent =
-                parseFloat(totalAmount)
-                    .toFixed(2);
-        }
+        /*
+        * On ne touche pas à .js-report-stat-total.
+        * Le montant affiché vient du serveur et inclut :
+        * - kilomètres × taux
+        * - montant fixe annuel / 12
+        * - majoration électrique éventuelle
+        */
     }
 
     function applyReadonlySearchFilter() {

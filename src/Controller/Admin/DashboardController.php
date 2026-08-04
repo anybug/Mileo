@@ -62,8 +62,9 @@ class DashboardController extends AbstractDashboardController
 
     public function configureDashboard(): Dashboard
     {
+        $interfaceName = "Interface Administrateur" ;
         return Dashboard::new()
-            ->setTitle(sprintf('<img src="%s" />', $this->assets->getUrl('img/logo.png')))
+            ->setTitle(sprintf('<img src="%s" /><br /><span class="fs-6 fw-bold">%s</span>', $this->assets->getUrl('img/logo.png'), $interfaceName))
             ;
     }
 

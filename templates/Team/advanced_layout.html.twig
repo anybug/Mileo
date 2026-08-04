@@ -1,5 +1,23 @@
 {% extends '@EasyAdminDashboard/Default/index.html.twig' %}
 
+
+{% block header_custom_menu %}
+    {% set currentAction = ea is defined and ea.crud is defined ? ea.crud.currentAction : null %}
+
+    <div class="d-flex align-items-center justify-content-end gap-2">
+    
+        <a class="btn btn-primary"
+            href="{{ path('app') }}">
+            <i class="fa fa-user-check"></i> {{ "Aller à mon interface utilisateur"|trans }}
+        </a>
+
+        {% if currentAction not in ['edit', 'new'] %}
+            {{ parent() }}
+        {% endif %}
+    </div>
+{% endblock %}
+
+
 {% block body_javascript %}
     {% include 'App/javascript.html.twig' %}
 {% endblock body_javascript %}
