@@ -221,11 +221,10 @@ class DashboardAppController extends AbstractDashboardController
 
     public function configureDashboard(): Dashboard
     {
-        $interfaceName = "Interface Utilisateur" ;
         //dd($this->assets->getUrl('img/logo.png'));
         return Dashboard::new()
             //->setTitle('Mileo')
-            ->setTitle(sprintf('<img src="%s" /><br /><span class="fs-6 fw-bold">%s</span>', $this->assets->getUrl('img/logo.png'), $interfaceName))
+            ->setTitle(sprintf('<img src="%s" />', $this->assets->getUrl('img/logo.png')))
             ->setFaviconPath($this->assets->getUrl('img/favicons/favicon.ico'))
             ->disableDarkMode()
             //->renderContentMaximized()
