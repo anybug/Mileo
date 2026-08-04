@@ -172,31 +172,9 @@ class DashboardAppController extends AbstractDashboardController
             $yearSelected = $years[0];
         }
 
-        $vehiculeChart = null;
-        $vehiculePagination = null;
-
-        $vehiculePage = max(
-            1,
-            (int) $request->query->get('vehiculePage', 1)
-        );
-
-        if (count($user->getVehicules()) > 1) {
-            $vehiculeChartResult = $this->createTripsAndAmountByVehiculeChart(
-                $yearSelected,
-                $vehiculePage,
-                5
-            );
-
-            if ($vehiculeChartResult !== null) {
-                $vehiculeChart = $vehiculeChartResult['chart'];
-
-                $vehiculePagination = [
-                    'page' => $vehiculeChartResult['page'],
-                    'totalPages' => $vehiculeChartResult['totalPages'],
-                    'totalVehicles' => $vehiculeChartResult['totalVehicles'],
-                ];
-            }
-        }
+        $vehiculeChart = $this->createVehiculesAnnualChart(
+            $yearSelected
+        );        
 
         $chartTripsByMonth = $this->createTripsByMonthChart($yearSelected);
         $chartTripsByYear = $this->createTripsByYearChart();
@@ -237,22 +215,23 @@ class DashboardAppController extends AbstractDashboardController
             'chartAmountByMonth' => $chartAmountByMonth,
             'chartAmountByYear' => $chartAmountByYear,
             'vehiculeChart' => $vehiculeChart,
-            'vehiculePagination' => $vehiculePagination,
             'topUsedAddressesChart' => $topUsedAddressesChart,
         ]);
     }
 
     public function configureDashboard(): Dashboard
     {
+        $interfaceName = "Interface Utilisateur" ;
         //dd($this->assets->getUrl('img/logo.png'));
         return Dashboard::new()
             //->setTitle('Mileo')
-            ->setTitle(sprintf('<img src="%s" />', $this->assets->getUrl('img/logo.png')))
+            ->setTitle(sprintf('<img src="%s" /><br /><span class="fs-6 fw-bold">%s</span>', $this->assets->getUrl('img/logo.png'), $interfaceName))
             ->setFaviconPath($this->assets->getUrl('img/favicons/favicon.ico'))
             ->disableDarkMode()
             //->renderContentMaximized()
             ;
     }
+
 
     public function configureMenuItems(): iterable
     {
@@ -472,26 +451,13 @@ class DashboardAppController extends AbstractDashboardController
         return array_slice($addresses, 0, $limit);
     }
 
-    /**
-     * @return array{
-     *     chart: Chart,
-     *     page: int,
-     *     totalPages: int,
-     *     totalVehicles: int
-     * }|null
-     */
-    private function createTripsAndAmountByVehiculeChart(
-        int $year,
-        int $page = 1,
-        int $perPage = 5,
-    ): ?array {
+    private function createVehiculesAnnualChart(int $year): ?Chart
+    {
         $user = $this->getUser();
 
-        if (!$user instanceof User || count($user->getVehicules()) <= 1) {
+        if (!$user instanceof User) {
             return null;
         }
-
-        $perPage = max(1, $perPage);
 
         $vehiculeLabels = [];
 
@@ -499,46 +465,6 @@ class DashboardAppController extends AbstractDashboardController
             $vehiculeLabels[$vehicule->getId()] = (string) $vehicule;
         }
 
-        /*
-        * Nombre total de véhicules ayant des trajets
-        * pour l'année sélectionnée.
-        */
-        $totalVehicles = (int) $this->entityManager
-            ->createQueryBuilder()
-            ->select('COUNT(DISTINCT v.id)')
-            ->from(ReportLine::class, 'rl')
-            ->innerJoin('rl.vehicule', 'v')
-            ->innerJoin('rl.report', 'r')
-            ->where('r.user = :user')
-            ->andWhere('rl.travel_date IS NOT NULL')
-            ->andWhere('YEAR(rl.travel_date) = :year')
-            ->setParameter('user', $user)
-            ->setParameter('year', $year)
-            ->getQuery()
-            ->getSingleScalarResult();
-
-        if ($totalVehicles === 0) {
-            return null;
-        }
-
-        /*
-        * Calcul de la pagination.
-        */
-        $totalPages = max(
-            1,
-            (int) ceil($totalVehicles / $perPage)
-        );
-
-        $page = min(
-            max(1, $page),
-            $totalPages
-        );
-
-        $offset = ($page - 1) * $perPage;
-
-        /*
-        * Récupération des véhicules de la page courante.
-        */
         $rows = $this->entityManager
             ->createQueryBuilder()
             ->select(
@@ -555,10 +481,7 @@ class DashboardAppController extends AbstractDashboardController
             ->setParameter('user', $user)
             ->setParameter('year', $year)
             ->groupBy('v.id')
-            ->orderBy('totalAmount', 'DESC')
-            ->addOrderBy('v.id', 'ASC')
-            ->setFirstResult($offset)
-            ->setMaxResults($perPage)
+            ->orderBy('v.id', 'ASC')
             ->getQuery()
             ->getArrayResult();
 
@@ -568,151 +491,33 @@ class DashboardAppController extends AbstractDashboardController
 
         $labels = [];
         $amountData = [];
-        $backgroundColors = [];
-        $hoverBackgroundColors = [];
 
-        foreach ($rows as $index => $row) {
+        foreach ($rows as $row) {
             $vehiculeId = (int) $row['vehiculeId'];
-            $tripsCount = (int) $row['totalTrips'];
             $vehiculeName = $vehiculeLabels[$vehiculeId] ?? 'Véhicule';
 
-            $labels[] = [
-                $this->chartService->truncateLabel($vehiculeName, 28),
-                sprintf(
-                    '%d %s',
-                    $tripsCount,
-                    $tripsCount > 1 ? 'trajets' : 'trajet'
-                ),
-            ];
+            // La légende contient uniquement le nom du véhicule.
+            $labels[] = $this->chartService->truncateLabel(
+                $vehiculeName,
+                35
+            );
 
-            $amountData[] = (float) $row['totalAmount'];
-
-            /*
-            * Seul le véhicule en tête du classement général
-            * est affiché avec la couleur renforcée.
-            */
-            $isFirstVehicle = $page === 1 && $index === 0;
-
-            $backgroundColors[] = $isFirstVehicle
-                ? 'rgba(97, 116, 209, 0.95)'
-                : 'rgba(97, 116, 209, 0.62)';
-
-            $hoverBackgroundColors[] = 'rgba(72, 89, 190, 1)';
+            // La valeur du camembert correspond au montant des IK.
+            $amountData[] = round(
+                (float) $row['totalAmount'],
+                2
+            );
         }
 
-        $chart = new Chart(Chart::TYPE_BAR);
-
-        $chart->setData([
-            'labels' => $labels,
-            'datasets' => [
-                [
-                    'label' => 'Montant IK',
-                    'data' => $amountData,
-                    'backgroundColor' => $backgroundColors,
-                    'hoverBackgroundColor' => $hoverBackgroundColors,
-                    'borderWidth' => 0,
-                    'borderRadius' => 0,
-                    'borderSkipped' => false,
-                    'barPercentage' => 0.68,
-                    'categoryPercentage' => 0.82,
-                    'maxBarThickness' => 42,
-                ],
-            ],
-        ]);
-
-        $chart->setOptions([
-            'responsive' => true,
-            'maintainAspectRatio' => false,
-            'indexAxis' => 'y',
-            'locale' => 'fr-FR',
-
-            'layout' => [
-                'padding' => [
-                    'top' => 8,
-                    'right' => 12,
-                    'bottom' => 4,
-                    'left' => 4,
-                ],
-            ],
-
-            'animation' => [
-                'duration' => 500,
-                'easing' => 'easeOutQuart',
-            ],
-
-            'interaction' => [
-                'mode' => 'nearest',
-                'intersect' => false,
-            ],
-
-            'plugins' => [
-                'legend' => [
-                    'display' => false,
-                ],
-
-                'tooltip' => [
-                    'backgroundColor' => 'rgba(36, 47, 81, 0.96)',
-                    'titleColor' => '#ffffff',
-                    'bodyColor' => '#ffffff',
-                    'padding' => 12,
-                    'cornerRadius' => 10,
-                    'displayColors' => false,
-                ],
-            ],
-
-            'scales' => [
-                'x' => [
-                    'beginAtZero' => true,
-                    'grace' => '10%',
-
-                    'border' => [
-                        'display' => false,
-                    ],
-
-                    'grid' => [
-                        'color' => 'rgba(97, 116, 209, 0.10)',
-                        'drawTicks' => false,
-                    ],
-
-                    'ticks' => [
-                        'padding' => 10,
-                        'maxTicksLimit' => 5,
-                        'format' => [
-                            'style' => 'currency',
-                            'currency' => 'EUR',
-                            'minimumFractionDigits' => 0,
-                            'maximumFractionDigits' => 0,
-                        ],
-                    ],
-                ],
-
-                'y' => [
-                    'border' => [
-                        'display' => false,
-                    ],
-
-                    'grid' => [
-                        'display' => false,
-                        'drawTicks' => false,
-                    ],
-
-                    'ticks' => [
-                        'padding' => 14,
-                        'font' => [
-                            'size' => 12,
-                            'weight' => '500',
-                        ],
-                    ],
-                ],
-            ],
-        ]);
-
-        return [
-            'chart' => $chart,
-            'page' => $page,
-            'totalPages' => $totalPages,
-            'totalVehicles' => $totalVehicles,
-        ];
+        return $this->chartService->createDataChart(
+            Chart::TYPE_PIE,
+            $labels,
+            $amountData,
+            sprintf(
+                'Montant des IK par véhicule en %d',
+                $year
+            )
+        );
     }
 
     private function createTopUsedAddressesChart(int $year): ?Chart

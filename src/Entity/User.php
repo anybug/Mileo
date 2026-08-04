@@ -123,7 +123,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $calendarEncryptedPassword = null;
-
+    
+    #[ORM\Column(length: 20, unique: true, nullable: true)]
+    private ?string $referralCode = null;
     private ?string $plainCalendarPassword = null;
 
     const PERIOD_JANUARY = 'January';
@@ -1088,6 +1090,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function isInWorkforce(): bool
     {
         return null === $this->workforceExitDate;
+    }
+
+    public function getReferralCode(): ?string
+    {
+        return $this->referralCode;
+    }
+
+    public function setReferralCode(?string $referralCode): static
+    {
+        $this->referralCode = $referralCode;
+
+        return $this;
     }
 
 }
