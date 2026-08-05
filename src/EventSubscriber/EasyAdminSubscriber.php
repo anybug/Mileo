@@ -4,7 +4,7 @@ namespace App\EventSubscriber;
 
 use App\Entity\Report;
 use App\Entity\ReportLine;
-use App\Entity\VehiculesReport;
+use App\Service\ReportService;
 use Doctrine\ORM\EntityManagerInterface;
 use EasyCorp\Bundle\EasyAdminBundle\Event\AfterEntityDeletedEvent;
 use EasyCorp\Bundle\EasyAdminBundle\Event\AfterEntityPersistedEvent;
@@ -16,11 +16,16 @@ class EasyAdminSubscriber implements EventSubscriberInterface
 {
     private EntityManagerInterface $em;
     private AdminUrlGenerator $adminUrlGenerator;
+    private ReportService $reportService;
 
-    public function __construct(EntityManagerInterface $em, AdminUrlGenerator $adminUrlGenerator)
-    {
+    public function __construct(
+        EntityManagerInterface $em,
+        AdminUrlGenerator $adminUrlGenerator,
+        ReportService $reportService
+    ) {
         $this->em = $em;
         $this->adminUrlGenerator = $adminUrlGenerator;
+        $this->reportService = $reportService;
     }
 
     public static function getSubscribedEvents(): array
@@ -38,7 +43,6 @@ class EasyAdminSubscriber implements EventSubscriberInterface
 
         if ($entity instanceof Report) {
             $this->recalculateReport($entity);
-            $this->em->flush();
 
             return;
         }
@@ -54,7 +58,6 @@ class EasyAdminSubscriber implements EventSubscriberInterface
 
         if ($entity instanceof Report) {
             $this->recalculateReport($entity);
-            $this->em->flush();
 
             return;
         }
@@ -78,11 +81,11 @@ class EasyAdminSubscriber implements EventSubscriberInterface
             return;
         }
 
-        // Important : après suppression, on ne se base pas sur $report->getLines()
-        // car la collection peut encore être stale.
         $remainingLines = $this->em
             ->getRepository(ReportLine::class)
-            ->findBy(['report' => $report]);
+            ->findBy([
+                'report' => $report,
+            ]);
 
         if (count($remainingLines) === 0) {
             $this->em->remove($report);
@@ -91,8 +94,15 @@ class EasyAdminSubscriber implements EventSubscriberInterface
             return;
         }
 
+        /*
+         * La collection Doctrine peut encore contenir
+         * la ligne qui vient d'être supprimée.
+         */
+        if ($report->getLines()->contains($entity)) {
+            $report->removeLine($entity);
+        }
+
         $this->recalculateReport($report);
-        $this->em->flush();
     }
 
     private function handleReportLine(ReportLine $line): void
@@ -103,62 +113,19 @@ class EasyAdminSubscriber implements EventSubscriberInterface
             return;
         }
 
-        // Très important pour le cas création :
-        // on synchronise la collection inverse en mémoire.
+        /*
+         * Lors de la création, la collection inverse du rapport
+         * peut ne pas encore contenir la nouvelle ligne.
+         */
         if (!$report->getLines()->contains($line)) {
             $report->addLine($line);
         }
 
-        $this->recalculateLine($line);
         $this->recalculateReport($report);
-
-        $this->em->flush();
-    }
-
-    private function recalculateLine(ReportLine $line): void
-    {
-        $scale = $line->getVehicule()->getScale();
-
-        $line->setScale($scale);
-        $line->calculateAmount();
     }
 
     private function recalculateReport(Report $report): void
     {
-        $scales = [];
-
-        foreach ($report->getVehiculesReports() as $vehiculesReport) {
-            $vehicule = $vehiculesReport->getVehicule();
-
-            if ($vehicule) {
-                $scales[$vehicule->getId()] = $vehiculesReport->getScale();
-            }
-
-            $report->removeVehiculesReport($vehiculesReport);
-            $this->em->remove($vehiculesReport);
-        }
-
-        foreach ($report->getVehicules() as $vehicule) {
-            $vehiculesReport = new VehiculesReport();
-
-            $report->addVehiculesReport($vehiculesReport);
-
-            $vehiculesReport->setVehicule($vehicule);
-
-            if (isset($scales[$vehicule->getId()])) {
-                $vehiculesReport->setScale($scales[$vehicule->getId()]);
-            } else {
-                $vehiculesReport->setScale($vehicule->getScale());
-            }
-
-            $vehiculesReport->calculateTotal();
-
-            $this->em->persist($vehiculesReport);
-        }
-
-        $report->calculateKm();
-        $report->calculateTotal();
-
-        $this->em->persist($report);
+        $this->reportService->refreshReport($report);
     }
 }
