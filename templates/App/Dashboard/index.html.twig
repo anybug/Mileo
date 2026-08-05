@@ -106,22 +106,6 @@
                     </div>
  
                 </div>
-                {#
-                <div
-                    id="vehicule-chart"
-                    data-controller="vehicule-pagination"
-                    data-vehicule-pagination-url-value="{{ path('app_dashboard_vehicules_chart') }}"
-                    data-vehicule-pagination-year-value="{{ yearSelected }}"
-                >
-                    <div data-vehicule-pagination-target="content">
-                        {% include 'App/Dashboard/_vehicule_chart.html.twig' with {
-                            vehiculeChart: vehiculeChart,
-                            vehiculePagination: vehiculePagination,
-                            yearSelected: yearSelected
-                        } only %}
-                    </div>
-                </div>
-                #}
 
                 <hr />
 
@@ -147,9 +131,7 @@
                                 {% endif %} 
                             </div>
                         </div>    
-                    </div>
-
-                    <div class="p-4 col-lg-6">
+                    
                         <div class="card mb-2 shadow-sm">
                             <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
                                 <div>
@@ -168,6 +150,38 @@
                                 {% endif %} 
                             </div>
                         </div>    
+                    </div>
+
+                    <div class="p-4 col-lg-6">
+                        <div class="card mb-4 shadow-sm">
+                            <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+                                <div>
+                                    <h5 class="mb-1 text-primary">
+                                        <i class="fa-solid fa-car me-2"></i>
+
+                                        {% if vehiculeChart is not null %}
+                                            {{ vehiculeChart.data.datasets[0].label }}
+                                        {% else %}
+                                            {{ 'Trajets et IK par véhicule'|trans }}
+                                        {% endif %}
+                                    </h5>
+                                </div>
+                            </div>
+
+                            <div class="card-body">
+                                <div class="data-chart mb-4">
+                                    {% if vehiculeChart is not null
+                                        and vehiculeChart.data.datasets[0].data|length > 0
+                                    %}
+                                        {{ render_chart(vehiculeChart) }}
+                                    {% else %}
+                                        <p class="mb-0">
+                                            {{ 'Pas de données de véhicule pour le moment'|trans }}
+                                        </p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             {% else %}

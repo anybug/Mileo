@@ -34,7 +34,7 @@ class ReportTotalScaleType extends AbstractType
     public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
-            'data_class' => vehiculesReport::class,
+            'data_class' => VehiculesReport::class,
             'choices' => null
         ]);
     }
