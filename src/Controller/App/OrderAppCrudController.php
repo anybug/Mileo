@@ -7,6 +7,8 @@ use App\Utils\InvoicePdf;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Mapping\Id;
 use Doctrine\ORM\QueryBuilder;
+use App\Service\Billing\OrderFacturXGenerator;
+use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use EasyCorp\Bundle\EasyAdminBundle\Attribute\AdminRoute;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FieldCollection;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FilterCollection;
@@ -109,28 +111,35 @@ class OrderAppCrudController extends AbstractCrudController
         }
     }
     
-    #[AdminRoute(path: '/invoice/download', name: 'app_generate_invoice')]
-    public function generateInvoicePdf(AdminContext $context)
-    {
+    #[AdminRoute(
+        path: '/invoice/download',
+        name: 'app_generate_invoice',
+    )]
+    public function generateInvoicePdf(
+        AdminContext $context,
+        OrderFacturXGenerator $facturXGenerator,
+    ): Response {
         $order = $context->getEntity()->getInstance();
 
-        if($this->isGranted('ROLE_ADMIN') || $this->getUser() == $order->getUser()){
-            $pdf = new InvoicePdf();
-            $pdfContent = $pdf->generatePdf($order);
-            $filename = 'Mileo_Facture_'.$order->getInvoice()->getNum().'.pdf';
-            $response = new Response($pdfContent);
-            $response->headers->set('Content-Type', 'application/pdf');
-            $response->headers->set('Content-Disposition', 'attachment; filename="'.$filename.'"');
-            $response->headers->set('Cache-Control', 'no-store, no-cache, must-revalidate');
-            $response->headers->set('Pragma', 'no-cache');
-            $response->headers->set('Expires', '0');
-    
-            return $response;
-            
-            
-        }else{
+        if (!$order instanceof Order) {
+            throw $this->createNotFoundException(
+                'Commande introuvable.',
+            );
+        }
+
+        if (
+            !$this->isGranted('ROLE_ADMIN')
+            && $this->getUser() !== $order->getUser()
+        ) {
             throw new AccessDeniedException();
         }
-        
+
+        $path = $facturXGenerator->generate($order);
+
+        return $this->file(
+            $path,
+            basename($path),
+            ResponseHeaderBag::DISPOSITION_ATTACHMENT,
+        );
     }
 }
