@@ -596,6 +596,213 @@
         return true;
     }
 
+    function getTripSelectionElements() {
+        const form = document.querySelector('.js-preview-confirm-form');
+
+        if (!form) {
+            return null;
+        }
+
+        return {
+            form,
+            button: form.querySelector('.js-confirm-dup'),
+            tripsInput: form.querySelector('#assistant-trips-json'),
+            selectAllCheckbox: document.querySelector(
+                '.js-select-all-calendar-trips'
+            ),
+            tripCheckboxes: Array.from(
+                document.querySelectorAll('.js-calendar-trip-selection')
+            ),
+            selectedCountElement: document.querySelector(
+                '.js-selected-trips-count'
+            )
+        };
+    }
+
+    function getAllPreviewTrips(tripsInput) {
+        if (!tripsInput) {
+            return [];
+        }
+
+        /*
+        * On conserve le JSON d'origine dans un attribut.
+        * Cela évite de perdre les trajets si une première soumission
+        * est interrompue.
+        */
+        if (!tripsInput.dataset.allTrips) {
+            tripsInput.dataset.allTrips = tripsInput.value || '[]';
+        }
+
+        try {
+            const trips = JSON.parse(tripsInput.dataset.allTrips);
+
+            return Array.isArray(trips) ? trips : [];
+        } catch (error) {
+            console.error(
+                'Impossible de lire les trajets de la prévisualisation.',
+                error
+            );
+
+            return [];
+        }
+    }
+
+    function getSelectedPreviewTrips(elements) {
+        const allTrips = getAllPreviewTrips(elements.tripsInput);
+
+        /*
+        * Pour les autres actions que l'import calendrier,
+        * il n'y a pas de checkbox : on conserve tous les trajets.
+        */
+        if (elements.tripCheckboxes.length === 0) {
+            return allTrips;
+        }
+
+        const selectedIndexes = new Set(
+            elements.tripCheckboxes
+                .filter(function (checkbox) {
+                    return checkbox.checked && !checkbox.disabled;
+                })
+                .map(function (checkbox) {
+                    return Number.parseInt(checkbox.value, 10);
+                })
+                .filter(function (index) {
+                    return Number.isInteger(index);
+                })
+        );
+
+        return allTrips.filter(function (trip, index) {
+            return selectedIndexes.has(index);
+        });
+    }
+
+    function updateTripSelectionState() {
+        const elements = getTripSelectionElements();
+
+        if (!elements) {
+            return;
+        }
+
+        const selectedTrips = getSelectedPreviewTrips(elements);
+        const selectedCount = selectedTrips.length;
+
+        if (elements.selectedCountElement) {
+            elements.selectedCountElement.textContent = String(selectedCount);
+        }
+
+        if (elements.selectAllCheckbox) {
+            const selectableCheckboxes = elements.tripCheckboxes.filter(
+                function (checkbox) {
+                    return !checkbox.disabled;
+                }
+            );
+
+            const checkedCount = selectableCheckboxes.filter(
+                function (checkbox) {
+                    return checkbox.checked;
+                }
+            ).length;
+
+            const selectableCount = selectableCheckboxes.length;
+
+            elements.selectAllCheckbox.disabled = selectableCount === 0;
+
+            elements.selectAllCheckbox.checked =
+                selectableCount > 0 &&
+                checkedCount === selectableCount;
+
+            elements.selectAllCheckbox.indeterminate =
+                checkedCount > 0 &&
+                checkedCount < selectableCount;
+        }
+
+        if (!elements.button) {
+            return;
+        }
+
+        elements.button.dataset.selectionDisabled =
+            selectedCount === 0 ? '1' : '0';
+
+        if (selectedCount === 0) {
+            elements.button.disabled = true;
+            elements.button.classList.add('opacity-50');
+
+            return;
+        }
+
+        /*
+        * Ne pas réactiver le bouton s'il est désactivé
+        * par le calcul des distances.
+        */
+        const calculationDisabled =
+            elements.button.dataset.calculationDisabled === '1';
+
+        if (!calculationDisabled) {
+            elements.button.disabled = false;
+            elements.button.classList.remove('opacity-50');
+        }
+    }
+
+    function setTripCalculationError(row, hasError) {
+        if (!(row instanceof HTMLElement)) {
+            return;
+        }
+
+        row.dataset.calculationError = hasError ? '1' : '0';
+
+        const checkbox = row.querySelector(
+            '.js-calendar-trip-selection'
+        );
+
+        if (checkbox) {
+            checkbox.disabled = hasError;
+
+            if (hasError) {
+                checkbox.checked = false;
+                checkbox.title =
+                    'Ce trajet ne peut pas être sélectionné car son calcul a échoué.';
+            } else {
+                checkbox.title = '';
+            }
+        }
+
+        updateTripSelectionState();
+    }
+
+    window.setTripCalculationError = setTripCalculationError;
+    window.updateTripSelectionState = updateTripSelectionState;
+
+    document.addEventListener('change', function (event) {
+        const target = event.target;
+
+        if (!(target instanceof HTMLInputElement)) {
+            return;
+        }
+
+        /*
+        * Checkbox globale.
+        */
+        if (target.matches('.js-select-all-calendar-trips')) {
+            document
+                .querySelectorAll(
+                    '.js-calendar-trip-selection:not(:disabled)'
+                )
+                .forEach(function (checkbox) {
+                    checkbox.checked = target.checked;
+                });
+
+            updateTripSelectionState();
+            return;
+        }
+
+        /*
+        * Checkbox d'une ligne.
+        */
+        if (target.matches('.js-calendar-trip-selection')) {
+            updateTripSelectionState();
+        }
+    });
+
     document.addEventListener('click', function (event) {
         const disableCalendarButton = event.target.closest('[data-disable-calendar-submit]');
 
@@ -897,15 +1104,62 @@
     });
 
     document.addEventListener('submit', function (event) {
-        const form = event.target;
+        const form = event.target; 
 
         if (!(form instanceof HTMLFormElement)) {
             return;
         }
 
+        /*
+        * Validation de la connexion calendrier.
+        */
         if (!canSubmitCalendar(form)) {
             event.preventDefault();
             event.stopPropagation();
+            return;
+        }
+
+        /*
+        * Formulaire de confirmation de la prévisualisation.
+        */
+        if (!form.matches('.js-preview-confirm-form')) {
+            return;
+        }
+
+        if (form.dataset.submitted === '1') {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+        }
+
+        const elements = getTripSelectionElements();
+
+        if (!elements || !elements.tripsInput) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+        }
+
+        const selectedTrips = getSelectedPreviewTrips(elements);
+
+        if (selectedTrips.length === 0) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            updateTripSelectionState();
+            return;
+        }
+
+        /*
+        * Le contrôleur PHP reçoit uniquement les trajets cochés.
+        */
+        elements.tripsInput.value = JSON.stringify(selectedTrips);
+
+        form.dataset.submitted = '1';
+
+        if (elements.button) {
+            elements.button.disabled = true;
+            elements.button.classList.add('opacity-50');
         }
     }, true);
 

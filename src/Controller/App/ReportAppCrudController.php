@@ -593,52 +593,124 @@ class ReportAppCrudController extends AbstractCrudController
 
     public function bulkCreateLines(AdminContext $context): RedirectResponse
     {
+        /** @var Report $report */
         $report = $context->getEntity()->getInstance();
         $request = $context->getRequest();
 
+        if ($report->getUser() !== $this->getUser()) {
+            throw new AccessDeniedHttpException();
+        }
+
         $backUrl = $this->adminUrlGenerator
-                ->setController(self::class)
-                ->setAction(Action::EDIT)
-                ->setEntityId($report->getId())
-                ->generateUrl()
-        ;
+            ->setController(self::class)
+            ->setAction(Action::EDIT)
+            ->setEntityId($report->getId())
+            ->generateUrl();
 
-        $tripsData = json_decode($request->request->get('trips'), true);
+        $rawTrips = $request->request->get('trips', '[]');
 
-        if (empty($tripsData)) {
-            $this->addFlash('error', 'Aucun trajet à créer.');
+        try {
+            $tripsData = json_decode(
+                $rawTrips,
+                true,
+                512,
+                JSON_THROW_ON_ERROR
+            );
+        } catch (\JsonException) {
+            $this->addFlash('danger', 'Les trajets sélectionnés sont invalides.');
+
             return $this->redirect($backUrl);
         }
 
-        $entityManager = $this->container->get('doctrine')->getManagerForClass(Report::class);
+        if (!is_array($tripsData) || $tripsData === []) {
+            $this->addFlash('danger', 'Veuillez sélectionner au moins un trajet.');
+
+            return $this->redirect($backUrl);
+        }
+
+        $entityManager = $this->entityManager;
         $vehicleRepository = $entityManager->getRepository(Vehicule::class);
 
+        $createdCount = 0;
+
         foreach ($tripsData as $tripData) {
+            if (!is_array($tripData)) {
+                continue;
+            }
+
+            $date = $tripData['date'] ?? null;
+            $start = trim((string) ($tripData['start'] ?? ''));
+            $end = trim((string) ($tripData['end'] ?? ''));
+            $vehiculeId = $tripData['vehicule_id'] ?? null;
+
+            if (!$date || $start === '' || $end === '' || !$vehiculeId) {
+                continue;
+            }
+
+            try {
+                $travelDate = new \DateTime($date);
+            } catch (\Throwable) {
+                continue;
+            }
+
+            $vehicule = $vehicleRepository->find($vehiculeId);
+
+            /*
+            * Empêche d'injecter l'identifiant du véhicule d'un autre utilisateur.
+            */
+            if (
+                !$vehicule instanceof Vehicule
+                || $vehicule->getUser() !== $report->getUser()
+            ) {
+                continue;
+            }
+
             $trip = new ReportLine();
-            $trip->setTravelDate(new \DateTime($tripData['date']))
-                ->setStartAdress($tripData['start'])
-                ->setEndAdress($tripData['end'])
-                ->setKm($tripData['km'])
-                ->setKmTotal($tripData['km_total'])
-                ->setIsReturn($tripData['is_return'])
-                ->setVehicule($vehicleRepository->find($tripData['vehicule_id']))
-                ->setAmount($tripData['amount'])
-                ->setComment($tripData['comment'])
-                ->setReport($report)
-            ;
+
+            $trip
+                ->setTravelDate($travelDate)
+                ->setStartAdress($start)
+                ->setEndAdress($end)
+                ->setKm((float) ($tripData['km'] ?? 0))
+                ->setKmTotal((float) ($tripData['km_total'] ?? 0))
+                ->setIsReturn((bool) ($tripData['is_return'] ?? false))
+                ->setVehicule($vehicule)
+                ->setScale($vehicule->getScale())
+                ->setAmount((float) ($tripData['amount'] ?? 0))
+                ->setComment((string) ($tripData['comment'] ?? ''))
+                ->setReport($report);
 
             $entityManager->persist($trip);
-            //$report->addLine($trip);
+            $createdCount++;
+        }
+
+        if ($createdCount === 0) {
+            $this->addFlash(
+                'danger',
+                'Aucun des trajets sélectionnés n’a pu être créé.'
+            );
+
+            return $this->redirect($backUrl);
         }
 
         $entityManager->flush();
 
         $this->reportService->refreshReport($report);
 
-        $this->addFlash('success', 'Les trajets ont été crées avec succès.');
+        $this->addFlash(
+            'success',
+            sprintf(
+                '%d trajet%s créé%s avec succès.',
+                $createdCount,
+                $createdCount > 1 ? 's' : '',
+                $createdCount > 1 ? 's' : ''
+            )
+        );
 
-        $this->container->get('event_dispatcher')->dispatch(new AfterEntityUpdatedEvent($report));
-        
+        $this->dispatcher->dispatch(
+            new AfterEntityUpdatedEvent($report)
+        );
+
         return $this->redirect($backUrl);
     }
 

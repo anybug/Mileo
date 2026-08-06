@@ -49,10 +49,26 @@
     
 </div>
 
+{% set hasCalendarTrips = false %}
+{% for trip in previewTrips %}
+    {% if trip.is_calendar|default(false) %}
+        {% set hasCalendarTrips = true %}
+    {% endif %}
+{% endfor %}
+
 <table class="table table-bordered w-75">
     <thead>
         <tr>
             <th class="d-none"></th>
+            {% if action is defined and action == 'import_calendar' %}
+                <th class="text-center" style="width: 45px;">
+                    <input
+                        type="checkbox"
+                        class="form-check-input js-select-all-calendar-trips"
+                        checked
+                    >
+                </th>
+            {% endif %}
             <th>Date</th>
             <th>Départ</th>
             <th>Arrivée</th>
@@ -65,12 +81,7 @@
         </tr>
     </thead>
 
-    {% set hasCalendarTrips = false %}
-    {% for trip in previewTrips %}
-        {% if trip.is_calendar|default(false) %}
-            {% set hasCalendarTrips = true %}
-        {% endif %}
-    {% endfor %}
+    
     <tbody>
         {% for trip in previewTrips %}
         {% set isCalendarTrip = trip.is_calendar|default(false) %}
@@ -79,6 +90,8 @@
             class="report-line-row tm-trip-item"
             data-calendar="{{ isCalendarTrip ? '1' : '0' }}"
             data-vehicule="{{ trip.vehicule_id }}"
+            data-trip-index="{{ loop.index0 }}"
+            data-calculation-error="0"
         >
             <td class="d-none">
                 {{ trip.date }}
@@ -98,6 +111,16 @@
                     {% if trip.is_return %}checked{% endif %}
                 >
             </td>
+            {% if action is defined and action == 'import_calendar' %}
+                <td class="text-center align-middle">
+                    <input
+                        type="checkbox"
+                        class="form-check-input js-calendar-trip-selection"
+                        value="{{ loop.index0 }}"
+                        checked
+                    >
+                </td>
+            {% endif %}
 
             <td class="text-nowrap">
                 {{ trip.date|date('l')|trans }} <br>
@@ -140,7 +163,7 @@
         </tr>
         {% else %}
         <tr>
-            <td colspan="9">Aucun trajet à prévisualiser.</td>
+            <td colspan="{{ action is defined and action == 'import_calendar' ? 10 : 9 }}">Aucun trajet à prévisualiser.</td>
         </tr>
         {% endfor %}
     </tbody>
@@ -163,14 +186,20 @@
 {% endif %}
 <div id="calculation-warning" class="alert alert-warning w-75 mt-2 d-none">
     <strong>Certains trajets ne se sont pas calculés automatiquement.</strong><br>
-    Les lignes affichées en orange correspondent aux trajets pour lesquels Mileo n’a pas pu déterminer la distance ou le montant.
-    Vous ne pouvez pas confirmer la création tant que ces trajets ne sont pas corrigés.
-    Corrigez directement les adresses dans votre calendrier, puis relancez la prévisualisation.
+    Les lignes affichées en orange ne peuvent pas être sélectionnées ni importées.
+    Vous pouvez importer les autres trajets, ou corriger les adresses dans votre calendrier puis relancer la prévisualisation.
 </div>
+
+{% if action is defined and action == 'import_calendar' and previewTrips|length > 0 %}
+    <div class="small text-muted mb-3">
+        <span class="js-selected-trips-count">{{ previewTrips|length }}</span>
+        trajet(s) sélectionné(s) sur {{ previewTrips|length }}.
+    </div>
+{% endif %}
 
 {% if previewTrips|length > 0 %}
 {# Formulaire de confirmation #}
-<form method="POST" action="{{ confirmActionUrl }}">
+<form method="POST" action="{{ confirmActionUrl }}" class="js-preview-confirm-form">
     {# Champ caché pour les données des trajets #}
     <input type="hidden" name="trips"  id="assistant-trips-json" value="{{ previewTrips|json_encode|e('html_attr') }}">
 
@@ -181,11 +210,12 @@
 
     {# Boutons de confirmation/annulation #}
     <div class="mt-3">
-        <button type="submit" 
-                class="btn btn-success js-confirm-dup {% if isCalendarTrip %}opacity-50{% endif %}" 
-                {% if isCalendarTrip %}disabled{% endif %}
+        <button
+            type="submit"
+            class="btn btn-success js-confirm-dup"
         >
-            <i class="fa fa-check"></i> {{"Confirmer la création des trajets"|trans }}
+            <i class="fa fa-check"></i>
+            {{ "Confirmer la création des trajets"|trans }}
         </button>
         <a href="{{ backUrl }}" class="btn btn-danger">
             <i class="fa fa-times"></i> {{"Annuler"|trans }}
@@ -194,19 +224,4 @@
 </form>
 {% endif %}
 
-<script>
-  (function () {
-    const btn = document.querySelector('.js-confirm-dup');
-    if (!btn) return;
-
-    btn.addEventListener('click', function (e) {
-      if (btn.dataset.submitted === '1') {
-        e.preventDefault();
-        return;
-      }
-      btn.dataset.submitted = '1';
-      btn.disabled = true;
-    }, { once: true });
-  })();
-</script>
 
