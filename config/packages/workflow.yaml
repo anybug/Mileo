@@ -46,19 +46,14 @@ framework:
             supports:
                 - App\Entity\Report
 
-            initial_marking: Draft
-
             places:
-                - Draft
                 - Sent
                 - Validated
                 - Invalidated
 
             transitions:
-                Send:
-                    from:
-                        - Draft
-                        - Invalidated
+                Resend:
+                    from: Invalidated
                     to: Sent
 
                 Validated:

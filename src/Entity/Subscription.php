@@ -234,4 +234,21 @@ class Subscription
 
         return $this;
     }
+
+    public function addFreeDays(int $days): static
+    {
+        $now = new \DateTimeImmutable();
+
+        $currentEnd = $this->getSubscriptionEnd();
+
+        $baseDate = $currentEnd !== null && $currentEnd > $now
+            ? $currentEnd
+            : $now;
+
+        $this->setSubscriptionEnd(
+            $baseDate->modify(sprintf('+%d days', $days))
+        );
+
+        return $this;
+    }
 }

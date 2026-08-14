@@ -105,3 +105,8 @@ label.required::after {
     color: var(--bs-danger, #dc3545);
     font-weight: 700;
 }
+
+.tm-history-period-locked {
+    color: #9ca3af !important;
+    background-color: #f3f4f6 !important;
+}

@@ -183,6 +183,38 @@
                             </div>
                         </div>
                     </div>
+                    <div class="p-4 col-lg-6">
+                        <div class="card mb-4 shadow-sm">
+                            <div class="card-header">
+                                <h5 class="mb-1 text-primary">
+                                    <i class="fa-solid fa-map-location-dot me-2"></i>
+
+                                    {% if topUsedAddressesAllYearsChart is not null %}
+                                        {{ topUsedAddressesAllYearsChart.data.datasets[0].label }}
+                                    {% else %}
+                                        {{ 'Top 10 des adresses les plus utilisées'|trans }}
+                                    {% endif %}
+                                </h5>
+                            </div>
+
+                            <div class="card-body">
+                                {% if topUsedAddressesAllYearsChart is not null
+                                    and topUsedAddressesAllYearsChart.data.datasets[0].data|length > 0
+                                %}
+                                    <div
+                                        class="mx-auto"
+                                        style="position: relative; height: 320px; max-width: 750px;"
+                                    >
+                                        {{ render_chart(topUsedAddressesAllYearsChart) }}
+                                    </div>
+                                {% else %}
+                                    <p class="mb-0">
+                                        {{ 'Pas de données d’adresse pour le moment'|trans }}
+                                    </p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             {% else %}
                 <p>{{ "Pas de trajets effectués pour le moment"|trans }}.</p>

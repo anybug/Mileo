@@ -353,10 +353,70 @@
                                         </div>
                                     </div>
                                 {% endif %}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                {% if app.user.hasValidSubscription
+                    and app.user.subscription
+                    and app.user.subscription.plan
+                    and app.user.subscription.plan.code.value == 'pro'
+                %}
+                    <div class="col-lg-6">
+                        <div class="card border-secondary text-dark mb-3 me-5">
+                            <div class="card-header bg-light">
+                                <h5 class="mt-1 mb-0">
+                                    <i class="fa-fw fa-solid fa-user-group"></i>
+                                    {{ 'Parrainage'|trans }}
+                                </h5>
+                            </div>
+
+                            <div class="card-body bg-light">
+                                <p class="card-text">
+                                    Partagez votre code de parrainage.
+                                    Lors de la première souscription Pro de votre filleul,
+                                    vous bénéficiez tous les deux de 45 jours supplémentaires.
+                                </p>
+
+                                {% if app.user.referralCode %}
+                                    <div class="row align-items-center">
+                                        <div class="col-sm-4">
+                                            <p class="mb-0">
+                                                {{ 'Votre code'|trans }}
+                                            </p>
+                                        </div>
+
+                                        <div class="col-sm-8">
+                                            <div class="input-group">
+                                                <input
+                                                    id="referral-code"
+                                                    type="text"
+                                                    class="form-control fw-bold"
+                                                    value="{{ app.user.referralCode }}"
+                                                    readonly
+                                                >
+
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-outline-primary"
+                                                    onclick="navigator.clipboard.writeText(document.getElementById('referral-code').value)"
+                                                >
+                                                    <i class="fa-solid fa-copy me-1"></i>
+                                                    {{ 'Copier'|trans }}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <p class="text-muted mb-0">
+                                        <i>{{ 'Aucun code de parrainage disponible.'|trans }}</i>
+                                    </p>
+                                {% endif %}
                             </div>
                         </div>
-                    {% endif %}
-                </div> 
+                    </div>
+                {% endif %}
             </div>
 
             {% set hasSavedCalendar = app.user.calendarUrl is not empty %}

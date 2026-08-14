@@ -123,6 +123,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $calendarEncryptedPassword = null;
+
+    #[ORM\Column(length: 20, unique: true, nullable: true)]
+    private ?string $referralCode = null;
     
     private ?string $plainCalendarPassword = null;
 
@@ -1088,6 +1091,37 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function isInWorkforce(): bool
     {
         return null === $this->workforceExitDate;
+    }
+
+    public function getReferralCode(): ?string
+    {
+        return $this->referralCode;
+    }
+
+    public function setReferralCode(?string $referralCode): static
+    {
+        $this->referralCode = $referralCode;
+
+        return $this;
+    }
+
+    public function hasAlreadySubscribedToPro(): bool
+    {
+        foreach ($this->getOrders() as $order) {
+            if (
+                $order->getPlan()?->getCode() === \App\Enum\PlanCode::PRO
+                && $order->getStatus() === 'paid'
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function canUseReferralCode(): bool
+    {
+        return !$this->hasAlreadySubscribedToPro();
     }
 
 }

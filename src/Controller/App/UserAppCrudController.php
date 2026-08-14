@@ -6,6 +6,7 @@ use App\Controller\App\CalendarUserCrudController;
 use App\Dto\CalendarConnectionData;
 use App\Entity\Order;
 use App\Entity\Plan;
+use App\Entity\Referral;
 use App\Entity\User;
 use App\Enum\PlanCode;
 use App\Form\CalendarConnectionType;
@@ -32,6 +33,8 @@ use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Component\Form\Extension\Core\Type\PasswordType;
 use Symfony\Component\Form\Extension\Core\Type\RepeatedType;
+use Symfony\Component\Form\FormError;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -187,39 +190,116 @@ class UserAppCrudController extends AbstractCrudController
             ]); 
     }
     
-    public function subscriptionForm(Request $request, EntityManagerInterface $manager)
-    {
-        $order = new Order;
-        $plan = $manager->getRepository(Plan::class)->findByCode(PlanCode::PRO);
+    public function subscriptionForm(
+        Request $request,
+        EntityManagerInterface $manager
+    ) {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        $order = new Order();
+
+        $plan = $manager
+            ->getRepository(Plan::class)
+            ->findByCode(PlanCode::PRO);
+
+        $isFirstProSubscription = !$user->hasAlreadySubscribedToPro();
+
         $order->setPlan($plan);
 
-        //order name autocomplete
-        $order->setBillingName($this->getUser()->getCompany() ?? $this->getUser()->__toString()); 
-        $order->setUser($this->getUser());
+        $order->setBillingName(
+            $user->getCompany() ?? $user->__toString()
+        );
+
+        $order->setUser($user);
         $order->setPlan($plan);
         $order->setProductName($plan->getName());
         $order->setProductDescription($plan->getBillingDetails());
         $order->setTotalHt($plan->getPricePerYear());
         $order->calculateVatAmount();
         $order->setStatus('new');
-        
-        //TODO: autocomplete billingAddress, billingPostcode, billingCity
 
-        $form = $this->createForm(OrderType::class, $order);
-        
+        $form = $this->createForm(
+            OrderType::class,
+            $order,
+            [
+                'allow_referral_code' => $isFirstProSubscription,
+            ]
+        );
+
         $form->handleRequest($request);
+
         if ($form->isSubmitted() && $form->isValid()) {
+
+            $sponsor = null;
+
+            if ($isFirstProSubscription && $form->has('referralCode')) {
+                $referralCode = strtoupper(trim(
+                    (string) $form->get('referralCode')->getData()
+                ));
+
+                if ($referralCode !== '') {
+                    $sponsor = $manager
+                        ->getRepository(User::class)
+                        ->findOneBy([
+                            'referralCode' => $referralCode,
+                        ]);
+
+                    if (!$sponsor) {
+                        $form->get('referralCode')->addError(
+                            new FormError(
+                                'Ce code de parrainage est invalide.'
+                            )
+                        );
+                    } elseif ($sponsor === $user) {
+                        $form->get('referralCode')->addError(
+                            new FormError(
+                                'Vous ne pouvez pas utiliser votre propre code de parrainage.'
+                            )
+                        );
+                    } elseif (!$sponsor->hasValidSubscription()) {
+                        $form->get('referralCode')->addError(
+                            new FormError(
+                                'Ce code de parrainage n’est plus actif.'
+                            )
+                        );
+                    }
+
+                    if (!$form->isValid()) {
+                        return $this->render(
+                            'App/Profile/order.html.twig',
+                            [
+                                'form' => $form,
+                                'plan' => $plan,
+                                'isFirstProSubscription' => $isFirstProSubscription,
+                            ]
+                        );
+                    }
+                }
+            }
+
+            $order->setReferralSponsor($sponsor);
             $order->setStatus('pending');
+
             $manager->persist($order);
             $manager->flush();
 
-            return $this->redirectToRoute('payum_prepare_payment', ['order_id' => $order->getId()]);
+            return $this->redirectToRoute(
+                'payum_prepare_payment',
+                [
+                    'order_id' => $order->getId(),
+                ]
+            );
         }
 
-        return $this->render('App/Profile/order.html.twig', [
-            'form' => $form,
-            'plan' => $plan
-        ]);
+        return $this->render(
+            'App/Profile/order.html.twig',
+            [
+                'form' => $form,
+                'plan' => $plan,
+                'isFirstProSubscription' => $isFirstProSubscription,
+            ]
+        );
     }
 
     public function requestDeleteMe(
@@ -317,6 +397,26 @@ class UserAppCrudController extends AbstractCrudController
                 ])
         );
 
+        $referralRepository = $em->getRepository(Referral::class);
+
+        // L'utilisateur est filleul
+        $referralAsReferredUser = $referralRepository->findOneBy([
+            'referredUser' => $user,
+        ]);
+
+        if ($referralAsReferredUser !== null) {
+            $em->remove($referralAsReferredUser);
+        }
+
+        // L'utilisateur est parrain
+        $referralsAsSponsor = $referralRepository->findBy([
+            'sponsor' => $user,
+        ]);
+
+        foreach ($referralsAsSponsor as $referral) {
+            $em->remove($referral);
+        }
+
         // Suppression user (cascade sur vehicules/reports etc, mais PAS orders)
         $em->remove($user);
         $em->flush();
@@ -366,5 +466,80 @@ class UserAppCrudController extends AbstractCrudController
         $parameters->set('hasSavedCalendar', !empty($user->getCalendarUrl()));
 
         return $parameters;
+    }
+
+    #[Route(
+        '/dashboard/referral/validate',
+        name: 'app_validate_referral_code',
+        methods: ['POST']
+    )]
+    public function validateReferralCode(
+        Request $request,
+        EntityManagerInterface $manager
+    ): JsonResponse {
+        /** @var User|null $user */
+        $user = $this->getUser();
+
+        if (!$user) {
+            return $this->json([
+                'valid' => false,
+                'message' => 'Utilisateur non connecté.',
+            ], 401);
+        }
+
+        if (!$user->canUseReferralCode()) {
+            return $this->json([
+                'valid' => false,
+                'message' => 'Vous ne pouvez plus utiliser de code de parrainage.',
+            ], 400);
+        }
+
+        $data = json_decode(
+            $request->getContent(),
+            true
+        );
+
+        $code = strtoupper(trim(
+            (string) ($data['code'] ?? '')
+        ));
+
+        if ($code === '') {
+            return $this->json([
+                'valid' => false,
+                'message' => 'Veuillez saisir un code de parrainage.',
+            ], 400);
+        }
+
+        $sponsor = $manager
+            ->getRepository(User::class)
+            ->findOneBy([
+                'referralCode' => $code,
+            ]);
+
+        if (!$sponsor) {
+            return $this->json([
+                'valid' => false,
+                'message' => 'Ce code de parrainage est invalide.',
+            ], 404);
+        }
+
+        if ($sponsor === $user) {
+            return $this->json([
+                'valid' => false,
+                'message' => 'Vous ne pouvez pas utiliser votre propre code.',
+            ], 400);
+        }
+
+        if (!$sponsor->hasValidSubscription()) {
+            return $this->json([
+                'valid' => false,
+                'message' => 'Ce code de parrainage n’est plus actif.',
+            ], 400);
+        }
+
+        return $this->json([
+            'valid' => true,
+            'message' => 'Code de parrainage valide.',
+        ]);
     }
 }
