@@ -60,6 +60,10 @@ class Order
     #[ORM\Column(type: 'string')]
     private $status;
 
+    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?User $referralSponsor = null;
+
     const STATUS_NEW = 'new';
     const STATUS_PENDING = 'pending';
     const STATUS_PAID = 'paid';
@@ -272,5 +276,17 @@ class Order
    
     public function getInvoiceNum(){
         return $this->getInvoice()->getNum();
+    }
+
+    public function getReferralSponsor(): ?User
+    {
+        return $this->referralSponsor;
+    }
+
+    public function setReferralSponsor(?User $referralSponsor): static
+    {
+        $this->referralSponsor = $referralSponsor;
+
+        return $this;
     }
 }

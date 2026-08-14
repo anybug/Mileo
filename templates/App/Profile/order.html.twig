@@ -50,12 +50,69 @@
           {% endfor %}
         {% endfor %}
         {{ form_start(form) }}
+
           <div class="row">
-            <div class="col-12">{{ form_row(form.billingName) }}</div>
-            <div class="col-12">{{ form_row(form.billingAddress) }}</div>
-            <div class="col-6">{{ form_row(form.billingPostcode) }}</div>
-            <div class="col-6">{{ form_row(form.billingCity) }}</div>
-            <div class="col-12 text-right f-2">{{ form_row(form.submit) }}</div>
+              <div class="col-12">
+                  {{ form_row(form.billingName) }}
+              </div>
+
+              <div class="col-12">
+                  {{ form_row(form.billingAddress) }}
+              </div>
+
+              <div class="col-6">
+                  {{ form_row(form.billingPostcode) }}
+              </div>
+
+              <div class="col-6">
+                  {{ form_row(form.billingCity) }}
+              </div>
+
+              {% if form.referralCode is defined %}
+                <div
+                    class="col-12 mb-3"
+                    data-controller="referral"
+                    data-referral-url-value="{{ path('app_validate_referral_code') }}"
+                >
+                    <label class="form-label">
+                        {{ form.referralCode.vars.label }}
+                    </label>
+
+                    <div class="position-relative">
+                        {{ form_widget(form.referralCode, {
+                            attr: {
+                                class: 'form-control form-control-lg pe-5',
+                                'data-referral-target': 'input',
+                                'data-action': 'input->referral#reset'
+                            }
+                        }) }}
+
+                        <button
+                            type="button"
+                            class="btn btn-success position-absolute top-50 end-0 translate-middle-y me-2"
+                            data-action="referral#validate"
+                            data-referral-target="button"
+                        >
+                            <i class="fa-solid fa-check me-1"></i>
+                            Valider
+                        </button>
+                    </div>
+
+                    {{ form_errors(form.referralCode) }}
+
+                    <div
+                        class="form-text"
+                        data-referral-target="message"
+                    >
+                        Le code de parrainage vous permet, ainsi qu'à votre parrain,
+                        de bénéficier de 45 jours supplémentaires.
+                    </div>
+                </div>
+            {% endif %}
+
+              <div class="col-12 text-end">
+                  {{ form_row(form.submit) }}
+              </div>
           </div>
         {{ form_end(form) }}
       </div>

@@ -105,9 +105,42 @@ class ReportLineAppCrudController extends AbstractCrudController
                     ->generateUrl()
         ;
 
+        $user = $this->getUser();
+
+        $profileUrl = $this->adminUrlGenerator
+            ->setController(UserAppCrudController::class)
+            ->setAction(Action::INDEX)
+            ->setDashboard(DashboardAppController::class)
+            ->generateUrl();
+
+        $pageIndexTitle = 'Mes trajets <br />
+        <span class="fs-6 fw-normal">
+            Mode de saisie <i>trajet par trajet</i>:
+            les trajets saisis ici sont automatiquement regroupés dans un rapport mensuel.
+            <br />
+            Vous pouvez également opter pour le mode de saisie <i>au mois</i>
+            depuis le menu <a href="'.$reportUrl.'">Rapports</a>.
+        </span>';
+
+        if (
+            $user instanceof User
+            && !$user->canAddVehicule()
+            && $this->hasOlderHistory($user)
+        ) {
+            $pageIndexTitle .= '<br /><span class="fs-6 fw-light small">
+                <i class="fa-solid fa-circle-info"></i>
+                <i>
+                    Vous utilisez la version gratuite de Mileo et nous vous en remercions !
+                    Si vous souhaitez accéder à votre historique plus ancien,
+                    merci de passer à la version Pro depuis
+                    <a href="'.$profileUrl.'">votre profil</a>
+                </i>.
+            </span>';
+        }
+
         return $crud
             ->setDefaultSort(['travel_date' => 'ASC'])
-            ->setPageTitle(Crud::PAGE_INDEX, 'Mes trajets <br /><span class="fs-6 fw-normal">Mode de saisie <i>trajet par trajet</i>: les trajets saisis ici sont automatiquement regroupés dans un rapport mensuel. <br />Vous pouvez également opter pour le mode de saisie <i>au mois</i> depuis le menu <a href="'.$reportUrl.'">Rapports</a>.</span>')
+            ->setPageTitle(Crud::PAGE_INDEX, $pageIndexTitle)
             ->setPageTitle(Crud::PAGE_NEW, 'Saisir un trajet')
             ->setPageTitle(Crud::PAGE_EDIT, fn (ReportLine $reportLine) => sprintf('Modifier trajet du %s', $reportLine->getTravelDate()->format("d/m/Y")))
             ->showEntityActionsInlined()
@@ -143,9 +176,28 @@ class ReportLineAppCrudController extends AbstractCrudController
             'Dupliquer',
             'fa fa-copy'
         )
-            ->linkToCrudAction('duplicateLine');
+            ->linkToCrudAction('duplicateLine')
+            ->displayIf(function (ReportLine $reportLine): bool {
+                return $this->canWriteReportLine($reportLine);
+            });
 
         $actions
+            ->update(
+                Crud::PAGE_INDEX,
+                Action::EDIT,
+                fn (Action $action) => $action->displayIf(
+                    fn (ReportLine $reportLine): bool =>
+                        $this->canWriteReportLine($reportLine)
+                )
+            )
+            ->update(
+                Crud::PAGE_INDEX,
+                Action::DELETE,
+                fn (Action $action) => $action->displayIf(
+                    fn (ReportLine $reportLine): bool =>
+                        $this->canWriteReportLine($reportLine)
+                )
+            )
             ->add(Crud::PAGE_INDEX, $duplicateAction)
             ->add(Crud::PAGE_EDIT, Action::DELETE);
 
@@ -209,6 +261,11 @@ class ReportLineAppCrudController extends AbstractCrudController
 
         $this->denyIkWriteAccess($reportUser);
 
+        $this->denyOldHistoryWriteAccess(
+            $reportUser,
+            $reportLine
+        );
+
         return parent::edit($context);
     }
 
@@ -234,6 +291,11 @@ class ReportLineAppCrudController extends AbstractCrudController
         }
 
         $this->denyIkWriteAccess($reportUser);
+
+        $this->denyOldHistoryWriteAccess(
+            $reportUser,
+            $reportLine
+        );
 
         return parent::delete($context);
     }
@@ -261,6 +323,11 @@ class ReportLineAppCrudController extends AbstractCrudController
         }
 
         $this->denyIkWriteAccess($reportUser);
+
+        $this->denyOldHistoryWriteAccess(
+            $reportUser,
+            $reportLine
+        );
 
         $url = (clone $this->adminUrlGenerator)
             ->setController(self::class)
@@ -299,16 +366,26 @@ class ReportLineAppCrudController extends AbstractCrudController
     public function configureFields(string $pageName): iterable
     {
         $entity = $this->getContext()->getEntity()->getInstance();
-        $currentYear = (int) (new \DateTimeImmutable())->format('Y');
-        $minYear = $currentYear - 10;
-        $maxYear = $currentYear + 1;
+        $currentDate = new \DateTimeImmutable();
+        $currentYear = (int) $currentDate->format('Y');
+
+        /** @var User $me */
+        $me = $this->getCurrentUserOrDeny();
+
+        $isFreeUser = !$me->canAddVehicule();
+
+        $minDate = $isFreeUser
+            ? $currentDate->modify('-2 years')
+            : $currentDate->modify('-10 years');
+
+        $maxDate = $currentDate->modify('+1 year');
 
         /** @var App\Entity\User */
         $me = $this->getUser();
 
         $dateFieldHtmlAttributes = [
-            'min' => sprintf('%d-01-01', $minYear),
-            'max' => sprintf('%d-12-31', $maxYear),
+            'min' => $minDate->format('Y-m-d'),
+            'max' => $maxDate->format('Y-m-d'),
         ];
 
         if($pageName == Crud::PAGE_EDIT && $entity?->getId())
@@ -323,18 +400,45 @@ class ReportLineAppCrudController extends AbstractCrudController
         yield FormField::addPanel();
         yield DateField::new('travel_date','Date')->setColumns('col-sm-6 col-lg-5 col-xxl-2')->setHtmlAttributes($dateFieldHtmlAttributes)->onlyOnForms();
         yield DateField::new('travel_date','Date')->setFormat('full')->onlyOnIndex();
+        $user = $this->getCurrentUserOrDeny();
+        $defaultVehicule = $user->getDefaultVehicule();
+        $isFreeUser = !$user->canAddVehicule();
+
         yield AssociationField::new('vehicule', 'Véhicule')
             ->setFormTypeOptions([
-                'query_builder' => function (EntityRepository $er) {
-                return $er->createQueryBuilder('v')
-                    ->andWhere('v.user = (:user)')
-                    ->setParameter('user', $this->getUser());
+                'query_builder' => static function (EntityRepository $repository) use (
+                    $user,
+                    $defaultVehicule,
+                    $isFreeUser
+                ): QueryBuilder {
+                    $queryBuilder = $repository
+                        ->createQueryBuilder('v')
+                        ->andWhere('v.user = :user')
+                        ->setParameter('user', $user)
+                        ->orderBy('v.is_default', 'DESC')
+                        ->addOrderBy('v.id', 'ASC');
+
+                    if ($isFreeUser) {
+                        if (!$defaultVehicule instanceof Vehicule) {
+                            $queryBuilder->andWhere('1 = 0');
+                        } else {
+                            $queryBuilder
+                                ->andWhere('v = :defaultVehicule')
+                                ->setParameter(
+                                    'defaultVehicule',
+                                    $defaultVehicule
+                                );
+                        }
+                    }
+
+                    return $queryBuilder;
                 },
-                'attr' => ['class'=>'report_vehicule']
+                'attr' => [
+                    'class' => 'report_vehicule',
+                ],
             ])
             ->setColumns('col-sm-6 col-lg-5 col-xxl-2')
-            ->setTemplateName('crud/field/generic')
-            ;
+            ->setTemplateName('crud/field/generic');
         yield FormField::addRow();
         yield FormField::addPanel('Travel information')->setIcon('fa fa-car');
 
@@ -757,6 +861,15 @@ class ReportLineAppCrudController extends AbstractCrudController
 
         $this->denyIkWriteAccess($user);
 
+        $this->denyOldHistoryWriteAccess(
+            $user,
+            $entityInstance
+        );
+
+        $this->validateSelectedVehicule(
+            $entityInstance
+        );
+
         $this->getReportForTravel(
             $entityManager,
             $entityInstance
@@ -793,6 +906,15 @@ class ReportLineAppCrudController extends AbstractCrudController
         }
 
         $this->denyIkWriteAccess($reportUser);
+
+        $this->denyOldHistoryWriteAccess(
+            $reportUser,
+            $entityInstance
+        );
+
+        $this->validateSelectedVehicule(
+            $entityInstance
+        );
 
         $this->getReportForTravel(
             $entityManager,
@@ -932,6 +1054,11 @@ class ReportLineAppCrudController extends AbstractCrudController
 
         $this->denyIkWriteAccess($reportUser);
 
+        $this->denyOldHistoryWriteAccess(
+            $reportUser,
+            $reportLine
+        );
+
         if (
             !$this->isCsrfTokenValid(
                 'delete'.$reportLine->getId(),
@@ -969,5 +1096,122 @@ class ReportLineAppCrudController extends AbstractCrudController
                 'Ce compte est en lecture seule. Les trajets restent consultables, mais ne peuvent plus être créés, modifiés ou supprimés.'
             );
         }
+    }
+
+    private function validateSelectedVehicule(
+        ReportLine $reportLine
+    ): void {
+        $user = $this->getUser();
+
+        if (!$user instanceof \App\Entity\User) {
+            throw new AccessDeniedHttpException();
+        }
+
+        $vehicule = $reportLine->getVehicule();
+
+        if (
+            !$vehicule instanceof Vehicule
+            || $vehicule->getUser() !== $user
+        ) {
+            throw new AccessDeniedHttpException(
+                'Le véhicule sélectionné est invalide.'
+            );
+        }
+
+        /*
+        * Pour un compte gratuit, seul le véhicule par défaut
+        * peut être utilisé dans un trajet.
+        */
+        if (!$user->canAddVehicule()) {
+            $defaultVehicule = $user->getDefaultVehicule();
+
+            if (
+                !$defaultVehicule instanceof Vehicule
+                || $vehicule !== $defaultVehicule
+            ) {
+                throw new AccessDeniedHttpException(
+                    'La version gratuite permet uniquement d’utiliser le véhicule par défaut.'
+                );
+            }
+        }
+    }
+
+    private function hasOlderHistory(User $user): bool
+    {
+        if ($user->canAddVehicule()) {
+            return false;
+        }
+
+        $historyLimit = new \DateTimeImmutable('-2 years');
+
+        $count = $this->entityManager
+            ->getRepository(ReportLine::class)
+            ->createQueryBuilder('line')
+            ->innerJoin('line.report', 'report')
+            ->select('COUNT(line.id)')
+            ->where('report.user = :user')
+            ->andWhere('line.travel_date < :historyLimit')
+            ->setParameter('user', $user)
+            ->setParameter('historyLimit', $historyLimit)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return (int) $count > 0;
+    }
+
+    private function denyOldHistoryWriteAccess(
+        User $user,
+        ReportLine $reportLine
+    ): void {
+        if ($user->canAddVehicule()) {
+            return;
+        }
+
+        $travelDate = $reportLine->getTravelDate();
+
+        if (!$travelDate) {
+            return;
+        }
+
+        $historyLimit = new \DateTimeImmutable('-2 years');
+
+        if ($travelDate < $historyLimit) {
+            throw new AccessDeniedHttpException(
+                'La version gratuite permet uniquement de créer ou modifier des trajets sur les deux dernières années.'
+            );
+        }
+    }
+
+    private function canWriteReportLine(
+        ReportLine $reportLine
+    ): bool {
+        $user = $this->getUser();
+
+        if (!$user instanceof User) {
+            return false;
+        }
+
+        /*
+        * Compte globalement en lecture seule.
+        */
+        if (!$user->canManageIkReports()) {
+            return false;
+        }
+
+        /*
+        * Les comptes Pro ne sont pas limités
+        * par l'ancienneté.
+        */
+        if ($user->canAddVehicule()) {
+            return true;
+        }
+
+        $travelDate = $reportLine->getTravelDate();
+
+        if (!$travelDate) {
+            return false;
+        }
+
+        return $travelDate >= new \DateTimeImmutable('-2 years');
     }
 }

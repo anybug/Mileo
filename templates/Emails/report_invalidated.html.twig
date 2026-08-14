@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Rapport IK validé</title>
+</head>
+<body>
+    <h2>Votre rapport IK a été validé</h2>
+
+    <p>
+        Bonjour {{ user.firstname }} {{ user.lastname }},
+    </p>
+
+    <p>
+        Votre rapport d’indemnités kilométriques pour la période
+        <strong>{{ report.startDate|date('m/Y') }}</strong>
+        a été validé par votre manager.
+    </p>
+
+    <p>
+        <strong>Distance totale :</strong>
+        {{ report.vehiculesReportsTotalKm }} km
+    </p>
+
+    <p>
+        <strong>Montant total :</strong>
+        {{ report.vehiculesReportsTotalAmount|number_format(2, ',', ' ') }} €
+    </p>
+
+    <p>
+        Aucune action supplémentaire n’est nécessaire de votre côté.
+    </p>
+
+    <p>
+        Cordialement,<br>
+        L’équipe Mileo
+    </p>
+</body>
+</html>

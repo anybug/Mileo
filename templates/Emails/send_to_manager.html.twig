@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Rapport IK à valider</title>
+</head>
+<body>
+    <p>Bonjour {{ manager.firstname }} {{ user.lastname }},</p>
+
+    <p>
+        {{ user.firstname|default(user.email) }}
+        vous a envoyé un rapport d’indemnités kilométriques à valider.
+    </p>
+
+    <p>
+        <strong>Période :</strong>
+        {{ report.startDate|date('m/Y') }}
+    </p>
+
+    <p>
+        <strong>Distance totale :</strong>
+        {{ report.vehiculesReportsTotalKm }} km
+    </p>
+
+    <p>
+        <strong>Montant total :</strong>
+        {{ report.vehiculesReportsTotalAmount|number_format(2, ',', ' ') }} €
+    </p>
+
+    <p>
+        Vous pouvez vous connecter à Mileo afin de consulter le rapport et le valider ou l’invalider.
+    </p>
+
+    <p>
+        Cordialement,<br>
+        L’équipe Mileo
+    </p>
+</body>
+</html>

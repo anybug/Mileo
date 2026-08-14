@@ -183,6 +183,7 @@ class DashboardAppController extends AbstractDashboardController
         $chartAmountByYear = $this->createAmountByYearChart();
 
         $topUsedAddressesChart = $this->createTopUsedAddressesChart($yearSelected);
+        $topUsedAddressesAllYearsChart = $this->createTopUsedAddressesAllYearsChart();
 
         $flash = false;
         $url = null;
@@ -216,6 +217,7 @@ class DashboardAppController extends AbstractDashboardController
             'chartAmountByYear' => $chartAmountByYear,
             'vehiculeChart' => $vehiculeChart,
             'topUsedAddressesChart' => $topUsedAddressesChart,
+            'topUsedAddressesAllYearsChart' => $topUsedAddressesAllYearsChart,
         ]);
     }
 
@@ -256,6 +258,8 @@ class DashboardAppController extends AbstractDashboardController
 
         yield MenuItem::section('Support');
         yield MenuItem::linkToRoute('Contact express', 'fa fa-paper-plane', 'app_contact_express');
+        yield MenuItem::linkToRoute('Tutoriels', 'fa-solid fa-graduation-cap', 'app_tutorials');
+
     }
 
     public function configureUserMenu(UserInterface $user): UserMenu
@@ -744,6 +748,428 @@ class DashboardAppController extends AbstractDashboardController
             'vehiculeChart' => $vehiculeChart,
             'vehiculePagination' => $vehiculePagination,
             'yearSelected' => $yearSelected,
+        ]);
+    }
+
+    private function getTopUsedAddressesAllYears(int $limit = 10): array
+    {
+        $startAddressQb = $this->entityManager->createQueryBuilder()
+            ->select(
+                'rl.startAdress AS address',
+                'COUNT(rl.id) AS startCount'
+            )
+            ->from(ReportLine::class, 'rl')
+            ->where('rl.startAdress IS NOT NULL')
+            ->andWhere('rl.startAdress != :empty')
+            ->setParameter('empty', '')
+            ->groupBy('rl.startAdress');
+
+        $this->applyCurrentUserFilterOnReportLines($startAddressQb);
+
+        $startRows = $startAddressQb
+            ->getQuery()
+            ->getScalarResult();
+
+        $endAddressQb = $this->entityManager->createQueryBuilder()
+            ->select(
+                'rl.endAdress AS address',
+                'COUNT(rl.id) AS endCount'
+            )
+            ->from(ReportLine::class, 'rl')
+            ->where('rl.endAdress IS NOT NULL')
+            ->andWhere('rl.endAdress != :empty')
+            ->setParameter('empty', '')
+            ->groupBy('rl.endAdress');
+
+        $this->applyCurrentUserFilterOnReportLines($endAddressQb);
+
+        $endRows = $endAddressQb
+            ->getQuery()
+            ->getScalarResult();
+
+        $addresses = [];
+
+        foreach ($startRows as $row) {
+            $address = trim((string) $row['address']);
+
+            if ($address === '') {
+                continue;
+            }
+
+            $key = mb_strtolower($address);
+
+            if (!isset($addresses[$key])) {
+                $addresses[$key] = [
+                    'address' => $address,
+                    'startCount' => 0,
+                    'endCount' => 0,
+                    'totalCount' => 0,
+                ];
+            }
+
+            $count = (int) $row['startCount'];
+
+            $addresses[$key]['startCount'] += $count;
+            $addresses[$key]['totalCount'] += $count;
+        }
+
+        foreach ($endRows as $row) {
+            $address = trim((string) $row['address']);
+
+            if ($address === '') {
+                continue;
+            }
+
+            $key = mb_strtolower($address);
+
+            if (!isset($addresses[$key])) {
+                $addresses[$key] = [
+                    'address' => $address,
+                    'startCount' => 0,
+                    'endCount' => 0,
+                    'totalCount' => 0,
+                ];
+            }
+
+            $count = (int) $row['endCount'];
+
+            $addresses[$key]['endCount'] += $count;
+            $addresses[$key]['totalCount'] += $count;
+        }
+
+        usort(
+            $addresses,
+            static fn (array $a, array $b): int =>
+                $b['totalCount'] <=> $a['totalCount']
+        );
+
+        return array_slice($addresses, 0, $limit);
+    }
+
+    private function createTopUsedAddressesAllYearsChart(): ?Chart
+    {
+        $topUsedAddresses = $this->getTopUsedAddressesAllYears(10);
+
+        if ($topUsedAddresses === []) {
+            return null;
+        }
+
+        $labels = array_map(
+            fn ($value) => $this->chartService->truncateLabel(
+                (string) $value,
+                35
+            ),
+            array_column($topUsedAddresses, 'address')
+        );
+
+        $data = array_column(
+            $topUsedAddresses,
+            'totalCount'
+        );
+
+        $chart = $this->chartService->createDataChart(
+            Chart::TYPE_PIE,
+            $labels,
+            $data,
+            'Top 10 des adresses les plus utilisées toutes années confondues'
+        );
+
+        $chart->setOptions([
+            'responsive' => true,
+            'maintainAspectRatio' => false,
+
+            'plugins' => [
+                'legend' => [
+                    'position' => 'right',
+                    'align' => 'center',
+                    'labels' => [
+                        'boxWidth' => 14,
+                        'boxHeight' => 14,
+                        'padding' => 12,
+                    ],
+                ],
+            ],
+        ]);
+
+        return $chart;
+    }
+
+
+    #[Route('/dashboard/tutoriels', name: 'app_tutorials')]
+    public function tutorials(): Response
+    {
+        $tutorials = [
+            [
+                'title' => 'Compléter son profil',
+                'slug' => 'completer-son-profil',
+                'description' => 'Configurez vos informations personnelles, votre entreprise et votre année fiscale.',
+                'icon' => 'fa-solid fa-user',
+                'category' => 'Prise en main',
+                'duration' => '16 sec',
+            ],
+            [
+                'title' => 'Déclarer son véhicule',
+                'slug' => 'declarer-son-vehicule',
+                'description' => 'Ajoutez votre voiture ou votre moto et configurez le barème kilométrique.',
+                'icon' => 'fa-solid fa-car',
+                'category' => 'Véhicules',
+                'duration' => '20 sec',
+            ],
+            [
+                'title' => 'Ajouter des adresses récurrentes',
+                'slug' => 'ajouter-des-adresses',
+                'description' => 'Enregistrez vos adresses fréquentes pour gagner du temps lors de la saisie.',
+                'icon' => 'fa-solid fa-location-dot',
+                'category' => 'Adresses',
+                'duration' => '40 sec',
+            ],
+            [
+                'title' => 'Créer un trajet',
+                'slug' => 'creer-un-trajet',
+                'description' => 'Découvrez comment enregistrer rapidement un déplacement dans Mileo.',
+                'icon' => 'fa-solid fa-route',
+                'category' => 'Trajets',
+                'duration' => '24 sec',
+            ],
+            [
+                'title' => 'Comprendre le rapport mensuel automatique',
+                'slug' => 'rapport-mensuel-automatique',
+                'description' => 'Découvrez comment Mileo crée automatiquement votre rapport mensuel.',
+                'icon' => 'fa-solid fa-file-lines',
+                'category' => 'Rapports',
+                'duration' => '10 sec',
+            ],
+            [
+                'title' => 'Dupliquer des trajets avec l’assistant',
+                'slug' => 'assistant-duplication',
+                'description' => 'Utilisez les différents modes de duplication pour éviter les saisies répétitives.',
+                'icon' => 'fa-solid fa-wand-magic-sparkles',
+                'category' => 'Trajets',
+                'duration' => '46 sec',
+            ],
+            [
+                'title' => 'Dupliquer une semaine',
+                'slug' => 'dupliquer-une-semaine',
+                'description' => 'Reproduisez facilement les trajets d’une semaine sur la suivante.',
+                'icon' => 'fa-solid fa-calendar-week',
+                'category' => 'Trajets',
+                'duration' => '18 sec',
+            ],
+            [
+                'title' => 'Dupliquer un rapport entier',
+                'slug' => 'dupliquer-un-rapport',
+                'description' => 'Copiez les trajets d’un rapport vers une autre période.',
+                'icon' => 'fa-solid fa-copy',
+                'category' => 'Rapports',
+                'duration' => '22 sec',
+            ],
+            [
+                'title' => 'Consulter ses rapports et son total annuel',
+                'slug' => 'rapports-total-annuel',
+                'description' => 'Consultez vos kilomètres, vos indemnités et exportez vos rapports.',
+                'icon' => 'fa-solid fa-chart-line',
+                'category' => 'Rapports',
+                'duration' => '14 sec',
+            ],
+            [
+                'title' => 'Comprendre le tableau de bord',
+                'slug' => 'tableau-de-bord',
+                'description' => 'Découvrez les statistiques et indicateurs disponibles dans votre tableau de bord.',
+                'icon' => 'fa-solid fa-chart-pie',
+                'category' => 'Tableau de bord',
+                'duration' => '10 sec',
+            ],
+            [
+                'title' => 'Gérer son profil et son abonnement',
+                'slug' => 'profil-abonnement',
+                'description' => 'Consultez votre abonnement et connectez vos calendriers.',
+                'icon' => 'fa-solid fa-id-card',
+                'category' => 'Compte',
+                'duration' => '10 sec',
+            ],
+            [
+                'title' => 'Consulter les barèmes kilométriques',
+                'slug' => 'baremes-kilometriques',
+                'description' => 'Retrouvez directement dans Mileo les barèmes kilométriques officiels.',
+                'icon' => 'fa-solid fa-table',
+                'category' => 'Barèmes',
+                'duration' => '5 sec',
+            ],
+            [
+                'title' => 'Utiliser Contact express',
+                'slug' => 'contact-express',
+                'description' => 'Posez une question, signalez un bug ou envoyez une suggestion.',
+                'icon' => 'fa-solid fa-paper-plane',
+                'category' => 'Support',
+                'duration' => '14 sec',
+            ],
+        ];
+
+        return $this->render('App/Dashboard/tutorials.html.twig', [
+            'dashboard' => $this->easyAdminDashboard->getDashboard(),
+            'tutorials' => $tutorials,
+        ]);
+    }
+
+    #[Route('/dashboard/tutoriels/{slug}', name: 'app_tutorial_show')]
+    public function tutorialShow(string $slug): Response
+    {
+        $video = 'img/tutorials.mp4';
+
+        $tutorials = [
+            'completer-son-profil' => [
+                'title' => 'Compléter son profil',
+                'description' => 'Configurez vos informations personnelles, votre entreprise et votre année fiscale.',
+                'icon' => 'fa-solid fa-user',
+                'category' => 'Prise en main',
+                'duration' => '16 sec',
+                'video' => $video,
+                'start' => 5,
+                'end' => 21,
+            ],
+
+            'declarer-son-vehicule' => [
+                'title' => 'Déclarer son véhicule',
+                'description' => 'Ajoutez votre voiture ou votre moto, sa puissance fiscale et son barème kilométrique.',
+                'icon' => 'fa-solid fa-car',
+                'category' => 'Véhicules',
+                'duration' => '20 sec',
+                'video' => $video,
+                'start' => 21,
+                'end' => 41,
+            ],
+
+            'ajouter-des-adresses' => [
+                'title' => 'Ajouter des adresses récurrentes',
+                'description' => 'Créez votre carnet d’adresses et profitez de l’autocomplétion.',
+                'icon' => 'fa-solid fa-location-dot',
+                'category' => 'Adresses',
+                'duration' => '40 sec',
+                'video' => $video,
+                'start' => 48,
+                'end' => 88,
+            ],
+
+            'creer-un-trajet' => [
+                'title' => 'Créer un trajet',
+                'description' => 'Enregistrez votre premier déplacement dans Mileo.',
+                'icon' => 'fa-solid fa-route',
+                'category' => 'Trajets',
+                'duration' => '24 sec',
+                'video' => $video,
+                'start' => 88,
+                'end' => 112,
+            ],
+
+            'rapport-mensuel-automatique' => [
+                'title' => 'Comprendre le rapport mensuel automatique',
+                'description' => 'Découvrez comment Mileo crée automatiquement votre rapport à partir de vos trajets.',
+                'icon' => 'fa-solid fa-file-lines',
+                'category' => 'Rapports',
+                'duration' => '10 sec',
+                'video' => $video,
+                'start' => 112,
+                'end' => 122,
+            ],
+
+            'assistant-duplication' => [
+                'title' => 'Dupliquer des trajets avec l’assistant',
+                'description' => 'Utilisez l’assistant pour automatiser la création de trajets répétitifs.',
+                'icon' => 'fa-solid fa-wand-magic-sparkles',
+                'category' => 'Trajets',
+                'duration' => '46 sec',
+                'video' => $video,
+                'start' => 122,
+                'end' => 168,
+            ],
+
+            'dupliquer-une-semaine' => [
+                'title' => 'Dupliquer une semaine',
+                'description' => 'Copiez les trajets d’une semaine sur la suivante.',
+                'icon' => 'fa-solid fa-calendar-week',
+                'category' => 'Trajets',
+                'duration' => '18 sec',
+                'video' => $video,
+                'start' => 150,
+                'end' => 168,
+            ],
+
+            'dupliquer-un-rapport' => [
+                'title' => 'Dupliquer un rapport entier',
+                'description' => 'Copiez tous les trajets d’un rapport vers une autre période.',
+                'icon' => 'fa-solid fa-copy',
+                'category' => 'Rapports',
+                'duration' => '22 sec',
+                'video' => $video,
+                'start' => 168,
+                'end' => 190,
+            ],
+
+            'rapports-total-annuel' => [
+                'title' => 'Consulter ses rapports et son total annuel',
+                'description' => 'Consultez vos rapports, vos kilomètres, vos indemnités et vos exports.',
+                'icon' => 'fa-solid fa-chart-line',
+                'category' => 'Rapports',
+                'duration' => '14 sec',
+                'video' => $video,
+                'start' => 190,
+                'end' => 204,
+            ],
+
+            'tableau-de-bord' => [
+                'title' => 'Comprendre le tableau de bord',
+                'description' => 'Visualisez vos trajets, indemnités et adresses les plus utilisées.',
+                'icon' => 'fa-solid fa-chart-pie',
+                'category' => 'Tableau de bord',
+                'duration' => '10 sec',
+                'video' => $video,
+                'start' => 194,
+                'end' => 204,
+            ],
+
+            'profil-abonnement' => [
+                'title' => 'Gérer son profil et son abonnement',
+                'description' => 'Consultez votre abonnement et connectez votre calendrier.',
+                'icon' => 'fa-solid fa-id-card',
+                'category' => 'Compte',
+                'duration' => '10 sec',
+                'video' => $video,
+                'start' => 204,
+                'end' => 214,
+            ],
+
+            'baremes-kilometriques' => [
+                'title' => 'Consulter les barèmes kilométriques',
+                'description' => 'Retrouvez les barèmes kilométriques officiels directement dans Mileo.',
+                'icon' => 'fa-solid fa-table',
+                'category' => 'Barèmes',
+                'duration' => '5 sec',
+                'video' => $video,
+                'start' => 214,
+                'end' => 219,
+            ],
+
+            'contact-express' => [
+                'title' => 'Utiliser Contact express',
+                'description' => 'Posez une question, signalez un bug ou proposez une amélioration.',
+                'icon' => 'fa-solid fa-paper-plane',
+                'category' => 'Support',
+                'duration' => '14 sec',
+                'video' => $video,
+                'start' => 219,
+                'end' => 233,
+            ],
+        ];
+
+        if (!isset($tutorials[$slug])) {
+            throw $this->createNotFoundException(
+                'Ce tutoriel n’existe pas.'
+            );
+        }
+
+        return $this->render('App/Dashboard/tutorial_show.html.twig', [
+            'dashboard' => $this->easyAdminDashboard->getDashboard(),
+            'tutorial' => $tutorials[$slug],
         ]);
     }
 }

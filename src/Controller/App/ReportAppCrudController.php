@@ -2,6 +2,9 @@
 
 namespace App\Controller\App;
 
+use App\Controller\App\DashboardAppController;
+use App\Controller\App\ReportLineAppCrudController;
+use App\Controller\App\UserAppCrudController;
 use App\Entity\Report;
 use App\Entity\ReportLine;
 use App\Entity\User;
@@ -43,6 +46,8 @@ use EasyCorp\Bundle\EasyAdminBundle\Field\MoneyField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\NumberField;
 use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
 use Psr\Log\LoggerInterface;
+use Symfony\Bridge\Twig\Mime\TemplatedEmail;
+use Symfony\Component\DependencyInjection\Attribute\Target;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Form\Extension\Core\Type\PasswordType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
@@ -54,9 +59,11 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\String\Slugger\SluggerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
+use Symfony\Component\Workflow\WorkflowInterface;
 
 class ReportAppCrudController extends AbstractCrudController
 {
@@ -72,6 +79,11 @@ class ReportAppCrudController extends AbstractCrudController
         private readonly RequestStack $requestStack,
         private readonly CalendarReportImporter $calendarReportImporter,
         private readonly EntityManagerInterface $entityManager,
+
+        #[Target('report_status')]
+        private readonly WorkflowInterface $reportWorkflow,
+
+        private readonly MailerInterface $mailer,
     ) {}
 
     public function configureAssets(Assets $assets): Assets
@@ -160,14 +172,47 @@ class ReportAppCrudController extends AbstractCrudController
                     ->generateUrl()
         ;
 
+        $user = $this->getUser();
+
+        $profileUrl = $this->adminUrlGenerator
+            ->setController(UserAppCrudController::class)
+            ->setAction(Action::INDEX)
+            ->setDashboard(DashboardAppController::class)
+            ->generateUrl();
+
         $crudAction = $request?->query->get('crudAction')
             ?? $request?->attributes->get('crudAction')
             ?? $request?->query->get('action')
             ?? $request?->attributes->get('action');
 
+        $pageIndexTitle = 'Rapports annuels et provisions mensuelles<br />
+        <span class="fs-6 fw-normal">
+            Mode de saisie <i>au mois</i>: chaque rapport contient les trajets effectués le mois concerné.
+            Vous pouvez ajouter/modifier autant de trajets par Rapport que nécessaire,
+            n\'hésitez pas à utiliser l\'assistant pour vous aider.<br />
+            Vous pouvez également opter pour le mode de saisie <i>trajet par trajet</i>
+            depuis le menu <a href="'.$reportLineUrl.'">Mes trajets</a>.
+        </span>';
+
+        if (
+            $user instanceof User
+            && !$user->canAddVehicule()
+            && $this->hasOlderHistory($user)
+        ) {
+            $pageIndexTitle .= '<br /><span class="fs-6 fw-light small">
+                <i class="fa-solid fa-circle-info"></i>
+                <i>
+                    Vous utilisez la version gratuite de Mileo et nous vous en remercions !
+                    Si vous souhaitez accéder à votre historique plus ancien,
+                    merci de passer à la version Pro depuis
+                    <a href="'.$profileUrl.'">votre profil</a>
+                </i>.
+            </span>';
+        }
+
         $crud = $crud
             ->setDefaultSort(['start_date' => 'ASC'])
-            ->setPageTitle(Crud::PAGE_INDEX, 'Rapports annuels et provisions mensuelles<br /><span class="fs-6 fw-normal">Mode de saisie <i>au mois</i>: chaque rapport contient les trajets effectués le mois concerné. Vous pouvez ajouter/modifier autant de trajets par Rapport que nécessaire, n\'hésitez pas à utiliser l\'assistant pour vous aider.<br />Vous pouvez également opter pour le mode de saisie <i>trajet par trajet</i> depuis le menu <a href="'.$reportLineUrl.'">Mes trajets</a>.</span>')
+            ->setPageTitle(Crud::PAGE_INDEX, $pageIndexTitle)
             ->setPageTitle(Crud::PAGE_EDIT, fn (Report $r) => sprintf('Modifier le rapport de %s', $r->getPeriod()))
             ->setPageTitle(Crud::PAGE_NEW, 'New report period')
             ->overrideTemplate('crud/index', 'App/Report/index.html.twig')
@@ -198,7 +243,58 @@ class ReportAppCrudController extends AbstractCrudController
             ->setIcon('fa-solid fa-wand-magic-sparkles')
             ->linkToCrudAction('assistant')
             ->setCssClass('btn btn-secondary')
+            ->displayIf(
+                fn (Report $report): bool =>
+                    $this->canWriteReport($report)
+            )
         ;
+
+        $sendToManager = Action::new('sendToManager', 'Envoyer au manager')
+            ->setIcon('fa-solid fa-paper-plane')
+            ->setCssClass('btn btn-primary')
+            ->linkToCrudAction('sendToManager')
+            ->displayIf(function (Report $report): bool {
+                /** @var User|null $user */
+                $user = $this->getUser();
+
+                if (!$user instanceof User) {
+                    return false;
+                }
+
+                // Le manager est actuellement connecté en tant que ce membre
+                if ($this->isGranted('ROLE_PREVIOUS_ADMIN')) {
+                    return false;
+                }
+
+                if (!$user->getManagedBy()) {
+                    return false;
+                }
+
+                if (!$this->canWriteReport($report)) {
+                    return false;
+                }
+
+                return $report->getStatusAsString() === null
+                    || $report->getStatusAsString() === 'Invalidated';
+            });
+
+        $validateReport = Action::new('validateReport', 'Valider')
+            ->setIcon('fa-solid fa-check')
+            ->setCssClass('btn btn-success')
+            ->linkToCrudAction('validateReport')
+            ->displayIf(function (Report $report): bool {
+                return $this->isGranted('ROLE_PREVIOUS_ADMIN')
+                    && $report->getStatusAsString() === 'Sent';
+            });
+
+        $invalidateReport = Action::new('invalidateReport', 'Invalider')
+            ->setIcon('fa-solid fa-xmark')
+            ->setCssClass('btn btn-danger')
+            ->linkToCrudAction('invalidateReport')
+            ->displayIf(function (Report $report): bool {
+                return $this->isGranted('ROLE_PREVIOUS_ADMIN')
+                    && $report->getStatusAsString() === 'Sent';
+            });
 
         /*$generateFromGoogleCalendar = Action::new('generateFromGoogleCalendar', 'Google Calendar')
             ->setIcon('fa-brands fa-google')
@@ -224,25 +320,89 @@ class ReportAppCrudController extends AbstractCrudController
             ->remove(Crud::PAGE_NEW, Action::SAVE_AND_RETURN)
             ->remove(Crud::PAGE_NEW, Action::SAVE_AND_ADD_ANOTHER)
             ->remove(Crud::PAGE_INDEX, Action::BATCH_DELETE)
+
             ->add(Crud::PAGE_NEW, Action::SAVE_AND_CONTINUE)
-            ->update(Crud::PAGE_NEW, Action::SAVE_AND_CONTINUE, fn(Action $a) =>
-                $a->setIcon("fa-solid fa-arrow-right")
-                ->setLabel("Next")
-                ->asPrimaryAction()
+
+            ->update(
+                Crud::PAGE_NEW,
+                Action::SAVE_AND_CONTINUE,
+                fn(Action $a) =>
+                    $a->setIcon("fa-solid fa-arrow-right")
+                        ->setLabel("Next")
+                        ->asPrimaryAction()
             )
 
-            ->update(Crud::PAGE_INDEX, Action::NEW, fn(Action $a) =>
-                $a->setCssClass('new-report-action')
-                ->asPrimaryAction()
+            ->update(
+                Crud::PAGE_INDEX,
+                Action::NEW,
+                fn(Action $a) =>
+                    $a->setCssClass('new-report-action')
+                        ->asPrimaryAction()
             )
+
+            ->update(
+                Crud::PAGE_INDEX,
+                Action::EDIT,
+                fn (Action $action) =>
+                    $action->displayIf(
+                        fn (Report $report): bool =>
+                            $this->canWriteReport($report)
+                    )
+            )
+
+            ->update(
+                Crud::PAGE_INDEX,
+                Action::DELETE,
+                fn (Action $action) =>
+                    $action->displayIf(
+                        fn (Report $report): bool =>
+                            $this->canWriteReport($report)
+                    )
+            )
+
             ->add(Crud::PAGE_INDEX, $generatePdf)
             ->add(Crud::PAGE_INDEX, $exportXls)
-			->add(Crud::PAGE_INDEX, $assistantAI)
+            ->add(Crud::PAGE_INDEX, $assistantAI)
+
             //->add(Crud::PAGE_INDEX, $generateFromGoogleCalendar)
+
             ->add(Crud::PAGE_EDIT, $assistantAI)
-            ->reorder(Crud::PAGE_INDEX, ['assistant', Action::EDIT, 'generatePdf', 'exportXls', Action::DELETE])
-            ->reorder(Crud::PAGE_NEW, [Action::SAVE_AND_CONTINUE, Action::INDEX])
-            ->reorder(Crud::PAGE_EDIT, [Action::SAVE_AND_RETURN, Action::SAVE_AND_CONTINUE, 'assistant', Action::INDEX])
+
+            ->add(Crud::PAGE_INDEX, $sendToManager)
+            ->add(Crud::PAGE_EDIT, $sendToManager)
+            ->add(Crud::PAGE_INDEX, $validateReport)
+            ->add(Crud::PAGE_INDEX, $invalidateReport)
+            ->add(Crud::PAGE_EDIT, $validateReport)
+            ->add(Crud::PAGE_EDIT, $invalidateReport)
+
+            ->reorder(
+                Crud::PAGE_INDEX,
+                [
+                    'assistant',
+                    Action::EDIT,
+                    'generatePdf',
+                    'exportXls',
+                    Action::DELETE
+                ]
+            )
+
+            ->reorder(
+                Crud::PAGE_NEW,
+                [
+                    Action::SAVE_AND_CONTINUE,
+                    Action::INDEX
+                ]
+            )
+
+            ->reorder(
+                Crud::PAGE_EDIT,
+                [
+                    Action::SAVE_AND_RETURN,
+                    Action::SAVE_AND_CONTINUE,
+                    'assistant',
+                    Action::INDEX
+                ]
+            )
         ;
 
         if (!$this->canCurrentUserManageIkReports()) {
@@ -255,9 +415,6 @@ class ReportAppCrudController extends AbstractCrudController
         }
 
         return $actions;
-
-        return $actions;
-
     }
 
     public function assistant(AdminContext $context, Request $request): Response
@@ -601,6 +758,12 @@ class ReportAppCrudController extends AbstractCrudController
             throw new AccessDeniedHttpException();
         }
 
+        if (!$this->canWriteReport($report)) {
+            throw new AccessDeniedHttpException(
+                'Ce rapport ne peut actuellement pas être modifié.'
+            );
+        }
+
         $backUrl = $this->adminUrlGenerator
             ->setController(self::class)
             ->setAction(Action::EDIT)
@@ -765,8 +928,17 @@ class ReportAppCrudController extends AbstractCrudController
 
     public function edit(AdminContext $context)
     {
-        if ($context->getEntity()->getInstance()->getUser() !== $this->getUser()) {
+        /** @var Report $report */
+        $report = $context->getEntity()->getInstance();
+
+        if ($report->getUser() !== $this->getUser()) {
             throw new AccessDeniedHttpException();
+        }
+
+        if (!$this->canWriteReport($report)) {
+            throw new AccessDeniedHttpException(
+                'Ce rapport ne peut actuellement pas être modifié.'
+            );
         }
 
         return parent::edit($context);
@@ -1050,7 +1222,14 @@ class ReportAppCrudController extends AbstractCrudController
         }
 
         $currentYear = (int) date('Y');
-        $minYear = $currentYear - 4;
+
+        $isFreeUser = $me instanceof User
+            && !$me->canAddVehicule();
+
+        $minYear = $isFreeUser
+            ? $currentYear - 2
+            : $currentYear - 4;
+
         $maxYear = $currentYear + 1;
 
         if ($pageName === Crud::PAGE_NEW) 
@@ -1443,6 +1622,21 @@ class ReportAppCrudController extends AbstractCrudController
         ReportLine $line,
         EntityManagerInterface $em
     ): JsonResponse {
+        $report = $line->getReport();
+
+        if (!$report instanceof Report) {
+            throw new AccessDeniedHttpException();
+        }
+
+        if ($report->getUser() !== $this->getUser()) {
+            throw new AccessDeniedHttpException();
+        }
+
+        if (!$this->canWriteReport($report)) {
+            throw new AccessDeniedHttpException(
+                'Ce rapport ne peut actuellement pas être modifié.'
+            );
+        }
 
         $data = json_decode($request->getContent(), true);
 
@@ -1453,7 +1647,7 @@ class ReportAppCrudController extends AbstractCrudController
         $em->flush();
 
         return $this->json([
-            'success' => true
+            'success' => true,
         ]);
     }
 
@@ -1606,6 +1800,276 @@ class ReportAppCrudController extends AbstractCrudController
 
         return $user instanceof User
             && $user->canManageIkReports();
+    }
+
+    private function hasOlderHistory(User $user): bool
+    {
+        if ($user->canAddVehicule()) {
+            return false;
+        }
+
+        $historyLimit = new \DateTimeImmutable('-2 years');
+
+        $count = $this->entityManager
+            ->getRepository(Report::class)
+            ->createQueryBuilder('r')
+            ->select('COUNT(r.id)')
+            ->where('r.user = :user')
+            ->andWhere('r.end_date < :historyLimit')
+            ->setParameter('user', $user)
+            ->setParameter('historyLimit', $historyLimit)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return (int) $count > 0;
+    }
+
+    private function canWriteReport(Report $report): bool
+    {
+        /** @var User|null $user */
+        $user = $this->getUser();
+
+        if (!$user instanceof User) {
+            return false;
+        }
+
+        /*
+        * Compte globalement en lecture seule.
+        */
+        if (!$user->canManageIkReports()) {
+            return false;
+        }
+
+        /*
+        * Un rapport envoyé ou validé ne peut plus être modifié
+        * par le membre.
+        *
+        * null = en cours de saisie
+        * Invalidated = correction autorisée
+        */
+        if (!in_array(
+            $report->getStatusAsString(),
+            [null, 'Invalidated'],
+            true
+        )) {
+            return false;
+        }
+
+        /*
+        * Compte Pro : pas de limitation historique.
+        */
+        if ($user->canAddVehicule()) {
+            return true;
+        }
+
+        $endDate = $report->getEndDate();
+
+        if (!$endDate) {
+            return false;
+        }
+
+        return $endDate >= new \DateTimeImmutable('-2 years');
+    }
+
+    private function denyOldHistoryWriteAccess(
+        User $user,
+        Report $report
+    ): void {
+        if ($user->canAddVehicule()) {
+            return;
+        }
+
+        $endDate = $report->getEndDate();
+
+        if (!$endDate) {
+            return;
+        }
+
+        if ($endDate < new \DateTimeImmutable('-2 years')) {
+            throw new AccessDeniedHttpException(
+                'La version gratuite permet uniquement de modifier les rapports des deux dernières années.'
+            );
+        }
+    }
+
+    public function sendToManager(AdminContext $context): RedirectResponse
+    {
+        /** @var Report $report */
+        $report = $context->getEntity()->getInstance();
+
+        /** @var User|null $user */
+        $user = $this->getUser();
+
+        if (!$user instanceof User || $report->getUser() !== $user) {
+            throw new AccessDeniedHttpException();
+        }
+
+        if (!$this->canWriteReport($report)) {
+            throw new AccessDeniedHttpException(
+                'Ce rapport ne peut plus être modifié.'
+            );
+        }
+
+        $status = $report->getStatusAsString();
+
+        /*
+        * Premier envoi.
+        */
+        if ($status === null) {
+            $report->setStatusAsString('Sent');
+        }
+        /*
+        * Renvoi après invalidation.
+        */
+        elseif ($status === 'Invalidated') {
+            if (!$this->reportWorkflow->can($report, 'Resend')) {
+                $this->addFlash(
+                    'danger',
+                    'Ce rapport ne peut pas être renvoyé.'
+                );
+
+                return $this->redirectToReportIndex();
+            }
+
+            $this->reportWorkflow->apply($report, 'Resend');
+        } else {
+            $this->addFlash(
+                'warning',
+                'Ce rapport a déjà été envoyé pour validation.'
+            );
+
+            return $this->redirectToReportIndex();
+        }
+
+        $this->entityManager->flush();
+
+        /*
+        * Email au manager.
+        *
+        * À adapter selon ta relation User -> manager.
+        */
+        $manager = $user->getManagedBy();
+
+        if ($manager && $manager->getEmail()) {
+            $email = (new TemplatedEmail())
+                ->to($manager->getEmail())
+                ->subject('Rapport IK à valider')
+                ->htmlTemplate('Emails/send_to_manager.html.twig')
+                ->context([
+                    'report' => $report,
+                    'user' => $user,
+                    'manager' => $manager,
+                ]);
+
+            $this->mailer->send($email);
+        }
+
+        $this->addFlash(
+            'success',
+            'Le rapport a été envoyé à votre manager pour validation.'
+        );
+
+        return $this->redirectToReportIndex();
+    }
+
+    public function validateReport(AdminContext $context): RedirectResponse
+    {
+        /** @var Report $report */
+        $report = $context->getEntity()->getInstance();
+
+        if (!$this->isGranted('ROLE_PREVIOUS_ADMIN')) {
+            throw new AccessDeniedHttpException();
+        }
+
+        if (!$this->reportWorkflow->can($report, 'Validated')) {
+            $this->addFlash(
+                'danger',
+                'Ce rapport ne peut pas être validé.'
+            );
+
+            return $this->redirectToReportIndex();
+        }
+
+        $this->reportWorkflow->apply($report, 'Validated');
+        $this->entityManager->flush();
+
+        $member = $report->getUser();
+
+        if ($member && $member->getEmail()) {
+            $email = (new TemplatedEmail())
+                ->to($member->getEmail())
+                ->subject('Votre rapport IK a été validé')
+                ->htmlTemplate('Emails/report_validated.html.twig')
+                ->context([
+                    'report' => $report,
+                    'user' => $member,
+                ]);
+
+            $this->mailer->send($email);
+        }
+
+        $this->addFlash(
+            'success',
+            'Le rapport a été validé.'
+        );
+
+        return $this->redirectToReportIndex();
+    }
+
+    public function invalidateReport(AdminContext $context): RedirectResponse
+    {
+        /** @var Report $report */
+        $report = $context->getEntity()->getInstance();
+
+        if (!$this->isGranted('ROLE_PREVIOUS_ADMIN')) {
+            throw new AccessDeniedHttpException();
+        }
+
+        if (!$this->reportWorkflow->can($report, 'Invalidated')) {
+            $this->addFlash(
+                'danger',
+                'Ce rapport ne peut pas être invalidé.'
+            );
+
+            return $this->redirectToReportIndex();
+        }
+
+        $this->reportWorkflow->apply($report, 'Invalidated');
+        $this->entityManager->flush();
+
+        $member = $report->getUser();
+
+        if ($member && $member->getEmail()) {
+            $email = (new TemplatedEmail())
+                ->to($member->getEmail())
+                ->subject('Votre rapport IK a été invalidé')
+                ->htmlTemplate('Emails/report_invalidated.html.twig')
+                ->context([
+                    'report' => $report,
+                    'user' => $member,
+                ]);
+
+            $this->mailer->send($email);
+        }
+
+        $this->addFlash(
+            'success',
+            'Le rapport a été invalidé.'
+        );
+
+        return $this->redirectToReportIndex();
+    }
+
+    private function redirectToReportIndex(): RedirectResponse
+    {
+        return $this->redirect(
+            $this->adminUrlGenerator
+                ->setController(self::class)
+                ->setAction(Action::INDEX)
+                ->unset('entityId')
+                ->unset('referrer')
+                ->generateUrl()
+        );
     }
 
 }

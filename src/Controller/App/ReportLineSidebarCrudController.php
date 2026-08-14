@@ -2,14 +2,16 @@
 
 namespace App\Controller\App;
 
+use App\Controller\App\ReportAppCrudController;
 use App\Entity\Report;
 use App\Entity\ReportLine;
 use App\Entity\UserAddress;
 use App\Entity\Vehicule;
 use App\Service\ReportService;
+use App\Validator\Constraints\DateRange;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
-use App\Validator\Constraints\DateRange;
+use Doctrine\ORM\QueryBuilder;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Assets;
@@ -142,6 +144,13 @@ class ReportLineSidebarCrudController extends AbstractCrudController
     public function configureFields(string $pageName): iterable
     {
         $currentUser = $this->getUser();
+
+        if (!$currentUser instanceof \App\Entity\User) {
+            throw new AccessDeniedHttpException();
+        }
+
+        $defaultVehicule = $currentUser->getDefaultVehicule();
+        $isFreeUser = !$currentUser->canAddVehicule();
         $addressOwner = $currentUser->getManagedBy() ?? $currentUser;
 
         $defaultUserAddress = $this->entityManager
@@ -216,16 +225,39 @@ class ReportLineSidebarCrudController extends AbstractCrudController
 
         yield AssociationField::new('vehicule', 'Véhicule')
             ->setFormTypeOptions([
-                'query_builder' => function (EntityRepository $er) {
-                return $er->createQueryBuilder('v')
-                    ->andWhere('v.user = (:user)')
-                    ->setParameter('user', $this->getUser());
+                'query_builder' => static function (EntityRepository $repository) use (
+                    $currentUser,
+                    $defaultVehicule,
+                    $isFreeUser
+                ): QueryBuilder {
+                    $queryBuilder = $repository
+                        ->createQueryBuilder('v')
+                        ->andWhere('v.user = :user')
+                        ->setParameter('user', $currentUser)
+                        ->orderBy('v.is_default', 'DESC')
+                        ->addOrderBy('v.id', 'ASC');
+
+                    if ($isFreeUser) {
+                        if (!$defaultVehicule instanceof Vehicule) {
+                            $queryBuilder->andWhere('1 = 0');
+                        } else {
+                            $queryBuilder
+                                ->andWhere('v = :defaultVehicule')
+                                ->setParameter(
+                                    'defaultVehicule',
+                                    $defaultVehicule
+                                );
+                        }
+                    }
+
+                    return $queryBuilder;
                 },
-                'attr' => ['class'=>'report_vehicule']
+                'attr' => [
+                    'class' => 'report_vehicule',
+                ],
             ])
             ->setColumns('col-sm-6 col-lg-5 col-xxl-2')
-            ->setTemplateName('crud/field/generic')
-            ;
+            ->setTemplateName('crud/field/generic');
 
         yield FormField::addRow();
 
@@ -289,6 +321,9 @@ class ReportLineSidebarCrudController extends AbstractCrudController
 
     public function persistEntity(EntityManagerInterface $entityManager, $entityInstance): void
     {
+
+        $this->validateSelectedVehicule($entityInstance);
+
         $this->attachReportIfNeeded($entityInstance);
 
         parent::persistEntity($entityManager, $entityInstance);
@@ -300,6 +335,9 @@ class ReportLineSidebarCrudController extends AbstractCrudController
 
     public function updateEntity(EntityManagerInterface $entityManager, $entityInstance): void
     {
+
+        $this->validateSelectedVehicule($entityInstance);
+
         $this->attachReportIfNeeded($entityInstance);
 
         parent::updateEntity($entityManager, $entityInstance);
@@ -423,5 +461,43 @@ class ReportLineSidebarCrudController extends AbstractCrudController
         }
 
         return new JsonResponse(['success' => true]);
+    }
+
+    private function validateSelectedVehicule(
+        ReportLine $reportLine
+    ): void {
+        $user = $this->getUser();
+
+        if (!$user instanceof \App\Entity\User) {
+            throw new AccessDeniedHttpException();
+        }
+
+        $vehicule = $reportLine->getVehicule();
+
+        if (
+            !$vehicule instanceof Vehicule
+            || $vehicule->getUser() !== $user
+        ) {
+            throw new AccessDeniedHttpException(
+                'Le véhicule sélectionné est invalide.'
+            );
+        }
+
+        /*
+        * Pour un compte gratuit, seul le véhicule par défaut
+        * peut être utilisé dans un trajet.
+        */
+        if (!$user->canAddVehicule()) {
+            $defaultVehicule = $user->getDefaultVehicule();
+
+            if (
+                !$defaultVehicule instanceof Vehicule
+                || $vehicule !== $defaultVehicule
+            ) {
+                throw new AccessDeniedHttpException(
+                    'La version gratuite permet uniquement d’utiliser le véhicule par défaut.'
+                );
+            }
+        }
     }
 }

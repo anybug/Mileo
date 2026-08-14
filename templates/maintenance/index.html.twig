@@ -1,0 +1,80 @@
+{# templates/maintenance/index.html.twig #}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Maintenance - Mileo</title>
+
+    <link rel="icon" href="{{ asset('img/logo.png') }}">
+    <link rel="stylesheet" href="{{ asset('build/app.css') }}">
+</head>
+
+<body class="bg-light">
+
+<main class="container min-vh-100 d-flex align-items-center justify-content-center py-5">
+
+    <div class="row justify-content-center w-100">
+        <div class="col-12 col-md-9 col-lg-7 col-xl-6">
+
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body text-center p-4 p-md-5">
+
+                    <div class="mb-4">
+                        <img
+                            src="{{ asset('img/logo.png') }}"
+                            alt="Mileo"
+                            class="img-fluid"
+                            style="max-width: 180px;"
+                        >
+                    </div>
+
+                    <div class="mb-4">
+                        <div
+                            class="d-inline-flex align-items-center justify-content-center bg-primary-subtle text-primary rounded-circle"
+                            style="width: 80px; height: 80px;"
+                        >
+                            <i class="fa-solid fa-screwdriver-wrench fs-2"></i>
+                        </div>
+                    </div>
+
+                    <h1 class="h2 fw-bold mb-3">
+                        Maintenance en cours
+                    </h1>
+
+                    <p class="fs-5 fw-medium mb-2">
+                        Mileo est temporairement indisponible.
+                    </p>
+
+                    <p class="text-muted mb-4 mx-auto">
+                        Une opération de maintenance est actuellement en cours
+                        afin d’améliorer l’application.
+                        Le service sera de nouveau accessible dès que possible.
+                    </p>
+
+                    <hr class="my-4">
+
+                    <button
+                        type="button"
+                        class="btn btn-primary px-4 py-2"
+                        onclick="window.location.reload();"
+                    >
+                        <i class="fa-solid fa-rotate-right me-2"></i>
+                        Réessayer
+                    </button>
+
+                    <p class="text-muted small mb-0 mt-4">
+                        Merci pour votre patience.
+                    </p>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</main>
+
+</body>
+</html>
