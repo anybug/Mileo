@@ -173,6 +173,15 @@ import TomSelect from 'tom-select';
             }, 400);
         });
 
+        delegate(document, 'change', '.report_km', () => {
+            calculTotalLineKm(null);
+        });
+
+        delegate(document, 'change', '.report_lines_km', (e, target) => {
+            const line = getLineContainer(target);
+            calculTotalLineKm(line);
+        });
+
         delegate(document, 'change', '.report_is_return', () => {
             calculTotalLineKm(null);
         });
