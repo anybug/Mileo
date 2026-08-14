@@ -20,7 +20,6 @@ use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\DateField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\FormField;
-use EasyCorp\Bundle\EasyAdminBundle\Field\HiddenField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\NumberField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextareaField;
@@ -251,10 +250,10 @@ class ReportLineSidebarCrudController extends AbstractCrudController
             ->setColumns('col-12 col-md-6')
             ->onlyOnForms();
 
-       yield HiddenField::new('km','Distance (km)')
-            ->setFormTypeOptions(['attr' => ['readonly'=> true, 'class' => 'report_km bg-light not-allowed']])
+       yield IntegerField::new('km', 'Distance aller (km)')
+            ->setFormTypeOptions(['attr' => ['min' => 0, 'class' => 'report_km']])
             ->onlyOnForms()
-            //->setColumns('col-sm-4 col-lg-3 col-xxl-2')
+            ->setColumns('col-sm-4 col-lg-3 col-xxl-2')
             ;
             
         yield IntegerField::new('km_total','Distance (km)')
