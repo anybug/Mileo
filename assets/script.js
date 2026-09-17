@@ -405,7 +405,7 @@ import TomSelect from 'tom-select';
                 return;
             }
 
-            const select = document.querySelector('.js-calendar-start-address');
+            /*const select = document.querySelector('.js-calendar-start-address');
 
             if (select?.tomselect) {
                 select.tomselect.addOption({
@@ -414,7 +414,18 @@ import TomSelect from 'tom-select';
                 });
 
                 select.tomselect.addItem(address);
-            }
+            }*/
+
+	     /* reload assistant form */
+            var radioButton = document.getElementById('assistant_ai_action_3');
+            
+            const changeEvent = new Event('change', {
+                bubbles: true, // Permet à l'événement de remonter dans le DOM
+                cancelable: true
+            });
+
+            radioButton.dispatchEvent(changeEvent);  
+            /* reload assistant form */ 
 
             bootstrap.Modal.getInstance(
                 document.getElementById('dynamicModal')

@@ -390,7 +390,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $addresses = [];
         foreach ($this->getUserAddresses() as $address) {
             //$addresses[(string) $address->__toString()] = (string) $address->getAddress();
-            $addresses[(string) trim($address->__toString())] = (string) trim($address->getAddress());
+            $addresses[(string) trim($address->getName())] = (string) trim($address->__toStringForSelect());
         }
         return $addresses;
     }
