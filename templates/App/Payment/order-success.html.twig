@@ -13,8 +13,15 @@
 
   <div class="alert alert-success mb-4 pt-4" role="alert">
       <p>Votre commande a été validée, merci d'avoir choisi Mileo !</p>
+      
+      {% if order.referralSponsor %}
+          <hr>
+          <p class="mb-0">
+              <i class="fa-solid fa-gift me-1"></i> <strong>Félicitations !</strong> 
+              Le code de parrainage a bien été validé. 45 jours supplémentaires vous sont offerts.
+          </p>
+      {% endif %}
   </div>
-
   <p>
     Votre abonnement est valide juqu'au <span class="fw-bold">{{ order.getSubscriptionEnd()|format_datetime(locale='fr',pattern="EEEE dd MMMM YYYY")}}</span>, nous sommes ravis de vous compter parmi nous <i class="far fa-smile-wink"></i>
   </p>

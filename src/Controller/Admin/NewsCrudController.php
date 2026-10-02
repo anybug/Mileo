@@ -14,6 +14,12 @@ use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextareaField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Doctrine\ORM\EntityManagerInterface;
+use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Assets;
+use Vich\UploaderBundle\Form\Type\VichImageType;
+use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
+use EasyCorp\Bundle\EasyAdminBundle\Field\ImageField;
 
 #[IsGranted('ROLE_ADMIN')]
 final class NewsCrudController extends AbstractCrudController
@@ -47,8 +53,23 @@ final class NewsCrudController extends AbstractCrudController
         if ($pageName === Crud::PAGE_DETAIL) {
             yield TextField::new('title', 'Titre');
 
+            yield BooleanField::new('isPublished', 'Publiée');  
+
             yield TextareaField::new('content', 'Contenu')
                 ->setTemplatePath('Admin/News/Fields/content.html.twig');
+
+            yield ImageField::new('photo', 'Photo')
+                ->setBasePath('uploads/members/photos')                // URL publique
+                ->hideOnForm();
+            yield TextField::new('photoFile', 'Photo')
+                ->setFormType(VichImageType::class)
+                ->onlyOnForms()
+                ->setFormTypeOptions([
+                    'required' => false,
+                    'allow_delete' => true,
+                    'download_uri' => false,
+                    'image_uri' => true, // si tu veux que Vich affiche un lien/aperçu selon ton template
+                ]);
 
             yield DateTimeField::new('publishedAt', 'Date de parution')
                 ->setFormat('dd/MM/yyyy');
@@ -63,7 +84,15 @@ final class NewsCrudController extends AbstractCrudController
         }
 
         if ($pageName === Crud::PAGE_INDEX) {
+
             yield TextField::new('title', 'Titre');
+
+            yield ImageField::new('poster', 'Illustration')
+                ->setBasePath('uploads/news/poster')
+                ->hideOnForm()
+            ;
+
+            yield BooleanField::new('isPublished', 'Publiée');
 
             yield DateTimeField::new('publishedAt', 'Date de parution')
                 ->setFormat('dd/MM/yyyy');
@@ -82,6 +111,21 @@ final class NewsCrudController extends AbstractCrudController
             yield TextField::new('title', 'Titre')
                 ->setColumns(12);
 
+            yield BooleanField::new('isPublished', 'Publier l\'actualité')
+                ->renderAsSwitch(true)
+                ->setColumns(12);
+
+
+            yield Field::new('posterFile', 'Image')
+                ->setFormType(VichImageType::class)
+                ->onlyOnForms()
+                ->setFormTypeOptions([
+                    'required' => true, // C'est VichUploader qui gère proprement l'obligation
+                    'allow_delete' => true,
+                    'download_uri' => false,
+                    'image_uri' => true,
+                ]);
+
             yield TextareaField::new('content', 'Contenu')
                 ->setFormType(QuillEditorType::class)
                 ->setFormTypeOption('attr', [
@@ -96,6 +140,42 @@ final class NewsCrudController extends AbstractCrudController
 
 
             return;
+        }
+    }
+
+    public function persistEntity(EntityManagerInterface $entityManager, $entityInstance): void
+    {
+        $this->enforceMaxPublishedNews($entityManager, $entityInstance);
+        parent::persistEntity($entityManager, $entityInstance);
+    }
+
+    public function updateEntity(EntityManagerInterface $entityManager, $entityInstance): void
+    {
+        $this->enforceMaxPublishedNews($entityManager, $entityInstance);
+        parent::updateEntity($entityManager, $entityInstance);
+    }
+
+    private function enforceMaxPublishedNews(EntityManagerInterface $entityManager, $entityInstance): void
+    {
+        if (!$entityInstance instanceof News || !$entityInstance->isPublished()) {
+            return;
+        }
+
+        $repository = $entityManager->getRepository(News::class);
+        $publishedNews = $repository->findBy(
+            ['isPublished' => true],
+            ['publishedAt' => 'DESC']
+        );
+
+        $otherPublishedNews = array_filter($publishedNews, fn($news) => $news !== $entityInstance);
+
+        if (count($otherPublishedNews) >= 3) {
+            array_shift($otherPublishedNews);
+
+            foreach ($otherPublishedNews as $oldNews) {
+                $oldNews->setIsPublished(false);
+                $entityManager->persist($oldNews);
+            }
         }
     }
 }

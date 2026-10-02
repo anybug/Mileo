@@ -404,6 +404,13 @@ class ReportLineAppCrudController extends AbstractCrudController
         $defaultVehicule = $user->getDefaultVehicule();
         $isFreeUser = !$user->canAddVehicule();
 
+        $renewUrl = 
+            $this->adminUrlGenerator
+                ->setController(UserAppCrudController::class)
+                ->setAction('subscriptionForm')
+                ->generateUrl()
+        ;
+
         yield AssociationField::new('vehicule', 'Véhicule')
             ->setFormTypeOptions([
                 'query_builder' => static function (EntityRepository $repository) use (
@@ -436,9 +443,12 @@ class ReportLineAppCrudController extends AbstractCrudController
                 'attr' => [
                     'class' => 'report_vehicule',
                 ],
+                
             ])
             ->setColumns('col-sm-6 col-lg-5 col-xxl-2')
-            ->setTemplateName('crud/field/generic');
+            ->setTemplateName('crud/field/generic')
+            ->setHelp($isFreeUser && count($user->getVehicules())>1 ? 'Seul le véhicule par défaut est disponible. <a href="'.$renewUrl.'">Passer à Mileo Pro</a>' : '')
+            ;
         yield FormField::addRow();
         yield FormField::addPanel('Travel information')->setIcon('fa fa-car');
 

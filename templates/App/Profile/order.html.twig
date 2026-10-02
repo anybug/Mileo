@@ -11,13 +11,16 @@
 <div class="d-flex justify-content-center card-group mt-4">
   <div class="col-lg-4">
     <div class="card shadow-lg mb-4 pb-4">
-      <div class="card-header border-bottom-0 pt-4">
+      <div class="card-header border-bottom-0 pt-4 pb-4">
         <div class="d-flex justify-content-center">
-          {% set priceExcVat = plan.pricePerYear|number_format %}
-          {% set priceIncVat = priceExcVat*1.2 %}
-          <h4 class="h2 fw-bold d-flex">{{ priceExcVat }}€ HT <span class="text-secondary fw-normal px-1">({{ priceIncVat }}€ TTC)</span></h4>
+          <h4 class="h1 fw-bold">Pro</h4>
         </div>
+        <h5 class="fw-bold text-center">Gérez vos IK sans effort pendant 1 an pour</h5>
+        {% set priceExcVat = plan.pricePerYear|number_format %}
+        {% set priceIncVat = priceExcVat*1.2 %}
+        <h6 class="h2 fw-bold text-center">{{ priceExcVat }}€ HT <span class="text-secondary fw-normal px-1">({{ priceIncVat }}€ TTC)</span></h6>
       </div>
+
       <div class="card-body mx-auto">
         <ul class="list-unstyled mb-4">
             <li class="text-700 py-2"><i class="fa-solid fa-circle-check text-success"></i> <span class="text-secondary"> Assistant intelligent de duplication de trajets</span></li>

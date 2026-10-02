@@ -69,6 +69,7 @@ class PaymentController extends AbstractController
         Payum $payum,
         EntityManagerInterface $manager,
         ReferralCodeGenerator $referralCodeGenerator,
+        MailerInterface $mailer,
         int $order_id
     )
     {
@@ -215,6 +216,25 @@ class PaymentController extends AbstractController
                         ->setRewardGrantedAt(new \DateTimeImmutable());
 
                     $manager->persist($referral);
+
+                     /*
+                    * ---------------------------------------
+                    * NOTIFICATIONS PARRAINAGE REUSSI
+                    * ---------------------------------------
+                    */
+
+
+                    $email = (new TemplatedEmail())
+                        ->from(new Address('ne-pas-repondre@mileo.fr', 'L\'équipe Mileo'))
+                        ->to($sponsor->getEmail())
+                        ->subject('Félicitations ! Vous avez un nouveau filleul 🎉')
+                        ->htmlTemplate('Emails/referral_success.html.twig')
+                        ->context([
+                            'parrain_name' => $sponsor->getFirstname(),
+                            'filleul_name' => $user->getFirstname(),
+                        ]);
+
+                    $mailer->send($email);
                 }
             }
 

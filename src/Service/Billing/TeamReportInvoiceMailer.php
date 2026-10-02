@@ -35,7 +35,7 @@ final class TeamReportInvoiceMailer
         }
 
         if (!is_file($facturXPath)) {
-            throw new LogicException('Impossible d’envoyer la facture : le fichier Factur-X est introuvable.');
+            throw new LogicException('Impossible d’envoyer la facture : le fichier Facture est introuvable.');
         }
 
         $managerName = $manager->getCompany()
@@ -48,7 +48,7 @@ final class TeamReportInvoiceMailer
         );
 
         $filename = sprintf(
-            'Mileo_Facture_%s_Factur-X.pdf',
+            'Mileo_Facture_%s.pdf',
             $invoice->getNum(),
         );
 

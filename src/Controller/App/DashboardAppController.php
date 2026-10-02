@@ -11,6 +11,7 @@ use App\Entity\Report;
 use App\Entity\ReportLine;
 use App\Entity\Scale;
 use App\Entity\Subscription;
+use App\Entity\News;
 use App\Entity\User;
 use App\Entity\UserAddress;
 use App\Entity\Vehicule;
@@ -185,6 +186,15 @@ class DashboardAppController extends AbstractDashboardController
         $topUsedAddressesChart = $this->createTopUsedAddressesChart($yearSelected);
         $topUsedAddressesAllYearsChart = $this->createTopUsedAddressesAllYearsChart();
 
+        $latestNews = $this->entityManager->getRepository(News::class)
+            ->createQueryBuilder('n')
+            ->where('n.isPublished = :published')
+            ->setParameter('published', true)
+            ->orderBy('n.publishedAt', 'DESC')
+            ->setMaxResults(3)
+            ->getQuery()
+            ->getResult();
+
         $flash = false;
         $url = null;
 
@@ -218,6 +228,7 @@ class DashboardAppController extends AbstractDashboardController
             'vehiculeChart' => $vehiculeChart,
             'topUsedAddressesChart' => $topUsedAddressesChart,
             'topUsedAddressesAllYearsChart' => $topUsedAddressesAllYearsChart,
+            'latestNews' => $latestNews,
         ]);
     }
 
@@ -899,6 +910,15 @@ class DashboardAppController extends AbstractDashboardController
     public function tutorials(): Response
     {
         $tutorials = [
+
+            [
+                'title' => 'Comprendre Miléo de A à Z',
+                'slug' => 'comprendre-mileo-de-a-a-z',
+                'description' => 'Visionnez notre guide vidéo complet pour maîtriser l’intégralité des fonctionnalités de Mileo.',
+                'icon' => 'fa-solid fa-graduation-cap',
+                'category' => 'Prise en main',
+                'duration' => '4 min 05 sec',
+            ],
             [
                 'title' => 'Compléter son profil',
                 'slug' => 'completer-son-profil',
@@ -913,7 +933,7 @@ class DashboardAppController extends AbstractDashboardController
                 'description' => 'Ajoutez votre voiture ou votre moto et configurez le barème kilométrique.',
                 'icon' => 'fa-solid fa-car',
                 'category' => 'Véhicules',
-                'duration' => '20 sec',
+                'duration' => '19 sec',
             ],
             [
                 'title' => 'Ajouter des adresses récurrentes',
@@ -921,7 +941,7 @@ class DashboardAppController extends AbstractDashboardController
                 'description' => 'Enregistrez vos adresses fréquentes pour gagner du temps lors de la saisie.',
                 'icon' => 'fa-solid fa-location-dot',
                 'category' => 'Adresses',
-                'duration' => '40 sec',
+                'duration' => '36 sec',
             ],
             [
                 'title' => 'Créer un trajet',
@@ -929,7 +949,7 @@ class DashboardAppController extends AbstractDashboardController
                 'description' => 'Découvrez comment enregistrer rapidement un déplacement dans Mileo.',
                 'icon' => 'fa-solid fa-route',
                 'category' => 'Trajets',
-                'duration' => '24 sec',
+                'duration' => '22 sec',
             ],
             [
                 'title' => 'Comprendre le rapport mensuel automatique',
@@ -937,7 +957,7 @@ class DashboardAppController extends AbstractDashboardController
                 'description' => 'Découvrez comment Mileo crée automatiquement votre rapport mensuel.',
                 'icon' => 'fa-solid fa-file-lines',
                 'category' => 'Rapports',
-                'duration' => '10 sec',
+                'duration' => '9 sec',
             ],
             [
                 'title' => 'Dupliquer des trajets avec l’assistant',
@@ -945,7 +965,7 @@ class DashboardAppController extends AbstractDashboardController
                 'description' => 'Utilisez les différents modes de duplication pour éviter les saisies répétitives.',
                 'icon' => 'fa-solid fa-wand-magic-sparkles',
                 'category' => 'Trajets',
-                'duration' => '46 sec',
+                'duration' => '28 sec',
             ],
             [
                 'title' => 'Dupliquer une semaine',
@@ -961,7 +981,7 @@ class DashboardAppController extends AbstractDashboardController
                 'description' => 'Copiez les trajets d’un rapport vers une autre période.',
                 'icon' => 'fa-solid fa-copy',
                 'category' => 'Rapports',
-                'duration' => '22 sec',
+                'duration' => '21 sec',
             ],
             [
                 'title' => 'Consulter ses rapports et son total annuel',
@@ -969,7 +989,7 @@ class DashboardAppController extends AbstractDashboardController
                 'description' => 'Consultez vos kilomètres, vos indemnités et exportez vos rapports.',
                 'icon' => 'fa-solid fa-chart-line',
                 'category' => 'Rapports',
-                'duration' => '14 sec',
+                'duration' => '13 sec',
             ],
             [
                 'title' => 'Comprendre le tableau de bord',
@@ -977,7 +997,7 @@ class DashboardAppController extends AbstractDashboardController
                 'description' => 'Découvrez les statistiques et indicateurs disponibles dans votre tableau de bord.',
                 'icon' => 'fa-solid fa-chart-pie',
                 'category' => 'Tableau de bord',
-                'duration' => '10 sec',
+                'duration' => '12 sec',
             ],
             [
                 'title' => 'Gérer son profil et son abonnement',
@@ -985,7 +1005,7 @@ class DashboardAppController extends AbstractDashboardController
                 'description' => 'Consultez votre abonnement et connectez vos calendriers.',
                 'icon' => 'fa-solid fa-id-card',
                 'category' => 'Compte',
-                'duration' => '10 sec',
+                'duration' => '8 sec',
             ],
             [
                 'title' => 'Consulter les barèmes kilométriques',
@@ -993,7 +1013,7 @@ class DashboardAppController extends AbstractDashboardController
                 'description' => 'Retrouvez directement dans Mileo les barèmes kilométriques officiels.',
                 'icon' => 'fa-solid fa-table',
                 'category' => 'Barèmes',
-                'duration' => '5 sec',
+                'duration' => '4 sec',
             ],
             [
                 'title' => 'Utiliser Contact express',
@@ -1001,7 +1021,7 @@ class DashboardAppController extends AbstractDashboardController
                 'description' => 'Posez une question, signalez un bug ou envoyez une suggestion.',
                 'icon' => 'fa-solid fa-paper-plane',
                 'category' => 'Support',
-                'duration' => '14 sec',
+                'duration' => '12 sec',
             ],
         ];
 
@@ -1012,20 +1032,26 @@ class DashboardAppController extends AbstractDashboardController
     }
 
     #[Route('/dashboard/tutoriels/{slug}', name: 'app_tutorial_show')]
-    public function tutorialShow(string $slug): Response
+   public function tutorialShow(string $slug): Response
     {
-        $video = 'img/tutorials.mp4';
-
         $tutorials = [
+
+        'comprendre-mileo-de-a-a-z' => [
+                'title' => 'Comprendre Miléo de A à Z',
+                'description' => 'Visionnez notre guide vidéo complet pour maîtriser l’intégralité des fonctionnalités de Mileo.',
+                'icon' => 'fa-solid fa-graduation-cap',
+                'category' => 'Prise en main',
+                'duration' => '4 min 05 sec',
+                'video' => 'img/tutorials.mp4',
+            ],
+
             'completer-son-profil' => [
                 'title' => 'Compléter son profil',
                 'description' => 'Configurez vos informations personnelles, votre entreprise et votre année fiscale.',
                 'icon' => 'fa-solid fa-user',
                 'category' => 'Prise en main',
                 'duration' => '16 sec',
-                'video' => $video,
-                'start' => 5,
-                'end' => 21,
+                'video' => 'img/tutoriel_profil.mp4',
             ],
 
             'declarer-son-vehicule' => [
@@ -1033,10 +1059,8 @@ class DashboardAppController extends AbstractDashboardController
                 'description' => 'Ajoutez votre voiture ou votre moto, sa puissance fiscale et son barème kilométrique.',
                 'icon' => 'fa-solid fa-car',
                 'category' => 'Véhicules',
-                'duration' => '20 sec',
-                'video' => $video,
-                'start' => 21,
-                'end' => 41,
+                'duration' => '19 sec',
+                'video' => 'img/tutoriel_vehicule.mp4',
             ],
 
             'ajouter-des-adresses' => [
@@ -1044,10 +1068,8 @@ class DashboardAppController extends AbstractDashboardController
                 'description' => 'Créez votre carnet d’adresses et profitez de l’autocomplétion.',
                 'icon' => 'fa-solid fa-location-dot',
                 'category' => 'Adresses',
-                'duration' => '40 sec',
-                'video' => $video,
-                'start' => 48,
-                'end' => 88,
+                'duration' => '36 sec',
+                'video' => 'img/tutoriel_adresses.mp4',
             ],
 
             'creer-un-trajet' => [
@@ -1055,10 +1077,8 @@ class DashboardAppController extends AbstractDashboardController
                 'description' => 'Enregistrez votre premier déplacement dans Mileo.',
                 'icon' => 'fa-solid fa-route',
                 'category' => 'Trajets',
-                'duration' => '24 sec',
-                'video' => $video,
-                'start' => 88,
-                'end' => 112,
+                'duration' => '22 sec',
+                'video' => 'img/tutoriel_trajets.mp4',
             ],
 
             'rapport-mensuel-automatique' => [
@@ -1066,10 +1086,8 @@ class DashboardAppController extends AbstractDashboardController
                 'description' => 'Découvrez comment Mileo crée automatiquement votre rapport à partir de vos trajets.',
                 'icon' => 'fa-solid fa-file-lines',
                 'category' => 'Rapports',
-                'duration' => '10 sec',
-                'video' => $video,
-                'start' => 112,
-                'end' => 122,
+                'duration' => '9 sec',
+                'video' => 'img/tutoriel_rapports.mp4',
             ],
 
             'assistant-duplication' => [
@@ -1077,10 +1095,8 @@ class DashboardAppController extends AbstractDashboardController
                 'description' => 'Utilisez l’assistant pour automatiser la création de trajets répétitifs.',
                 'icon' => 'fa-solid fa-wand-magic-sparkles',
                 'category' => 'Trajets',
-                'duration' => '46 sec',
-                'video' => $video,
-                'start' => 122,
-                'end' => 168,
+                'duration' => '28 sec',
+                'video' => 'img/tutoriel_dupplication_avec_assistant.mp4',
             ],
 
             'dupliquer-une-semaine' => [
@@ -1089,9 +1105,7 @@ class DashboardAppController extends AbstractDashboardController
                 'icon' => 'fa-solid fa-calendar-week',
                 'category' => 'Trajets',
                 'duration' => '18 sec',
-                'video' => $video,
-                'start' => 150,
-                'end' => 168,
+                'video' => 'img/tutoriel_dupliquer_semaine.mp4',
             ],
 
             'dupliquer-un-rapport' => [
@@ -1099,10 +1113,8 @@ class DashboardAppController extends AbstractDashboardController
                 'description' => 'Copiez tous les trajets d’un rapport vers une autre période.',
                 'icon' => 'fa-solid fa-copy',
                 'category' => 'Rapports',
-                'duration' => '22 sec',
-                'video' => $video,
-                'start' => 168,
-                'end' => 190,
+                'duration' => '21 sec',
+                'video' => 'img/tutoriel_duppliquer_rapport_entier.mp4',
             ],
 
             'rapports-total-annuel' => [
@@ -1110,10 +1122,8 @@ class DashboardAppController extends AbstractDashboardController
                 'description' => 'Consultez vos rapports, vos kilomètres, vos indemnités et vos exports.',
                 'icon' => 'fa-solid fa-chart-line',
                 'category' => 'Rapports',
-                'duration' => '14 sec',
-                'video' => $video,
-                'start' => 190,
-                'end' => 204,
+                'duration' => '13 sec',
+                'video' => 'img/tutoriel_consulter_rapports.mp4',
             ],
 
             'tableau-de-bord' => [
@@ -1121,10 +1131,8 @@ class DashboardAppController extends AbstractDashboardController
                 'description' => 'Visualisez vos trajets, indemnités et adresses les plus utilisées.',
                 'icon' => 'fa-solid fa-chart-pie',
                 'category' => 'Tableau de bord',
-                'duration' => '10 sec',
-                'video' => $video,
-                'start' => 194,
-                'end' => 204,
+                'duration' => '12 sec',
+                'video' => 'img/tutoriel_tutos.mp4',
             ],
 
             'profil-abonnement' => [
@@ -1132,10 +1140,8 @@ class DashboardAppController extends AbstractDashboardController
                 'description' => 'Consultez votre abonnement et connectez votre calendrier.',
                 'icon' => 'fa-solid fa-id-card',
                 'category' => 'Compte',
-                'duration' => '10 sec',
-                'video' => $video,
-                'start' => 204,
-                'end' => 214,
+                'duration' => '8 sec',
+                'video' => 'img/tutoriel_profil_et_abonnement.mp4',
             ],
 
             'baremes-kilometriques' => [
@@ -1143,10 +1149,8 @@ class DashboardAppController extends AbstractDashboardController
                 'description' => 'Retrouvez les barèmes kilométriques officiels directement dans Mileo.',
                 'icon' => 'fa-solid fa-table',
                 'category' => 'Barèmes',
-                'duration' => '5 sec',
-                'video' => $video,
-                'start' => 214,
-                'end' => 219,
+                'duration' => '4 sec',
+                'video' => 'img/tutoriel_baremes.mp4',
             ],
 
             'contact-express' => [
@@ -1154,22 +1158,18 @@ class DashboardAppController extends AbstractDashboardController
                 'description' => 'Posez une question, signalez un bug ou proposez une amélioration.',
                 'icon' => 'fa-solid fa-paper-plane',
                 'category' => 'Support',
-                'duration' => '14 sec',
-                'video' => $video,
-                'start' => 219,
-                'end' => 233,
+                'duration' => '12 sec',
+                'video' => 'img/tutoriel_contact.mp4',
             ],
         ];
 
         if (!isset($tutorials[$slug])) {
-            throw $this->createNotFoundException(
-                'Ce tutoriel n’existe pas.'
-            );
+            throw $this->createNotFoundException('Tutoriel introuvable');
         }
 
         return $this->render('App/Dashboard/tutorial_show.html.twig', [
-            'dashboard' => $this->easyAdminDashboard->getDashboard(),
             'tutorial' => $tutorials[$slug],
+            'slug' => $slug,
         ]);
     }
 }

@@ -257,7 +257,9 @@ class ReportLineSidebarCrudController extends AbstractCrudController
                 ],
             ])
             ->setColumns('col-sm-6 col-lg-5 col-xxl-2')
-            ->setTemplateName('crud/field/generic');
+            ->setTemplateName('crud/field/generic')
+            ->setHelp($isFreeUser && count($currentUser->getVehicules())>1 ? 'Seul le véhicule par défaut est disponible' : '')
+            ;
 
         yield FormField::addRow();
 
