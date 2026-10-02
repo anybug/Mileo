@@ -93,6 +93,11 @@ class UserAddress
         return $this->getName().' : '.$this->getAddress();
     }
 
+    public function __toStringForSelect()
+    {
+        return $this->getName().', '.$this->getAddress();
+    }
+
     public function getReason(): ?string
     {
         return $this->reason;
