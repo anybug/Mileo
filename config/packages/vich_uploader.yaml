@@ -12,3 +12,7 @@ vich_uploader:
             uri_prefix: /uploads/vehicules/certificates
             upload_destination: '%kernel.project_dir%/public/uploads/vehicules/certificates'
             namer: Vich\UploaderBundle\Naming\SmartUniqueNamer
+        news_poster:
+            uri_prefix: /uploads/news/poster
+            upload_destination: '%kernel.project_dir%/public/uploads/news/poster'
+            namer: Vich\UploaderBundle\Naming\SmartUniqueNamer            

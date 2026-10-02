@@ -20,6 +20,7 @@ final class OrderFacturXGenerator
 
     /**
      * Génère la facture Factur-X et retourne son chemin absolu.
+     * A compléter ! la facture se génère bien mais elle n'est pas conforme à 100%
      */
     public function generate(Order $order): string
     {
@@ -68,7 +69,7 @@ final class OrderFacturXGenerator
         (new Filesystem())->mkdir($directory);
 
         $filename = sprintf(
-            'Mileo_Facture_%s_Factur-X.pdf',
+            'Mileo_Facture_%s.pdf',
             $invoice->getNum(),
         );
 

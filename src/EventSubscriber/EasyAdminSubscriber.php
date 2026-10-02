@@ -2,15 +2,19 @@
 
 namespace App\EventSubscriber;
 
+use App\Controller\Team\TeamUserCrudController;
 use App\Entity\Report;
 use App\Entity\ReportLine;
 use App\Service\ReportService;
 use Doctrine\ORM\EntityManagerInterface;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
 use EasyCorp\Bundle\EasyAdminBundle\Event\AfterEntityDeletedEvent;
 use EasyCorp\Bundle\EasyAdminBundle\Event\AfterEntityPersistedEvent;
 use EasyCorp\Bundle\EasyAdminBundle\Event\AfterEntityUpdatedEvent;
+use EasyCorp\Bundle\EasyAdminBundle\Event\BeforeCrudActionEvent;
 use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 
 class EasyAdminSubscriber implements EventSubscriberInterface
 {
@@ -34,6 +38,7 @@ class EasyAdminSubscriber implements EventSubscriberInterface
             AfterEntityPersistedEvent::class => ['afterPersistReport'],
             AfterEntityUpdatedEvent::class => ['afterUpdateReport'],
             AfterEntityDeletedEvent::class => ['afterDeleteReport'],
+            BeforeCrudActionEvent::class => ['initFilters'],
         ];
     }
 
@@ -127,5 +132,69 @@ class EasyAdminSubscriber implements EventSubscriberInterface
     private function recalculateReport(Report $report): void
     {
         $this->reportService->refreshReport($report);
+    }
+
+    public function initFilters(BeforeCrudActionEvent $event): void
+    {
+        $context = $event->getAdminContext();
+        $crud = $context?->getCrud();
+        $request = $context?->getRequest();
+
+        if (!$crud || !$request) {
+            return;
+        }
+
+        $currentCrudController = $crud->getControllerFqcn();
+
+        if (!$currentCrudController) {
+            return;
+        }
+
+        if ($crud->getCurrentAction() !== Crud::PAGE_INDEX) {
+            return;
+        }
+
+        $defaultFilters = $this->getDefaultFiltersForCrudController($currentCrudController);
+
+        if (empty($defaultFilters)) {
+            return;
+        }
+
+        // Si l'utilisateur a explicitement des filtres dans l'URL, on ne touche à rien
+        if ($request->query->has('filters')) {
+            return;
+        }
+
+        // Reset explicite : on remet les filtres par défaut
+        if ($request->query->getBoolean('resetFilters')) {
+            // on retire le paramètre resetFilters pour éviter la boucle
+            $params = $request->query->all();
+            unset($params['resetFilters']);
+            unset($params['filters']);
+        }
+
+        // On applique les filtres par défaut
+        $params = $request->query->all();
+        $params['filters'] = $defaultFilters;
+
+        $url = $this->adminUrlGenerator
+            ->unsetAll()
+            ->setController($currentCrudController)
+            ->setAction(Crud::PAGE_INDEX)
+            ->setAll($params)
+            ->generateUrl();
+
+        $event->setResponse(new RedirectResponse($url));
+        
+    }
+
+    private function getDefaultFiltersForCrudController(string $crudController): array
+    {
+        return match ($crudController) {
+            TeamUserCrudController::class => [
+                'virtual_active_member' => 'yes'
+            ],
+            default => [],
+        };
     }
 }

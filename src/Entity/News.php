@@ -10,7 +10,10 @@ use Doctrine\ORM\Mapping as ORM;
 use Gedmo\Mapping\Annotation as Gedmo;
 use Gedmo\Timestampable\Traits\TimestampableEntity;
 use Symfony\Component\Validator\Constraints as Assert;
+use Vich\UploaderBundle\Mapping\Attribute as Vich;
+use Symfony\Component\HttpFoundation\File\File;
 
+#[Vich\Uploadable]
 #[ORM\Entity(repositoryClass: NewsRepository::class)]
 class News
 {
@@ -29,9 +32,19 @@ class News
     #[ORM\Column(type: Types::TEXT)]
     private ?string $content = null;
 
+    #[Assert\NotBlank(message: 'L\'image est obligatoire.')]
+    #[ORM\Column(length: 255)]
+    private ?string $poster = null;
+
+    #[Vich\UploadableField(mapping: 'news_poster', fileNameProperty: 'poster')]
+    private ?File $posterFile = null;
+
     #[Assert\NotNull(message: 'La date de parution est obligatoire.')]
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $publishedAt = null;
+
+    #[ORM\Column(name: 'isPublished', type: Types::BOOLEAN)]
+    private ?bool $isPublished = false;
 
     public function __construct()
     {
@@ -83,4 +96,48 @@ class News
 
         return $this;
     }
+
+    public function isPublished(): ?bool
+    {
+        return $this->isPublished;
+    }
+
+    public function setIsPublished(bool $isPublished): static
+    {
+        $this->isPublished = $isPublished;
+
+        return $this;
+    }
+
+    public function getPoster(): ?string
+    {
+        return $this->poster;
+    }
+
+    public function setPoster(?string $poster): static
+    {
+        $this->poster = $poster;
+
+        return $this;
+    }
+
+    public function getPosterFile(): ?File
+    {
+        return $this->posterFile;
+    }
+
+    public function setPosterFile(?File $posterFile = null): void
+    {
+        $this->posterFile = $posterFile;
+
+        if (null !== $posterFile) {
+            $this->setUpdatedAt(new \DateTime());        
+        }
+    }
+
+    public function isIsPublished(): ?bool
+    {
+        return $this->isPublished;
+    }
+
 }

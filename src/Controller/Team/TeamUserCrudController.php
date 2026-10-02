@@ -7,35 +7,38 @@ use App\Dto\CalendarConnectionData;
 use App\Entity\Subscription;
 use App\Entity\User;
 use App\Form\CalendarConnectionType;
+use App\Form\CollaboratorExitType;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\QueryBuilder;
-use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
+use App\Controller\Team\Filter\inWorkforceFilter;
+use EasyCorp\Bundle\EasyAdminBundle\Attribute\AdminRoute;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FieldCollection;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FilterCollection;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Filters;
 use EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
 use EasyCorp\Bundle\EasyAdminBundle\Dto\EntityDto;
 use EasyCorp\Bundle\EasyAdminBundle\Dto\SearchDto;
 use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\ChoiceField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\CollectionField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\DateTimeField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\EmailField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
 use EasyCorp\Bundle\EasyAdminBundle\Field\FormField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
 use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
 use Symfony\Component\Form\Extension\Core\Type\PasswordType;
 use Symfony\Component\Form\Extension\Core\Type\RepeatedType;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
-use EasyCorp\Bundle\EasyAdminBundle\Attribute\AdminRoute;
-use App\Form\CollaboratorExitType;
-use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
 
 #[IsGranted('ROLE_MANAGER')]
 class TeamUserCrudController extends AbstractCrudController
@@ -68,6 +71,16 @@ class TeamUserCrudController extends AbstractCrudController
                 '@EasyAdmin/crud/form_theme.html.twig',
                 'App/Form/calendar_connection_theme.html.twig',
             ]);
+    }
+
+    public function configureFilters(Filters $filters): Filters
+    {
+        return $filters
+            ->add('last_name')
+            ->add('first_name')
+            ->add('email')
+            ->add(inWorkforceFilter::new('virtual_active_member', 'Dans l’effectif'))
+            ;
     }
 
     public function configureActions(Actions $actions): Actions
@@ -172,7 +185,7 @@ class TeamUserCrudController extends AbstractCrudController
         $me = $this->getUser();
 
         $qb->andWhere('entity.managedBy = :me')
-            ->orWhere('entity = :me')
+            //->orWhere('entity = :me')
             ->setParameter('me', $me);
 
         return $qb;
@@ -312,21 +325,42 @@ class TeamUserCrudController extends AbstractCrudController
 
     public function configureFields(string $pageName): iterable
     {
-        if ($pageName === Crud::PAGE_INDEX || $pageName === Crud::PAGE_DETAIL) {
+        if ($pageName === Crud::PAGE_INDEX) {
             yield Field::new('first_name', 'Prénom');
             yield Field::new('last_name', 'Nom');
             yield EmailField::new('email', 'E-mail');
-
-            if ($pageName === Crud::PAGE_INDEX) {
-                yield BooleanField::new(
-                    'inWorkforce',
-                    'Dans l’effectif'
-                )
-                    ->renderAsSwitch(false);
-            }
-
+            yield BooleanField::new('inWorkforce', 'Dans l’effectif')->renderAsSwitch(false);
             yield DateTimeField::new('last_login', 'Dernière connexion');
             yield CollectionField::new('reports', 'Nb reports');
+            return;
+        }
+
+        if ($pageName === Crud::PAGE_DETAIL) {
+            yield FormField::addColumn(12);
+            yield FormField::addFieldset('Informations personnelles')
+                ->setIcon('fa-solid fa-id-card');
+
+            yield Field::new('first_name', 'Prénom');
+            yield Field::new('last_name', 'Nom');
+            yield EmailField::new('email', 'E-mail');
+            
+            yield Field::new('inWorkforce', 'Dans l’effectif')
+                ->formatValue(function ($value, $entity) {
+                    $inWorkforce = method_exists($entity, 'isInWorkforce') ? $entity->isInWorkforce() : (bool)$value;
+                    return $inWorkforce ? 'Oui' : 'Non';
+                });
+                
+            yield FormField::addColumn(12);
+            yield FormField::addFieldset('Activité et Connexion')
+                ->setIcon('fa-solid fa-chart-line');
+
+            yield DateTimeField::new('last_login', 'Dernière connexion');
+            yield IntegerField::new('reports', 'Nombre de rapports')
+                ->formatValue(function ($value, $entity) {
+                    $count = method_exists($entity, 'getReports') ? count($entity->getReports()) : 0;
+                    return sprintf('<span class="text-dark fw-semibold">%d</span>', $count);
+                });
+
             return;
         }
 

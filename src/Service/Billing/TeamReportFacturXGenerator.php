@@ -60,7 +60,7 @@ final class TeamReportFacturXGenerator
 
         (new Filesystem())->mkdir($directory);
 
-        $path = $directory.'/Mileo_Facture_'.$invoice->getNum().'_Factur-X.pdf';
+        $path = $directory.'/Mileo_Facture_'.$invoice->getNum().'.pdf';
 
         $pdfBuilder->saveDocument($path);
 

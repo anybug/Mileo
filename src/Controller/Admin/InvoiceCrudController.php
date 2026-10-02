@@ -101,7 +101,7 @@ final class InvoiceCrudController extends AbstractCrudController
 
     public function configureActions(Actions $actions): Actions
     {
-        $downloadFacturX = Action::new('downloadFacturX', 'Télécharger Factur-X', 'fa-solid fa-file-invoice')
+        $downloadFacturX = Action::new('downloadFacturX', 'Télécharger Facture', 'fa-solid fa-file-invoice')
             ->linkToCrudAction('downloadFacturX')
             ->displayIf(static fn (Invoice $invoice): bool => $invoice->getFacturXPath() !== null && is_file($invoice->getFacturXPath()));
 
@@ -275,7 +275,7 @@ final class InvoiceCrudController extends AbstractCrudController
             yield DateTimeField::new('paidAt', 'Payée le')
                 ->setFormat('dd/MM/yyyy HH:mm');
 
-            yield TextField::new('facturXPath', 'Factur-X')
+            yield TextField::new('facturXPath', 'Facture')
                 ->formatValue(function ($value, Invoice $invoice): string {
                     if ($invoice->getFacturXPath() === null || !is_file($invoice->getFacturXPath())) {
                         return '-';
@@ -290,7 +290,7 @@ final class InvoiceCrudController extends AbstractCrudController
 
                     return sprintf(
                         '<a href="%s" class="btn btn-success">
-                            <i class="fa-solid fa-file-invoice me-1"></i> Télécharger Factur-X
+                            <i class="fa-solid fa-file-invoice me-1"></i> Télécharger Facture
                         </a>',
                         htmlspecialchars($url, ENT_QUOTES, 'UTF-8'),
                     );
@@ -387,7 +387,7 @@ final class InvoiceCrudController extends AbstractCrudController
         $path = $invoice->getFacturXPath();
 
         if ($path === null || !is_file($path)) {
-            throw $this->createNotFoundException('Le fichier Factur-X est introuvable.');
+            throw $this->createNotFoundException('Le fichier Facture est introuvable.');
         }
 
         return $this->file(

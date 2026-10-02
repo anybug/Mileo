@@ -70,6 +70,15 @@ class DashboardManagerController extends AbstractDashboardController
 
         $topCollaboratorIndemnitiesChart = $this->createTopCollaboratorIndemnitiesChart($yearSelected);
 
+        $latestNews = $this->entityManager->getRepository(\App\Entity\News::class)
+            ->createQueryBuilder('n')
+            ->where('n.publishedAt <= :now')
+            ->setParameter('now', new \DateTimeImmutable())
+            ->orderBy('n.publishedAt', 'DESC')
+            ->setMaxResults(2)
+            ->getQuery()
+            ->getResult();
+
         return $this->render('Team/Dashboard/index.html.twig', [
             'dashboard' => $this->easyAdminDashboard->getDashboard(),
             'years' => $years,
@@ -79,6 +88,7 @@ class DashboardManagerController extends AbstractDashboardController
             'chartAmountByMonth' => $chartAmountByMonth,
             'chartAmountByYear' => $chartAmountByYear,
             'topCollaboratorIndemnitiesChart' => $topCollaboratorIndemnitiesChart,
+            'latestNews' => $latestNews,
         ]);
     }
 
@@ -119,10 +129,14 @@ class DashboardManagerController extends AbstractDashboardController
     {
         yield MenuItem::linkToDashboard('Dashboard', 'fa fa-home');
 
+        $members = $this->getUser()->getActiveMembers();
+        $nbVehicules = $this->entityManager->getRepository(Vehicule::class)->countVehiculesManagedBy();
+        $nbAddresses = $this->entityManager->getRepository(UserAddress::class)->countAddressManagedBy();
+
         yield MenuItem::section('Équipe');
-        yield MenuItem::linkTo(TeamUserCrudController::class, 'Membres collaborateurs', 'fa fa-users');
-        yield MenuItem::linkTo(TeamVehiculeCrudController::class, 'Flotte de véhicules', 'fa fa-car');
-        yield MenuItem::linkTo(TeamAddressesCrudController::class, 'Carnet d\'adresses', 'fa fa-map-marker-alt');
+        yield MenuItem::linkTo(TeamUserCrudController::class, 'Membres', 'fa fa-users')->setBadge($members ? count($members) : null);
+        yield MenuItem::linkTo(TeamVehiculeCrudController::class, 'Flotte de véhicules', 'fa fa-car')->setBadge($nbVehicules ? $nbVehicules : null);
+        yield MenuItem::linkTo(TeamAddressesCrudController::class, 'Carnet d\'adresses', 'fa fa-map-marker-alt')->setBadge($nbAddresses ? $nbAddresses : null);
         //retrait temporaire: à revoir et replacer
         //yield MenuItem::linkToRoute('Summary', 'fa-solid fa-chart-column', 'manager_team_reports'); 
 

@@ -317,6 +317,7 @@
                                                     {{ 'Non synchronisé'|trans }}
                                                 </span>
                                             {% endif %}
+                                            <br>
                                         </p>
                                     </div>
                                 </div>
@@ -336,6 +337,10 @@
                                             {% endif %}
                                         </p>
                                     </div>
+                                    <hr class="my-3">
+                                    <p class="card-text">
+                                        {{ "Vous pouvez désormais importer vos trajets à tout moment depuis votre calendrier directement depuis l'onglet l'assistant intelligent dans l\'onglet Rapports"|trans }}
+                                    </p>
                                 </div>
 
                                 
@@ -396,11 +401,25 @@
                                                     value="{{ app.user.referralCode }}"
                                                     readonly
                                                 >
-
                                                 <button
                                                     type="button"
-                                                    class="btn btn-outline-primary"
-                                                    onclick="navigator.clipboard.writeText(document.getElementById('referral-code').value)"
+                                                    class="btn btn-outline-primary m-0"
+                                                    style="height: 38px; padding-top: 6px; padding-bottom: 6px;"
+                                                    onclick="
+                                                        navigator.clipboard.writeText(document.getElementById('referral-code').value);
+                                                        
+                                                        this.style.width = this.offsetWidth + 'px';
+                                                        const originalHtml = this.innerHTML;
+                                                        
+                                                        this.innerHTML = `<i class='fa-solid fa-check text-success me-1'></i> <span class='text-success'>Copié !</span>`;
+                                                        this.style.setProperty('border-color', '#198754', 'important');
+                                                        
+                                                        setTimeout(() => {
+                                                            this.innerHTML = originalHtml;
+                                                            this.style.removeProperty('border-color');
+                                                            this.style.width = '';
+                                                        }, 2000);
+                                                    "
                                                 >
                                                     <i class="fa-solid fa-copy me-1"></i>
                                                     {{ 'Copier'|trans }}
