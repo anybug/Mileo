@@ -2,16 +2,17 @@
 
 namespace App\Controller\Team;
 
+use App\Entity\News;
 use App\Entity\Report;
 use App\Entity\ReportLine;
 use App\Entity\User;
 use App\Entity\UserAddress;
 use App\Entity\Vehicule;
-use App\Service\ChartService;
 use App\Repository\UserRepository;
+use App\Service\ChartService;
 use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\QueryBuilder;
 use Doctrine\ORM\Query\Expr\Join;
+use Doctrine\ORM\QueryBuilder;
 use EasyAdminFriends\EasyAdminDashboardBundle\Service\EasyAdminDashboard;
 use EasyCorp\Bundle\EasyAdminBundle\Attribute\AdminDashboard;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
@@ -70,12 +71,12 @@ class DashboardManagerController extends AbstractDashboardController
 
         $topCollaboratorIndemnitiesChart = $this->createTopCollaboratorIndemnitiesChart($yearSelected);
 
-        $latestNews = $this->entityManager->getRepository(\App\Entity\News::class)
+        $latestNews = $this->entityManager->getRepository(News::class)
             ->createQueryBuilder('n')
-            ->where('n.publishedAt <= :now')
-            ->setParameter('now', new \DateTimeImmutable())
+            ->where('n.isPublished = :published')
+            ->setParameter('published', true)
             ->orderBy('n.publishedAt', 'DESC')
-            ->setMaxResults(2)
+            ->setMaxResults(3)
             ->getQuery()
             ->getResult();
 

@@ -1,0 +1,5 @@
+{% if field.value is null %}
+    <i>{{ "toujours actif"|trans }}</i>
+{% else %}
+    {% include '@EasyAdmin/crud/field/datetime.html.twig' %}
+{% endif %}
