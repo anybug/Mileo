@@ -1,0 +1,14 @@
+{% if field.value|length>0  %}
+    <table class="table table-responsive table-secondary">
+        {%  for report in field.value %}
+        <tr>
+            <td><i class="fa fa-calendar-days"></i> {{ report.startDate|date('m/Y') }}</td>
+            <td><i class="fa-solid fa-location-dot"></i> {{ report.lines|length }}</td>
+            <td><i class="fa-solid fa-road"></i> {{ report.km }}</td>
+            <td>{{ report.total|number_format('2', ',', ' ') }} <i class="fa-solid fa-euro-sign"></i></td>
+        </tr>
+        {%  endfor  %}
+    </table>    
+{%  else  %}
+    <i>{{ "Pas encore de rapport"|trans }}</i>
+{%  endif  %}

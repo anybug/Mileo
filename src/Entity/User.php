@@ -3,19 +3,19 @@
 namespace App\Entity;
 
 use App\Entity\Subscription;
-use Doctrine\DBAL\Types\Types;
-use Doctrine\ORM\Mapping as ORM;
-use App\Repository\UserRepository;
-use Doctrine\Common\Collections\Collection;
-use Doctrine\Common\Collections\ArrayCollection;
-use Symfony\Component\Validator\Constraints as Assert;
-use Symfony\Component\Security\Core\User\UserInterface;
-use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
-use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
-use Doctrine\Common\Collections\Criteria;
-use Doctrine\ORM\EntityNotFoundException;
 use App\Enum\CalendarSyncMode;
+use App\Repository\UserRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
+use Doctrine\Common\Collections\Criteria;
+use Doctrine\DBAL\Types\Types;
+use Doctrine\ORM\EntityNotFoundException;
+use Doctrine\ORM\Mapping as ORM;
 use Gedmo\Timestampable\Traits\TimestampableEntity;
+use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
+use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
+use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[UniqueEntity(fields: 'email', message: 'Cette adresse e-mail est déjà utilisée')]
@@ -81,6 +81,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(type: Types::DATE_IMMUTABLE, nullable: true)]
     private ?\DateTimeImmutable $workforceExitDate = null;
+
+    #[ORM\Column(type: Types::DATE_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $workforceEntryDate = null;
 
     public $captcha;
 
@@ -1124,5 +1127,25 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return !$this->hasAlreadySubscribedToPro();
     }
 
+    public function getWorkforceEntryDate(): ?\DateTimeImmutable
+    {
+        return $this->workforceEntryDate;
+    }
+
+    public function setWorkforceEntryDate(?\DateTimeImmutable $workforceEntryDate): static
+    {
+        $this->workforceEntryDate = $workforceEntryDate;
+
+        return $this;
+    }
+
+    public function getLastReports(): Collection
+    {
+        $criteria = Criteria::create()
+            ->orderBy(['start_date' => Criteria::DESC])
+            ->setMaxResults(5);
+
+        return $this->reports->matching($criteria);
+    }
 }
 

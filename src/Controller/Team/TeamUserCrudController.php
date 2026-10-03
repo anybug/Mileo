@@ -3,6 +3,7 @@
 namespace App\Controller\Team;
 
 use App\Controller\App\CalendarUserCrudController;
+use App\Controller\Team\Filter\inWorkforceFilter;
 use App\Dto\CalendarConnectionData;
 use App\Entity\Subscription;
 use App\Entity\User;
@@ -10,7 +11,6 @@ use App\Form\CalendarConnectionType;
 use App\Form\CollaboratorExitType;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\QueryBuilder;
-use App\Controller\Team\Filter\inWorkforceFilter;
 use EasyCorp\Bundle\EasyAdminBundle\Attribute\AdminRoute;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FieldCollection;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FilterCollection;
@@ -23,17 +23,20 @@ use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
 use EasyCorp\Bundle\EasyAdminBundle\Dto\EntityDto;
 use EasyCorp\Bundle\EasyAdminBundle\Dto\SearchDto;
 use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
-use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\ChoiceField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\CollectionField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\DateField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\DateTimeField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\EmailField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
 use EasyCorp\Bundle\EasyAdminBundle\Field\FormField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
 use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
+use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGeneratorInterface;
 use Symfony\Component\Form\Extension\Core\Type\PasswordType;
 use Symfony\Component\Form\Extension\Core\Type\RepeatedType;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -63,7 +66,13 @@ class TeamUserCrudController extends AbstractCrudController
         return $crud
             ->setEntityLabelInSingular('Membre')
             ->setEntityLabelInPlural('Membres')
-            ->setPageTitle(Crud::PAGE_INDEX, 'Membres collaborateurs de l\'équipe <br /><span class="fs-6 fw-normal">Gestion de l\'effectif de votre équipe: chacun des membres peut se connecter à la plateforme indépendamment afin d\'effectuer sa saisie en toute autonomie. <br />Vous pouvez aussi vous connecter à leur compte à des fins de saisie ou de vérification.</span>')
+            ->setPageTitle(Crud::PAGE_INDEX, 'Membres collaborateurs de l\'équipe <br />
+            <span class="fs-6 fw-normal">
+            Gestion de l\'effectif de votre équipe: chacun des membres peut se connecter à la plateforme indépendamment afin d\'effectuer sa saisie en toute autonomie. 
+            Vous pouvez aussi vous connecter à leur compte à des fins de saisie ou de vérification.<br />
+            La liste ci-dessous affiche par défaut vos collaborateurs actifs faisant partie de l\'effectif. C\'est ce nombre qui est utilisé lors de la facturation mensuelle de Mileo.
+            Si vous souhaitez afficher également les collaborateurs sortis de l\'effectif, le filter est à votre disposition.
+            </span>')
             ->setDefaultSort(['last_name' => 'ASC', 'first_name' => 'ASC'])
             ->setSearchFields(['first_name', 'last_name', 'email'])
             ->overrideTemplate('crud/edit', 'App/advanced_edit.html.twig')
@@ -101,7 +110,9 @@ class TeamUserCrudController extends AbstractCrudController
 
                 return $user->getManagedBy()?->getId()
                     === $manager->getId();
-            });
+            })
+            ->asSuccessAction()
+            ;
 
         $leaveWorkforce = Action::new(
             'leaveWorkforce',
@@ -109,7 +120,7 @@ class TeamUserCrudController extends AbstractCrudController
             'fa-solid fa-user-minus'
         )
             ->linkToCrudAction('leaveWorkforce')
-            ->addCssClass('btn btn-danger')
+            ->asDangerAction()
             ->displayIf(function (User $user): bool {
                 /** @var User $manager */
                 $manager = $this->getUser();
@@ -150,27 +161,32 @@ class TeamUserCrudController extends AbstractCrudController
 
         return $actions
             ->add(Crud::PAGE_INDEX, Action::DETAIL)
+            ->remove(Crud::PAGE_INDEX, Action::EDIT)
             ->add(Crud::PAGE_INDEX, $impersonate)
 
             ->add(Crud::PAGE_DETAIL, $leaveWorkforce)
             ->add(Crud::PAGE_DETAIL, $restoreWorkforce)
+            ->add(Crud::PAGE_DETAIL, $impersonate)
 
             ->remove(Crud::PAGE_EDIT, Action::SAVE_AND_CONTINUE)
             ->disable(Action::DELETE)
-
-            ->update(
-                Crud::PAGE_INDEX,
-                Action::EDIT,
-                static fn (Action $action): Action =>
-                    $action->displayIf($canEdit)
-            )
 
             ->update(
                 Crud::PAGE_DETAIL,
                 Action::EDIT,
                 static fn (Action $action): Action =>
                     $action->displayIf($canEdit)
-            );
+            )
+
+            ->update(
+                Crud::PAGE_INDEX,
+                Action::DETAIL,
+                static fn (Action $action): Action =>
+                    $action->setLabel('Fiche membre')
+            )
+            ->reorder(Crud::PAGE_DETAIL, [Action::EDIT, 'leaveWorkforce', 'restoreWorkforce', 'impersonate',  Action::INDEX])
+            
+            ;
     }
 
     public function createIndexQueryBuilder(
@@ -189,6 +205,112 @@ class TeamUserCrudController extends AbstractCrudController
             ->setParameter('me', $me);
 
         return $qb;
+    }
+
+    public function configureFields(string $pageName): iterable
+    {
+        if ($pageName === Crud::PAGE_INDEX) {
+            yield Field::new('first_name', 'Prénom');
+            yield Field::new('last_name', 'Nom');
+            yield EmailField::new('email', 'E-mail');
+            yield BooleanField::new('inWorkforce', 'Dans l’effectif')->renderAsSwitch(false);
+            yield DateTimeField::new('last_login', 'Dernière connexion');
+            yield CollectionField::new('reports', 'Nb reports');
+            return;
+        }
+
+        if ($pageName === Crud::PAGE_DETAIL) {
+            yield FormField::addColumn(6);
+            yield FormField::addFieldset('Informations personnelles et profil')
+                ->setIcon('fa-solid fa-id-card');
+
+            yield Field::new('first_name', 'Prénom');
+            yield Field::new('last_name', 'Nom');
+            yield EmailField::new('email', 'E-mail');
+            yield Field::new('workforceEntryDate', "Entrée dans l'effectif");
+            
+            yield DateField::new('workforceExitDate', 'Sortie de l’effectif')
+                ->setTemplatePath('Team/Collaborator/workforceExitDate.html.twig')
+            ;
+
+            yield FormField::addColumn(6);
+            yield FormField::addFieldset('Activité et Connexion')
+                ->setIcon('fa-solid fa-chart-line');
+
+            yield DateTimeField::new('last_login', 'Dernière connexion');
+            yield IntegerField::new('reports', 'Nombre de rapports')
+                ->formatValue(function ($value, $entity) {
+                    $count = method_exists($entity, 'getReports') ? count($entity->getReports()) : 0;
+                    return sprintf('<span class="text-dark fw-semibold">%d</span>', $count);
+                });
+
+            yield Field::new('last_reports', 'Derniers rapports')->setTemplatePath('Team/Collaborator/lastReports.html.twig');    
+
+            return;
+        }
+
+        if ($pageName === Crud::PAGE_NEW || $pageName === Crud::PAGE_EDIT) {
+            yield FormField::addColumn(12);
+            yield FormField::addFieldset('Informations personnelles')->setIcon('fa fa fa-id-card');
+            yield Field::new('first_name')->setFormTypeOptions(['required' => true])->setColumns(6);
+            yield Field::new('last_name')->setFormTypeOptions(['required' => true])->setColumns(6);
+            yield Field::new('workforceEntryDate', "Date d'entrée dans l'effectif")->setHelp('Facultatif: uniquement pour informations')->setColumns(6);
+            
+            
+            yield FormField::addFieldset('Profil')->setIcon('fa fa fa-user');
+            yield Field::new('email', 'Adresse e-mail')->setHelp('L\'adresse e-mail est utilisée comme nom d\'utilisateur pour se connecter à la plateforme');
+            yield Field::new('plainPassword')
+                ->setFormType(RepeatedType::class)
+                ->setRequired($pageName === Crud::PAGE_NEW)
+                ->setFormTypeOptions([
+                    'required' => $pageName === Crud::PAGE_NEW,
+                    'options' => [
+                        'attr' => [
+                            'autocomplete' => 'new-password',
+                        ],
+                    ],
+                    'type' => PasswordType::class,
+                    'first_options' => [
+                        'label' => 'Mot de passe',
+                        'required' => $pageName === Crud::PAGE_NEW,
+                    ],
+                    'second_options' => [
+                        'label' => 'Confirmation du mot de passe',
+                        'required' => $pageName === Crud::PAGE_NEW,
+                    ],
+                    'invalid_message' => 'Les mots de passe ne correspondent pas.',
+                ])
+                ->setHelp(
+                    $pageName === Crud::PAGE_EDIT
+                        ? 'Laissez vide pour conserver le mot de passe actuel.'
+                        : ''
+                );
+            yield BooleanField::new('active', 'Profil activé')->setHelp("Si désactivé, l'utilisateur ne peut pas se connecter à la plateforme");
+
+            $context = $this->getContext();
+            $editedUser = $context?->getEntity()?->getInstance();
+
+            if ($editedUser instanceof User) {
+                $calendarValidationUrl = $this->adminUrlGenerator
+                    ->unsetAll()
+                    ->setController(CalendarUserCrudController::class)
+                    ->setAction('validateCalendarUrl')
+                    ->setEntityId($editedUser->getId())
+                    ->generateUrl();
+
+                yield FormField::addColumn(12);
+                yield FormField::addFieldset('Calendrier du membre')
+                    ->setIcon('fa fa-calendar-days');
+
+                yield $this->getCalendarConnectionField(
+                    $editedUser,
+                    $calendarValidationUrl
+                );
+            }
+
+            return;
+        }
+
     }
 
     public function createEntity(string $entityFqcn)
@@ -321,128 +443,6 @@ class TeamUserCrudController extends AbstractCrudController
         $sub->setUser($member);
 
         $member->setSubscription($sub);
-    }
-
-    public function configureFields(string $pageName): iterable
-    {
-        if ($pageName === Crud::PAGE_INDEX) {
-            yield Field::new('first_name', 'Prénom');
-            yield Field::new('last_name', 'Nom');
-            yield EmailField::new('email', 'E-mail');
-            yield BooleanField::new('inWorkforce', 'Dans l’effectif')->renderAsSwitch(false);
-            yield DateTimeField::new('last_login', 'Dernière connexion');
-            yield CollectionField::new('reports', 'Nb reports');
-            return;
-        }
-
-        if ($pageName === Crud::PAGE_DETAIL) {
-            yield FormField::addColumn(12);
-            yield FormField::addFieldset('Informations personnelles')
-                ->setIcon('fa-solid fa-id-card');
-
-            yield Field::new('first_name', 'Prénom');
-            yield Field::new('last_name', 'Nom');
-            yield EmailField::new('email', 'E-mail');
-            
-            yield Field::new('inWorkforce', 'Dans l’effectif')
-                ->formatValue(function ($value, $entity) {
-                    $inWorkforce = method_exists($entity, 'isInWorkforce') ? $entity->isInWorkforce() : (bool)$value;
-                    return $inWorkforce ? 'Oui' : 'Non';
-                });
-                
-            yield FormField::addColumn(12);
-            yield FormField::addFieldset('Activité et Connexion')
-                ->setIcon('fa-solid fa-chart-line');
-
-            yield DateTimeField::new('last_login', 'Dernière connexion');
-            yield IntegerField::new('reports', 'Nombre de rapports')
-                ->formatValue(function ($value, $entity) {
-                    $count = method_exists($entity, 'getReports') ? count($entity->getReports()) : 0;
-                    return sprintf('<span class="text-dark fw-semibold">%d</span>', $count);
-                });
-
-            return;
-        }
-
-        if ($pageName === Crud::PAGE_NEW || $pageName === Crud::PAGE_EDIT) {
-            yield FormField::addColumn(6);
-            yield FormField::addFieldset('Informations personnelles')->setIcon('fa fa fa-id-card');
-            yield Field::new('first_name')->setFormTypeOptions(['required' => true])->setColumns(6);
-            yield Field::new('last_name')->setFormTypeOptions(['required' => true])->setColumns(6);
-            yield Field::new('company');
-            yield ChoiceField::new('balanceStartPeriod')
-                ->setColumns('col-12')
-                //->setHelp('Modifier votre période fiscale modifie également celle de vos collaborateurs')
-                ->setChoices(fn () => [
-                    'Janvier' => 'January',
-                    'Février' => 'February',
-                    'Mars' => 'March',
-                    'Avril' => 'April',
-                    'Mai' => 'May',
-                    'Juin' => 'June',
-                    'Juillet' => 'July',
-                    'Août' => 'August',
-                    'Septembre' => 'September',
-                    'Octobre' => 'October',
-                    'Novembre' => 'November',
-                    'Décembre' => 'December',
-                ]);
-            
-            yield FormField::addColumn(6);
-            yield FormField::addFieldset('Profil')->setIcon('fa fa fa-user');
-            yield Field::new('email', 'Adresse e-mail')->setHelp('L\'adresse e-mail est utilisée comme nom d\'utilisateur pour se connecter à la plateforme');
-            yield Field::new('plainPassword')
-                ->setFormType(RepeatedType::class)
-                ->setRequired($pageName === Crud::PAGE_NEW)
-                ->setFormTypeOptions([
-                    'required' => $pageName === Crud::PAGE_NEW,
-                    'options' => [
-                        'attr' => [
-                            'autocomplete' => 'new-password',
-                        ],
-                    ],
-                    'type' => PasswordType::class,
-                    'first_options' => [
-                        'label' => 'Mot de passe',
-                        'required' => $pageName === Crud::PAGE_NEW,
-                    ],
-                    'second_options' => [
-                        'label' => 'Confirmation du mot de passe',
-                        'required' => $pageName === Crud::PAGE_NEW,
-                    ],
-                    'invalid_message' => 'Les mots de passe ne correspondent pas.',
-                ])
-                ->setHelp(
-                    $pageName === Crud::PAGE_EDIT
-                        ? 'Laissez vide pour conserver le mot de passe actuel.'
-                        : ''
-                );
-            yield BooleanField::new('active', 'Profil activé')->setHelp("Si désactivé, l'utilisateur ne peut pas se connecter à la plateforme");
-
-            $context = $this->getContext();
-            $editedUser = $context?->getEntity()?->getInstance();
-
-            if ($editedUser instanceof User) {
-                $calendarValidationUrl = $this->adminUrlGenerator
-                    ->unsetAll()
-                    ->setController(CalendarUserCrudController::class)
-                    ->setAction('validateCalendarUrl')
-                    ->setEntityId($editedUser->getId())
-                    ->generateUrl();
-
-                yield FormField::addColumn(12);
-                yield FormField::addFieldset('Calendrier du membre')
-                    ->setIcon('fa fa-calendar-days');
-
-                yield $this->getCalendarConnectionField(
-                    $editedUser,
-                    $calendarValidationUrl
-                );
-            }
-
-            return;
-        }
-
     }
 
     private function getCalendarConnectionData(User $user): CalendarConnectionData
@@ -784,6 +784,18 @@ class TeamUserCrudController extends AbstractCrudController
             ->setController(self::class)
             ->setAction(Crud::PAGE_DETAIL)
             ->setEntityId($collaborator->getId())
+            ->generateUrl();
+
+        return $this->redirect($url);
+    }
+
+    protected function getRedirectResponseAfterSave(AdminContext $context, string $action): RedirectResponse
+    {
+        $url = (clone $this->adminUrlGenerator)
+            ->unsetAll()
+            ->setController(self::class)
+            ->setAction(Crud::PAGE_DETAIL)
+            ->setEntityId($context->getEntity()->getPrimaryKeyValue())
             ->generateUrl();
 
         return $this->redirect($url);

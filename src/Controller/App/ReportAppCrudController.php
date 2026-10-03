@@ -360,6 +360,13 @@ class ReportAppCrudController extends AbstractCrudController
                     )
             )
 
+            ->update(
+                Crud::PAGE_INDEX,
+                Action::EDIT,
+                fn (Action $action) =>
+                    $action->setLabel('Gérer trajets')->setIcon('fa-solid fa-map-location-dot')
+            )
+
             ->add(Crud::PAGE_INDEX, $generatePdf)
             ->add(Crud::PAGE_INDEX, $exportXls)
             ->add(Crud::PAGE_INDEX, $assistantAI)
