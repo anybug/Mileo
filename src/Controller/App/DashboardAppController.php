@@ -256,15 +256,15 @@ class DashboardAppController extends AbstractDashboardController
         yield MenuItem::linkTo(ReportAppCrudController::class, 'Monthly reports', 'fa fa-road');
 
         yield MenuItem::section('Parameters');
-        yield MenuItem::linkToCrud('Profile', 'fa fa-id-card', User::class)->setController(UserAppCrudController::class);
-        yield MenuItem::linkToCrud('My vehicules', 'fa fa-car', Vehicule::class)->setController(VehiculeAppCrudController::class);
-        yield MenuItem::linkToCrud('My addresses', 'fa fa-map-marker-alt', UserAddress::class)->setController(AddressesAppCrudController::class);
+        yield MenuItem::linkTo(UserAppCrudController::class, 'Profile', 'fa fa-id-card');
+        yield MenuItem::linkTo(VehiculeAppCrudController::class, 'My vehicules', 'fa fa-car');
+        yield MenuItem::linkTo(AddressesAppCrudController::class, 'My addresses', 'fa fa-map-marker-alt');
 
         if ($user->hasInvoices()) {
-            yield MenuItem::linkToCrud('My invoices', 'fa-solid fa-file-invoice', Order::class)->setController(OrderAppCrudController::class);
+            yield MenuItem::linkTo(OrderAppCrudController::class, 'My invoices', 'fa-solid fa-file-invoice');
         }
         
-        yield MenuItem::linkToCrud('Scales', 'fa-solid fa-table', Scale::class)->setController(ScaleAppCrudController::class);
+        yield MenuItem::linkTo(ScaleAppCrudController::class, 'Scales', 'fa-solid fa-table');
 
         yield MenuItem::section('Support');
         yield MenuItem::linkToRoute('Contact express', 'fa fa-paper-plane', 'app_contact_express');
@@ -941,14 +941,6 @@ class DashboardAppController extends AbstractDashboardController
                 'icon' => 'fa-solid fa-location-dot',
                 'category' => 'Adresses',
                 'duration' => '36 sec',
-            ],
-            [
-                'title' => 'Créer un trajet',
-                'slug' => 'creer-un-trajet',
-                'description' => 'Découvrez comment enregistrer rapidement un déplacement dans Mileo.',
-                'icon' => 'fa-solid fa-route',
-                'category' => 'Trajets',
-                'duration' => '22 sec',
             ],
             [
                 'title' => 'Comprendre le rapport mensuel automatique',
