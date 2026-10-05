@@ -116,6 +116,7 @@ class VehiculeAppCrudController extends AbstractCrudController
             yield TextField::new('scale', 'Barème : estimation de la distance annuelle parcourue')->hideOnForm();    
             yield Field::new('hasLatestScale', 'Barème à jour')->onlyOnIndex()->setTemplatePath('App/Fields/boolean.html.twig');  
             yield BooleanField::new('is_electric', 'Ce véhicule est électrique')->setHelp("Le montant des frais de déplacement est majoré de 20 % pour les véhicules électriques.")->renderAsSwitch(Crud::PAGE_INDEX != $pageName);
+            yield TextField::new('registrationDocumentName', 'Carte grise')->setTemplatePath('Team/Vehicule/registration_document.html.twig');
             yield BooleanField::new('is_default','Véhicule par défaut')->renderAsSwitch(false)->hideOnForm();
             
             return;
