@@ -180,6 +180,12 @@ class ReportAppCrudController extends AbstractCrudController
             ->setDashboard(DashboardAppController::class)
             ->generateUrl();
 
+        $newReportUrl = $this->adminUrlGenerator
+            ->setController(self::class)
+            ->setAction(Action::NEW)
+            ->setDashboard(DashboardAppController::class)
+            ->generateUrl();    
+
         $crudAction = $request?->query->get('crudAction')
             ?? $request?->attributes->get('crudAction')
             ?? $request?->query->get('action')
@@ -187,11 +193,10 @@ class ReportAppCrudController extends AbstractCrudController
 
         $pageIndexTitle = 'Rapports annuels et provisions mensuelles<br />
         <span class="fs-6 fw-normal">
-            Mode de saisie <i>au mois</i>: chaque rapport contient les trajets effectués le mois concerné.
-            Vous pouvez ajouter/modifier autant de trajets par Rapport que nécessaire,
-            n\'hésitez pas à utiliser l\'assistant pour vous aider.<br />
-            Vous pouvez également opter pour le mode de saisie <i>trajet par trajet</i>
-            depuis le menu <a href="'.$reportLineUrl.'">Mes trajets</a>.
+            <span class="badge text-bg-primary">1</span> Créez votre rapport d\'IK mensuel : bouton <a href="'.$newReportUrl.'">Créer Rapport</a> <br />
+            <span class="badge text-bg-primary">2</span> Ajoutez/modifiez vos trajets du Rapport <br />
+            <span class="badge text-bg-primary">3</span> Terminé! Exportez le rapport en pdf ou xlsx<br />
+            N\'hésitez pas à utiliser l\'assistant pour vous aider et gagner du temps.
         </span>';
 
         if (
@@ -296,29 +301,11 @@ class ReportAppCrudController extends AbstractCrudController
                     && $report->getStatusAsString() === 'Sent';
             });
 
-        /*$generateFromGoogleCalendar = Action::new('generateFromGoogleCalendar', 'Google Calendar')
-            ->setIcon('fa-brands fa-google')
-            ->linkToCrudAction('generateFromGoogleCalendar')
-            ->setCssClass('btn btn-primary'); */
-
-        // Assistant visible si abonnement ≠ FREE -> tout le monde pour l'instant
-        /*$subscription = $this->getUser()->getSubscription();
-        $planName = $subscription && $subscription->getPlan()
-            ? strtoupper((string) $subscription->getPlan()->getName())
-            : 'FREE';
-
-        $canSeeAssistant = ($planName !== 'FREE') | $this->isGranted('ROLE_PREVIOUS_ADMIN');
-
-        if ($canSeeAssistant) {
-            $actions
-                ->add(Crud::PAGE_INDEX, $assistantAI)
-                ->add(Crud::PAGE_EDIT, $assistantAI)
-            ;
-        }*/
         
         $actions
             ->remove(Crud::PAGE_NEW, Action::SAVE_AND_RETURN)
             ->remove(Crud::PAGE_NEW, Action::SAVE_AND_ADD_ANOTHER)
+            //->remove(Crud::PAGE_EDIT, Action::SAVE_AND_CONTINUE)
             ->remove(Crud::PAGE_INDEX, Action::BATCH_DELETE)
 
             ->add(Crud::PAGE_NEW, Action::SAVE_AND_CONTINUE)
@@ -347,7 +334,21 @@ class ReportAppCrudController extends AbstractCrudController
                     $action->displayIf(
                         fn (Report $report): bool =>
                             $this->canWriteReport($report)
-                    )
+                    )->setLabel('Gérer trajets')->setIcon('fa-solid fa-map-location-dot')
+            )
+
+            ->update(
+                Crud::PAGE_EDIT,
+                Action::SAVE_AND_CONTINUE,
+                fn (Action $action) =>
+                    $action->setLabel('Enregistrer et continuer')
+            )
+
+            ->update(
+                Crud::PAGE_EDIT,
+                Action::SAVE_AND_RETURN,
+                fn (Action $action) =>
+                    $action->setLabel('Enregistrer le rapport')->setIcon('fa fa-save')
             )
 
             ->update(
@@ -358,13 +359,6 @@ class ReportAppCrudController extends AbstractCrudController
                         fn (Report $report): bool =>
                             $this->canWriteReport($report)
                     )
-            )
-
-            ->update(
-                Crud::PAGE_INDEX,
-                Action::EDIT,
-                fn (Action $action) =>
-                    $action->setLabel('Gérer trajets')->setIcon('fa-solid fa-map-location-dot')
             )
 
             ->add(Crud::PAGE_INDEX, $generatePdf)
@@ -1167,9 +1161,21 @@ class ReportAppCrudController extends AbstractCrudController
                 'Véhicule' => $line->getVehicule(),
                 'Date' => $line->getTravelDate()->format('d/m/Y'),
                 'Départ' => $line->getStartAdress(),
-                'Arrivé' => $line->getEndAdress(),
+                'Arrivée' => $line->getEndAdress(),
                 'Motif' => str_replace('<br />', '\n', $line->getComment()),
                 'Distance' => $line->getKmTotal(),
+            ];
+        }
+
+        /** anti error si rows = 0 */
+        if(count($rows)<1){
+            $rows[] = [
+                'Véhicule' => null,
+                'Date' => null,
+                'Départ' => null,
+                'Arrivée' => null,
+                'Motif' => null,
+                'Distance' => null,
             ];
         }
 
@@ -1209,7 +1215,7 @@ class ReportAppCrudController extends AbstractCrudController
 
         if ($pageName === Crud::PAGE_EDIT) {
 
-            yield DateField::new('start_date', 'Date de début')
+            /*yield DateField::new('start_date', 'Date de début')
                 ->setFormTypeOptions(['attr' => ['class' => 'report_start_date']])
                 ->onlyOnForms()
                 ->hideWhenCreating();
@@ -1217,7 +1223,7 @@ class ReportAppCrudController extends AbstractCrudController
             yield DateField::new('end_date', 'Date de fin')
                 ->setFormTypeOptions(['attr' => ['class' => 'report_end_date']])
                 ->onlyOnForms()
-                ->hideWhenCreating();
+                ->hideWhenCreating();*/
 
             yield Field::new('linesReportList', 'Trajet(s)')
                 ->onlyOnForms()
