@@ -11,6 +11,7 @@ use App\Controller\Admin\PlanCrudController;
 use App\Controller\Admin\UserCrudController;
 use App\Controller\Admin\UserProCrudController;
 use App\Controller\Admin\UserTeamCrudController;
+use App\Entity\News;
 use App\Entity\Subscription;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -54,9 +55,12 @@ class DashboardController extends AbstractDashboardController
 
         $metrics = $this->getSubscriptionMetrics();
 
+        $latestNews = $this->entityManager->getRepository(News::class)->findLatestPublished();
+
         return $this->render('Admin/Dashboard/index.html.twig', [
             'dashboard' => $this->easyAdminDashboard->getDashboard(),
             'subscriptionMetrics' => $metrics,
+            'latestNews' => $latestNews
         ]);
     }
 

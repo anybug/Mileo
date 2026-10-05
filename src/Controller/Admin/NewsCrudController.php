@@ -61,15 +61,6 @@ final class NewsCrudController extends AbstractCrudController
             yield ImageField::new('photo', 'Photo')
                 ->setBasePath('uploads/members/photos')                // URL publique
                 ->hideOnForm();
-            yield TextField::new('photoFile', 'Photo')
-                ->setFormType(VichImageType::class)
-                ->onlyOnForms()
-                ->setFormTypeOptions([
-                    'required' => false,
-                    'allow_delete' => true,
-                    'download_uri' => false,
-                    'image_uri' => true, // si tu veux que Vich affiche un lien/aperçu selon ton template
-                ]);
 
             yield DateTimeField::new('publishedAt', 'Date de parution')
                 ->setFormat('dd/MM/yyyy');
@@ -115,12 +106,11 @@ final class NewsCrudController extends AbstractCrudController
                 ->renderAsSwitch(true)
                 ->setColumns(12);
 
-
-            yield Field::new('posterFile', 'Image')
+            yield TextField::new('posterFile', 'Image d\'illustration')
                 ->setFormType(VichImageType::class)
                 ->onlyOnForms()
                 ->setFormTypeOptions([
-                    'required' => false,
+                    'required' => $pageName === Crud::PAGE_NEW ?? false,
                     'allow_delete' => true,
                     'download_uri' => false,
                     'image_uri' => true,

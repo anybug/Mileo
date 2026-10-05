@@ -32,8 +32,7 @@ class News
     #[ORM\Column(type: Types::TEXT)]
     private ?string $content = null;
 
-    #[Assert\NotBlank(message: 'L\'image est obligatoire.')]
-    #[ORM\Column(length: 255)]
+    #[ORM\Column(length: 255, nullable: true)]
     private ?string $poster = null;
 
     #[Vich\UploadableField(mapping: 'news_poster', fileNameProperty: 'poster')]

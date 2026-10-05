@@ -27,17 +27,16 @@ class NewsRepository extends ServiceEntityRepository
      *
      * @return list<News>
      */
-    public function findLatestPublished(int $limit = 2): array
+    public function findLatestPublished(int $limit = 3): array
     {
-        return $this->createQueryBuilder('news')
-            ->andWhere('news.publishedAt IS NOT NULL')
-            ->andWhere('news.publishedAt <= :now')
-            ->setParameter('now', new \DateTimeImmutable())
-            ->orderBy('news.publishedAt', 'DESC')
-            ->addOrderBy('news.id', 'DESC')
+        return $this->createQueryBuilder('n')
+            ->where('n.isPublished = :published')
+            ->setParameter('published', true)
+            ->orderBy('n.publishedAt', 'DESC')
             ->setMaxResults($limit)
             ->getQuery()
-            ->getResult();
+            ->getResult()
+        ;
     }
 
 //    /**
