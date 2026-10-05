@@ -71,14 +71,7 @@ class DashboardManagerController extends AbstractDashboardController
 
         $topCollaboratorIndemnitiesChart = $this->createTopCollaboratorIndemnitiesChart($yearSelected);
 
-        $latestNews = $this->entityManager->getRepository(News::class)
-            ->createQueryBuilder('n')
-            ->where('n.isPublished = :published')
-            ->setParameter('published', true)
-            ->orderBy('n.publishedAt', 'DESC')
-            ->setMaxResults(3)
-            ->getQuery()
-            ->getResult();
+        $latestNews = $this->entityManager->getRepository(News::class)->findLatestPublished();
 
         return $this->render('Team/Dashboard/index.html.twig', [
             'dashboard' => $this->easyAdminDashboard->getDashboard(),

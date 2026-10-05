@@ -186,14 +186,7 @@ class DashboardAppController extends AbstractDashboardController
         $topUsedAddressesChart = $this->createTopUsedAddressesChart($yearSelected);
         $topUsedAddressesAllYearsChart = $this->createTopUsedAddressesAllYearsChart();
 
-        $latestNews = $this->entityManager->getRepository(News::class)
-            ->createQueryBuilder('n')
-            ->where('n.isPublished = :published')
-            ->setParameter('published', true)
-            ->orderBy('n.publishedAt', 'DESC')
-            ->setMaxResults(3)
-            ->getQuery()
-            ->getResult();
+        $latestNews = $this->entityManager->getRepository(News::class)->findLatestPublished();
 
         $flash = false;
         $url = null;
