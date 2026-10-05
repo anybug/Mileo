@@ -252,9 +252,8 @@ class DashboardAppController extends AbstractDashboardController
 
         yield MenuItem::linktoDashboard('Dashboard', 'fa fa-home');
 
-        yield MenuItem::section('Travels');
-        yield MenuItem::linkToCrud('My travels', 'fa-solid fa-map-location-dot', ReportLine::class)->setController(ReportLineAppCrudController::class);
-        yield MenuItem::linkToCrud('Monthly reports', 'fa fa-road', Report::class)->setController(ReportAppCrudController::class);
+        yield MenuItem::section('Reports and Travels');
+        yield MenuItem::linkTo(ReportAppCrudController::class, 'Monthly reports', 'fa fa-road');
 
         yield MenuItem::section('Parameters');
         yield MenuItem::linkToCrud('Profile', 'fa fa-id-card', User::class)->setController(UserAppCrudController::class);

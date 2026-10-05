@@ -164,6 +164,9 @@ class ReportLineAppCrudController extends AbstractCrudController
             return $this->redirectToRoute('app', ['menuIndex' => 0, 'submenuIndex' => -1]);
         }
 
+        //retrait de ce menu le 05/10/2026: trop de confusions avec l'Edit Report
+        return $this->redirectToRoute('app_report_app_index', ['menuIndex' => 0, 'submenuIndex' => -1]);
+
         return parent::index($context);
     }
 

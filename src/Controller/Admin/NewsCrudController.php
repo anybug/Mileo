@@ -120,7 +120,7 @@ final class NewsCrudController extends AbstractCrudController
                 ->setFormType(VichImageType::class)
                 ->onlyOnForms()
                 ->setFormTypeOptions([
-                    'required' => true, // C'est VichUploader qui gère proprement l'obligation
+                    'required' => false,
                     'allow_delete' => true,
                     'download_uri' => false,
                     'image_uri' => true,

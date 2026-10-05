@@ -83,7 +83,7 @@ easy_admin_dashboard:
 
 ## USER ##            
       Bloc2z:
-        label: Trajets
+        label: Reports and Travels
         size: 12
         css_class: primary
         permissions: ['ROLE_USER']
@@ -98,15 +98,6 @@ easy_admin_dashboard:
             controller: App\Controller\App\ReportAppCrudController
             link_label: "Reports list"
             query: getReportsForUser
-          ReportLine:
-            label: "My travels"
-            size: 4
-            css_class: primary text-dark
-            class: App\Entity\ReportLine
-            icon:  road
-            controller: App\Controller\App\ReportLineAppCrudController
-            link_label: "Travels list"
-            query: getLineForUser
       Bloc3:
         label: Paramètres
         size: 12
