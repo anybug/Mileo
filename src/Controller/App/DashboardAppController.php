@@ -1020,15 +1020,6 @@ class DashboardAppController extends AbstractDashboardController
     {
         $tutorials = [
 
-        'comprendre-mileo-de-a-a-z' => [
-                'title' => 'Comprendre Miléo de A à Z',
-                'description' => 'Visionnez notre guide vidéo complet pour maîtriser l’intégralité des fonctionnalités de Mileo.',
-                'icon' => 'fa-solid fa-graduation-cap',
-                'category' => 'Prise en main',
-                'duration' => '4 min 05 sec',
-                'video' => 'img/tutorials.mp4',
-            ],
-
             'completer-son-profil' => [
                 'title' => 'Compléter son profil',
                 'description' => 'Configurez vos informations personnelles, votre entreprise et votre année fiscale.',
