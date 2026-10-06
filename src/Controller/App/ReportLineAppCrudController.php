@@ -746,12 +746,8 @@ class ReportLineAppCrudController extends AbstractCrudController
         ;
         
         yield FormField::addRow();
-
         yield FormField::addPanel('Estimation')->setIcon('fa fa-coins');
-        /*yield AssociationField::new('scale')
-            ->setColumns('col-sm-4 col-lg-3 col-xxl-3')
-        ;*/
-
+        
         yield NumberField::new("amount",'Montant')
             ->setFormTypeOptions(['attr' => ['readonly'=> true,'class'=>'report_amount bg-light', 'help' => "Montant estimé"]])
             ->setColumns('col-sm-4 col-lg-3 col-xxl-2')

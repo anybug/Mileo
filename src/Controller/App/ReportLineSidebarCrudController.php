@@ -50,12 +50,14 @@ class ReportLineSidebarCrudController extends AbstractCrudController
 
     public function configureAssets(Assets $assets): Assets
     {
-        return $assets->addHtmlContentToBody(
+        return $assets
+            ->addHtmlContentToBody(
             sprintf(
                 '<script async defer src="https://maps.googleapis.com/maps/api/js?key=%s&libraries=places"></script>',
                 $_ENV['GOOGLE_MAPS_API_KEY']
-            )
-        );
+            ))
+           ->addCssFile('assets/styles/edit-report.css')
+        ;
     }
 
     public function configureCrud(Crud $crud): Crud
@@ -171,7 +173,7 @@ class ReportLineSidebarCrudController extends AbstractCrudController
         $startAddressHelp = '
             Saisissez une adresse ou
             <a href="#" class="popup-fav-start">
-                sélectionnez une de vos <i class="fa fa-map-marker-alt"></i>
+                sélectionnez adresse récurrente <i class="fa fa-map-marker-alt"></i>
             </a>
         ';
 
@@ -184,7 +186,7 @@ class ReportLineSidebarCrudController extends AbstractCrudController
                     class="js-use-default-start"
                     data-default-address="%s"
                 >
-                    utilisez votre adresse par défaut
+                    utilisez adresse par défaut
                     <i class="fa-solid fa-house"></i>
                 </a>
                 ',
@@ -199,15 +201,14 @@ class ReportLineSidebarCrudController extends AbstractCrudController
         $endAddressHelp = '
             Saisissez une adresse ou
             <a href="#" class="popup-fav-end">
-                sélectionnez une de vos <i class="fa fa-map-marker-alt"></i>
+                sélectionnez adresse récurrente <i class="fa fa-map-marker-alt"></i>
             </a>
         ';
-
-        yield FormField::addPanel();
 
         $reportLine = $this->getContext()->getEntity()->getInstance();
         $report = $reportLine->getReport();
 
+        yield FormField::addFieldset()->setCssClass('mb-0');
         yield DateField::new('travel_date', 'Date')
             ->onlyOnForms()
             ->setFormTypeOptions([
@@ -221,8 +222,9 @@ class ReportLineSidebarCrudController extends AbstractCrudController
                     ]),
                 ],
                 'attr' => ['min' => $report->getStartDate()->format('Y-m-d'), 'max' => $report->getEndDate()->format('Y-m-d')],
-            ]);
+            ])->setColumns('col');
 
+        //yield FormField::addColumn('col-md-6 col-xs-12');
         yield AssociationField::new('vehicule', 'Véhicule')
             ->setFormTypeOptions([
                 'query_builder' => static function (EntityRepository $repository) use (
@@ -256,12 +258,13 @@ class ReportLineSidebarCrudController extends AbstractCrudController
                     'class' => 'report_vehicule',
                 ],
             ])
-            ->setColumns('col-sm-6 col-lg-5 col-xxl-2')
             ->setTemplateName('crud/field/generic')
             ->setHelp($isFreeUser && count($currentUser->getVehicules())>1 ? 'Seul le véhicule par défaut est disponible' : '')
+            ->setColumns('col')
             ;
 
         yield FormField::addRow();
+        yield FormField::addFieldset('Travel information')->setIcon('fa fa-car')->setCssClass('mb-0');
 
         yield TextField::new('startAdress', 'Départ')
             ->setFormTypeOptions([
@@ -299,11 +302,12 @@ class ReportLineSidebarCrudController extends AbstractCrudController
 
         yield BooleanField::new('is_return','Aller retour')
             ->setFormTypeOptions([
-            'attr' => ['class'=>'report_is_return']
+                'attr' => ['class'=>'report_is_return'],
+                'row_attr' => ['class' => 'report_is_return-widget']
             ])
             ->onlyOnForms()
             //->renderAsSwitch(false)
-            ->setColumns('col-sm-12 col-lg-12 col-xxl-12')
+            ->setColumns('col-sm-8 col-lg-9 col-xxl-10')
         ;
 
         yield TextareaField::new('comment', 'Motif du déplacement')
@@ -312,10 +316,14 @@ class ReportLineSidebarCrudController extends AbstractCrudController
                 'attr' => [
                     'placeholder' => 'Saisissez une courte description qui justifie ce trajet',
                     'class' => 'report_lines_comment',
+                    'rows' => 2
                 ],
             ]);
 
-        yield NumberField::new('amount', 'Montant')
+        yield FormField::addRow();
+        yield FormField::addFieldset('Estimation')->setIcon('fa fa-coins');    
+
+        yield NumberField::new('amount', 'Montant estimé')
             ->setFormTypeOptions([
                 'attr' => ['readonly' => true, 'class' => 'report_amount bg-light'],
             ]);
