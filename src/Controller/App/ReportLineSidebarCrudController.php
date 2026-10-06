@@ -431,7 +431,7 @@ class ReportLineSidebarCrudController extends AbstractCrudController
             }
         }
 
-        if($vehicule && $distance){
+        if($vehicule && ($distance !== null && $distance !== '')){
 
             //vérification si le barême n'est pas déjà attribué pour ce rapport
             if (!isset($scale)) {

@@ -813,7 +813,7 @@ class ReportLineAppCrudController extends AbstractCrudController
 
         $vehicule = $this->entityManager->getRepository(Vehicule::class)->find($vehiculeId);
 
-        if (!$vehicule || !$distance) {
+        if (!$vehicule || $distance === null || $distance === '') {
             return new JsonResponse(['amount' => null], 200);
         }
 
