@@ -1397,7 +1397,7 @@ import TomSelect from 'tom-select';
         const kmValue = kmField ? kmField.value : '';
         const vehiculeValue = getFieldValue(vehiculeField);
 
-        if (kmValue != 0 && vehiculeField) {
+        if (kmValue !== '' && vehiculeField) {
             const requestUrl = new URL(url_generateAmountAction, window.location.origin);
 
             if (reportId) {
@@ -1434,7 +1434,7 @@ import TomSelect from 'tom-select';
                 if (totalField) {
                     totalField.classList.remove('loading');
 
-                    if (data.amount) {
+                    if (data.amount !== null && data.amount !== undefined) {
                         totalField.value = parseFloat(data.amount).toFixed(2);
                     }
                 }

@@ -71,7 +71,7 @@ class TeamUserCrudController extends AbstractCrudController
             Gestion de l\'effectif de votre équipe: chacun des membres peut se connecter à la plateforme indépendamment afin d\'effectuer sa saisie en toute autonomie. 
             Vous pouvez aussi vous connecter à leur compte à des fins de saisie ou de vérification.<br />
             La liste ci-dessous affiche par défaut vos collaborateurs actifs faisant partie de l\'effectif. C\'est ce nombre qui est utilisé lors de la facturation mensuelle de Mileo.
-            Si vous souhaitez afficher également les collaborateurs sortis de l\'effectif, le filter est à votre disposition.
+            Si vous souhaitez afficher également les collaborateurs sortis de l\'effectif, le filtre est à votre disposition.
             </span>')
             ->setDefaultSort(['last_name' => 'ASC', 'first_name' => 'ASC'])
             ->setSearchFields(['first_name', 'last_name', 'email'])
