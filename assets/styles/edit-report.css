@@ -548,6 +548,21 @@ body.tm-sidepanel-open {
     flex: 1 1 auto;
 }
 
+.btn-assistant {
+    --button-box-shadow: 0 1px 0 0 #1f23280a;
+    --button-bg: linear-gradient(to bottom, white, #f6f8fa);
+    --button-color: #8250df;               /* purple GitHub */
+    --button-icon-color: inherit;
+    --button-border-color: #1f232826;
+    --button-hover-bg: #8250df;
+    --button-hover-color: var(--white);
+    --button-hover-border-color: #1f232826;
+    --button-active-box-shadow: inset 0px 1px 0px 0px #5a32a34d;
+    --button-active-color: var(--white);
+    --button-active-bg: #663cb8;
+    --button-active-border-color: #1f232826;
+}
+
 @media (max-width: 1137px) {
     .tm-report-list-card__header {
         align-items: flex-start;
@@ -758,4 +773,11 @@ body.tm-sidepanel-open {
     .tm-trip-search-input {
         padding-left: 2.75rem !important;
     }
+}
+
+.report_is_return-widget .form-widget { padding-top: 0; }
+.report_is_return-widget .form-check { align-items: center; margin-bottom: 0; }
+.report_is_return-widget .form-check .form-check-label { padding-bottom: 0; }
+@media (min-width: 576px) {
+    .report_is_return-widget .form-check { margin-top: 1.9rem; }
 }

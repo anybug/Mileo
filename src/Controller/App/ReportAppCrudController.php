@@ -165,13 +165,6 @@ class ReportAppCrudController extends AbstractCrudController
     {
         $request = $this->requestStack->getCurrentRequest();
 
-        $reportLineUrl = $this->adminUrlGenerator
-                    ->setController(ReportLineAppCrudController::class)
-                    ->setAction(Action::INDEX)
-                    ->setDashboard(DashboardAppController::class)
-                    ->generateUrl()
-        ;
-
         $user = $this->getUser();
 
         $profileUrl = $this->adminUrlGenerator
@@ -193,9 +186,9 @@ class ReportAppCrudController extends AbstractCrudController
 
         $pageIndexTitle = 'Rapports annuels et provisions mensuelles<br />
         <span class="fs-6 fw-normal">
-            <span class="badge text-bg-primary">1</span> Créez votre rapport d\'IK mensuel : bouton <a href="'.$newReportUrl.'">Créer Rapport</a> <br />
-            <span class="badge text-bg-primary">2</span> Ajoutez/modifiez vos trajets du Rapport <br />
-            <span class="badge text-bg-primary">3</span> Terminé! Exportez le rapport en pdf ou xlsx<br />
+            <span class="badge badge-primary">1</span> Créez votre rapport d\'IK mensuel : bouton <a href="'.$newReportUrl.'">Créer Rapport</a> <br />
+            <span class="badge badge-primary">2</span> Ajoutez/modifiez vos trajets du Rapport <br />
+            <span class="badge badge-primary">3</span> Terminé! Exportez le rapport en pdf ou xlsx<br />
             N\'hésitez pas à utiliser l\'assistant pour vous aider et gagner du temps.
         </span>';
 
@@ -238,7 +231,8 @@ class ReportAppCrudController extends AbstractCrudController
         $generatePdf = Action::new('generatePdf')
             ->setIcon("fa fa-file-pdf")
             ->setLabel("PDF")
-            ->linkToCrudAction('generatePdf');
+            ->linkToCrudAction('generatePdf')   
+        ;
 
         $exportXls = Action::new('exportXls', 'Excel')
             ->linkToCrudAction('exportXls')
@@ -247,7 +241,7 @@ class ReportAppCrudController extends AbstractCrudController
         $assistantAI = Action::new('assistant', 'Assistant')
             ->setIcon('fa-solid fa-wand-magic-sparkles')
             ->linkToCrudAction('assistant')
-            ->setCssClass('btn btn-secondary')
+            ->setCssClass('btn-assistant')
             ->displayIf(
                 fn (Report $report): bool =>
                     $this->canWriteReport($report)
@@ -334,7 +328,10 @@ class ReportAppCrudController extends AbstractCrudController
                     $action->displayIf(
                         fn (Report $report): bool =>
                             $this->canWriteReport($report)
-                    )->setLabel('Gérer trajets')->setIcon('fa-solid fa-map-location-dot')
+                    )
+                    ->setLabel('Gérer trajets')
+                    ->setIcon('fa-solid fa-map-location-dot')
+                    ->asSuccessAction() 
             )
 
             ->update(
