@@ -252,6 +252,10 @@ class ReportAppCrudController extends AbstractCrudController
             ->setIcon('fa-solid fa-paper-plane')
             ->setCssClass('btn btn-primary')
             ->linkToCrudAction('sendToManager')
+            ->askConfirmation(
+                'Votre rapport d\'IK va être envoyé pour validation, vous ne pourrez plus le modifier.',
+                'Confirmer la demande'
+            )
             ->displayIf(function (Report $report): bool {
                 /** @var User|null $user */
                 $user = $this->getUser();

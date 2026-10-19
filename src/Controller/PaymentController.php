@@ -13,6 +13,7 @@ use App\Entity\Purchase;
 use App\Entity\Referral;
 use App\Entity\Subscription;
 use App\Entity\User;
+use App\Enum\InvoiceStatus;
 use App\Enum\PlanCode;
 use App\Service\ReferralCodeGenerator;
 use DateInterval;
@@ -253,7 +254,7 @@ class PaymentController extends AbstractController
             * ---------------------------------------
             */
             $order->setInvoice($invoice);
-            $order->setStatus('paid');
+            $order->setStatus(InvoiceStatus::PAID);
 
             /*
             * Important :
@@ -279,14 +280,16 @@ class PaymentController extends AbstractController
             * ---------------------------------------
             */
             $user->setSubscription($subscription);
-
-            
-
             $manager->persist($user);
 
             /*
             * Un seul flush à la fin.
             */
+            $manager->flush();
+
+            /** Invoice number */
+            $num = sprintf("%s%05d",$order->getCreatedAt()->format("ym"), $invoice->getId());
+            $invoice->setNum(intval($num));
             $manager->flush();
 
             $url = $adminUrlGenerator

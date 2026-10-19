@@ -21,10 +21,10 @@ class Invoice
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
-    private $id;
+    private int $id;
 
     #[ORM\Column(type: 'integer', nullable: true)]
-    private $num;
+    private ?int $num;
 
     #[ORM\Column(type: 'string', length: 30, nullable: true)]
     private ?string $type = null;

@@ -926,6 +926,17 @@ class DashboardAppController extends AbstractDashboardController
                 'category' => 'Adresses',
                 'duration' => '36 sec',
             ],
+
+            //remettre les trajets ici
+            [
+                'title' => 'Créer des trajets',
+                'slug' => 'creer-des-trajets',
+                'description' => 'Créez vos trajets en un clic',
+                'icon' => 'fa-solid fa-file-lines',
+                'category' => 'Trajets',
+                'duration' => '1 min 15 sec',
+            ],
+
             [
                 'title' => 'Comprendre le rapport mensuel automatique',
                 'slug' => 'rapport-mensuel-automatique',
@@ -1038,12 +1049,12 @@ class DashboardAppController extends AbstractDashboardController
                 'video' => 'img/tutoriel_adresses.mp4',
             ],
 
-            'creer-un-trajet' => [
-                'title' => 'Créer un trajet',
+            'creer-des-trajets' => [
+                'title' => 'Créer des trajets',
                 'description' => 'Enregistrez votre premier déplacement dans Mileo.',
                 'icon' => 'fa-solid fa-route',
                 'category' => 'Trajets',
-                'duration' => '22 sec',
+                'duration' => '1 min 15 sec',
                 'video' => 'img/tutoriel_trajets.mp4',
             ],
 

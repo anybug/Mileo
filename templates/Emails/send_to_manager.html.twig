@@ -5,10 +5,10 @@
     <title>Rapport IK à valider</title>
 </head>
 <body>
-    <p>Bonjour {{ manager.firstname }} {{ user.lastname }},</p>
+    <p>Bonjour {{ manager.firstname }},</p>
 
     <p>
-        {{ user.firstname|default(user.email) }}
+        {{ user.firstname|default(user.email) }} {{ user.lastname|default('') }}
         vous a envoyé un rapport d’indemnités kilométriques à valider.
     </p>
 
