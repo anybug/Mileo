@@ -242,7 +242,19 @@ import TomSelect from 'tom-select';
                 return;
             }
 
+            // Préremplir sans déclencher Google Autocomplete
             setFavoriteValue(startField, address);
+
+            // Récupérer les champs nécessaires au calcul
+            const context = resolveFavoriteContext(startField, line);
+
+            // Recalculer les kilomètres
+            calculDistance(
+                context.line,
+                context.distance,
+                context.dpt,
+                context.arv
+            );
         });
 
         delegate(document, 'click', '.popup-fav-lines-start', (e, target) => {
@@ -739,7 +751,8 @@ import TomSelect from 'tom-select';
             size = 'lg',
             scrollable = false,
             centered = false,
-            bodyClass = ''
+            bodyClass = '',
+            focus = true
         } = options;
 
         const dialogClasses = ['modal-dialog', `modal-${size}`];
@@ -776,7 +789,7 @@ import TomSelect from 'tom-select';
         const modal = new bootstrap.Modal(modalEl, {
             backdrop: true,
             keyboard: true,
-            focus: true
+            focus: focus
         });
 
         modalEl.addEventListener('hidden.bs.modal', () => {
@@ -1681,8 +1694,6 @@ import TomSelect from 'tom-select';
         field.value = value;
         field.setAttribute('value', value);
 
-        field.dispatchEvent(new Event('input', { bubbles: true }));
-        field.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
     function formatFavoriteChoices(modalEl) {
@@ -1807,7 +1818,8 @@ import TomSelect from 'tom-select';
                     size: 'lg',
                     scrollable: true,
                     centered: true,
-                    bodyClass: 'favorite-address-modal-body'
+                    bodyClass: 'favorite-address-modal-body',
+                    focus: false
                 }
             );
 
@@ -1817,11 +1829,14 @@ import TomSelect from 'tom-select';
             }
 
             const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
+
             let valueApplied = false;
 
             formatFavoriteChoices(modalEl);
             applyFavoriteSearchFilter(modalEl);
-            focusFavoriteSearch(modalEl);
+            modalEl.addEventListener('shown.bs.modal', () => {
+                focusFavoriteSearch(modalEl);
+            }, { once: true });
 
             const applyFavorite = (choice) => {
                 const value = choice?.value || '';
@@ -2292,7 +2307,7 @@ import TomSelect from 'tom-select';
     */
 
     async function calculateGoogleDistance(origin, destination) {
-        console.log('GOOGLE DISTANCE START', origin, destination);
+
         return new Promise((resolve) => {
             if (
                 !window.google

@@ -56,7 +56,6 @@ class ReportLineSidebarCrudController extends AbstractCrudController
                 '<script async defer src="https://maps.googleapis.com/maps/api/js?key=%s&libraries=places"></script>',
                 $_ENV['GOOGLE_MAPS_API_KEY']
             ))
-           ->addCssFile('assets/styles/edit-report.css')
         ;
     }
 
