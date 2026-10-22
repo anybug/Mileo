@@ -5,21 +5,23 @@ declare(strict_types=1);
 namespace App\Controller\Admin;
 
 use App\Entity\News;
+use App\Enum\NewsScope;
 use App\Form\QuillEditorType;
+use Doctrine\ORM\EntityManagerInterface;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Assets;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
+use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\ChoiceField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\DateTimeField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IdField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\ImageField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextareaField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
-use Doctrine\ORM\EntityManagerInterface;
-use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
-use EasyCorp\Bundle\EasyAdminBundle\Config\Assets;
 use Vich\UploaderBundle\Form\Type\VichImageType;
-use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
-use EasyCorp\Bundle\EasyAdminBundle\Field\ImageField;
 
 #[IsGranted('ROLE_ADMIN')]
 final class NewsCrudController extends AbstractCrudController
@@ -55,6 +57,15 @@ final class NewsCrudController extends AbstractCrudController
 
             yield BooleanField::new('isPublished', 'Publiée');  
 
+            yield ChoiceField::new('scope', 'Diffusion')
+                ->setChoices([
+                    'Toutes les interfaces' => NewsScope::ALL,
+                    'Application' => NewsScope::APP,
+                    'Team' => NewsScope::TEAM,
+                    'Cabinet' => NewsScope::CABINET,
+                ])
+                ->renderAsBadges();
+
             yield TextareaField::new('content', 'Contenu')
                 ->setTemplatePath('Admin/News/Fields/content.html.twig');
 
@@ -77,6 +88,15 @@ final class NewsCrudController extends AbstractCrudController
         if ($pageName === Crud::PAGE_INDEX) {
 
             yield TextField::new('title', 'Titre');
+
+            yield ChoiceField::new('scope', 'Diffusion')
+                ->setChoices([
+                    'Toutes les interfaces' => NewsScope::ALL,
+                    'Application' => NewsScope::APP,
+                    'Team' => NewsScope::TEAM,
+                    'Cabinet' => NewsScope::CABINET,
+                ])
+                ->renderAsBadges();
 
             yield ImageField::new('poster', 'Illustration')
                 ->setBasePath('uploads/news/poster')
@@ -101,6 +121,15 @@ final class NewsCrudController extends AbstractCrudController
 
             yield TextField::new('title', 'Titre')
                 ->setColumns(12);
+
+            yield ChoiceField::new('scope', 'Etendue de diffusion')
+                ->setChoices([
+                    'Toutes les interfaces' => NewsScope::ALL,
+                    'Application' => NewsScope::APP,
+                    'Team' => NewsScope::TEAM,
+                    'Cabinet' => NewsScope::CABINET,
+                ])
+                ->renderAsBadges();
 
             yield BooleanField::new('isPublished', 'Publier l\'actualité')
                 ->renderAsSwitch(true)

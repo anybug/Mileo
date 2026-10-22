@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace App\Entity;
 
+use App\Enum\NewsScope;
 use App\Repository\NewsRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Gedmo\Mapping\Annotation as Gedmo;
 use Gedmo\Timestampable\Traits\TimestampableEntity;
+use Symfony\Component\HttpFoundation\File\File;
 use Symfony\Component\Validator\Constraints as Assert;
 use Vich\UploaderBundle\Mapping\Attribute as Vich;
-use Symfony\Component\HttpFoundation\File\File;
 
 #[Vich\Uploadable]
 #[ORM\Entity(repositoryClass: NewsRepository::class)]
@@ -44,6 +45,9 @@ class News
 
     #[ORM\Column(name: 'isPublished', type: Types::BOOLEAN)]
     private ?bool $isPublished = false;
+
+    #[ORM\Column(type: 'string', length: 20, enumType: NewsScope::class, options: ['default' => 'all'])]
+    private NewsScope $scope = NewsScope::ALL;
 
     public function __construct()
     {
@@ -139,4 +143,15 @@ class News
         return $this->isPublished;
     }
 
+    public function getScope(): NewsScope
+    {
+        return $this->scope;
+    }
+
+    public function setScope(NewsScope $scope): static
+    {
+        $this->scope = $scope;
+
+        return $this;
+    }
 }

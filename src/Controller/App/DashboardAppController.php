@@ -4,6 +4,7 @@ namespace App\Controller\App;
 
 use App\Controller\Admin\UserCrudController;
 use App\Controller\Admin\VehiculeCrudController;
+use App\Entity\News;
 use App\Entity\Order;
 use App\Entity\Plan;
 use App\Entity\Power;
@@ -11,10 +12,10 @@ use App\Entity\Report;
 use App\Entity\ReportLine;
 use App\Entity\Scale;
 use App\Entity\Subscription;
-use App\Entity\News;
 use App\Entity\User;
 use App\Entity\UserAddress;
 use App\Entity\Vehicule;
+use App\Enum\NewsScope;
 use App\Form\BugReportType;
 use App\Form\UserStep2Type;
 use App\Form\UserStep3Type;
@@ -186,7 +187,7 @@ class DashboardAppController extends AbstractDashboardController
         $topUsedAddressesChart = $this->createTopUsedAddressesChart($yearSelected);
         $topUsedAddressesAllYearsChart = $this->createTopUsedAddressesAllYearsChart();
 
-        $latestNews = $this->entityManager->getRepository(News::class)->findLatestPublished();
+        $latestNews = $this->entityManager->getRepository(News::class)->findLatestPublished(NewsScope::APP);
 
         $flash = false;
         $url = null;
@@ -932,7 +933,7 @@ class DashboardAppController extends AbstractDashboardController
                 'title' => 'Créer des trajets',
                 'slug' => 'creer-des-trajets',
                 'description' => 'Créez vos trajets en un clic',
-                'icon' => 'fa-solid fa-file-lines',
+                'icon' => 'fa-solid fa-route',
                 'category' => 'Trajets',
                 'duration' => '1 min 15 sec',
             ],
@@ -976,14 +977,6 @@ class DashboardAppController extends AbstractDashboardController
                 'icon' => 'fa-solid fa-chart-line',
                 'category' => 'Rapports',
                 'duration' => '13 sec',
-            ],
-            [
-                'title' => 'Comprendre le tableau de bord',
-                'slug' => 'tableau-de-bord',
-                'description' => 'Découvrez les statistiques et indicateurs disponibles dans votre tableau de bord.',
-                'icon' => 'fa-solid fa-chart-pie',
-                'category' => 'Tableau de bord',
-                'duration' => '12 sec',
             ],
             [
                 'title' => 'Gérer son profil et son abonnement',

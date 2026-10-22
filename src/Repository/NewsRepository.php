@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\News;
+use App\Enum\NewsScope;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -27,13 +28,26 @@ class NewsRepository extends ServiceEntityRepository
      *
      * @return list<News>
      */
-    public function findLatestPublished(int $limit = 3): array
+    public function findLatestPublished(?NewsScope $scope = NewsScope::ALL, ?int $limit = 3): array
     {
-        return $this->createQueryBuilder('n')
+        $q = $this->createQueryBuilder('n')
             ->where('n.isPublished = :published')
             ->setParameter('published', true)
+            ->andWhere('n.scope IN (:scopes)')
             ->orderBy('n.publishedAt', 'DESC')
             ->setMaxResults($limit)
+        ;
+
+        if($scope !== null and $scope instanceof NewsScope)
+        {
+            $scopeParameters = [NewsScope::ALL->value, $scope->value];
+        }else{
+            $scopeParameters = [NewsScope::ALL->value];
+        }
+
+        $q->setParameter('scopes', $scopeParameters);
+
+        return $q
             ->getQuery()
             ->getResult()
         ;

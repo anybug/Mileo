@@ -8,6 +8,7 @@ use App\Entity\ReportLine;
 use App\Entity\User;
 use App\Entity\UserAddress;
 use App\Entity\Vehicule;
+use App\Enum\NewsScope;
 use App\Repository\UserRepository;
 use App\Service\ChartService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -71,7 +72,7 @@ class DashboardManagerController extends AbstractDashboardController
 
         $topCollaboratorIndemnitiesChart = $this->createTopCollaboratorIndemnitiesChart($yearSelected);
 
-        $latestNews = $this->entityManager->getRepository(News::class)->findLatestPublished();
+        $latestNews = $this->entityManager->getRepository(News::class)->findLatestPublished(NewsScope::TEAM);
 
         return $this->render('Team/Dashboard/index.html.twig', [
             'dashboard' => $this->easyAdminDashboard->getDashboard(),
