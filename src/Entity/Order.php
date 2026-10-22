@@ -267,11 +267,10 @@ class Order
     public function setInvoice(?Invoice $invoice): self
     {
         $invoice->setOrder($this);
-        $invoice->setType(Invoice::TYPE_ORDER);
         $invoice->setVatAmount($this->getVatAmount());
         $invoice->setTotalHt($this->getTotalHt());
         $invoice->setTotalTtc($this->getTotalTTC());
-        $invoice->setPaidAt(new \DateTimeImmutable());
+         
         $this->invoice = $invoice;
         
         return $this;

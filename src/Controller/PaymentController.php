@@ -103,7 +103,7 @@ class PaymentController extends AbstractController
             }
 
             // Paiement déjà traité
-            if ($order->getStatus() === 'paid') {
+            if ($order->getStatus() === Order::STATUS_PAID) {
                 $url = $adminUrlGenerator
                     ->setDashboard(DashboardAppController::class)
                     ->setController(OrderAppCrudController::class)
@@ -245,6 +245,9 @@ class PaymentController extends AbstractController
             * ---------------------------------------
             */
             $invoice = new Invoice();
+            $invoice->setType(Invoice::TYPE_ORDER);
+            $invoice->setPaidAt(new \DateTimeImmutable());
+            $invoice->setStatus(InvoiceStatus::PAID);
 
             $manager->persist($invoice);
 
@@ -254,7 +257,7 @@ class PaymentController extends AbstractController
             * ---------------------------------------
             */
             $order->setInvoice($invoice);
-            $order->setStatus(InvoiceStatus::PAID);
+            $order->setStatus(Order::STATUS_PAID);
 
             /*
             * Important :
