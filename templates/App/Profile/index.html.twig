@@ -147,6 +147,7 @@
                                 .setAction('subscriptionForm')
                             %}
                             <div class="fs-5">
+                                {% if not app.user.managedBy %}
                                 <a href="{{ renewUrl }}" class="btn btn-success">
                                     {% if not app.user.hasValidSubscription %}
                                         <i class="fa-solid fa-road"></i> {{ 'Version Pro'|trans }}
@@ -156,8 +157,9 @@
                                         {% else %}     
                                             <i class="fa-solid fa-arrows-rotate"></i> {{ 'Renouveler'|trans }}
                                         {% endif %}
-                                    {% endif %}                     
+                                    {% endif %}                      
                                 </a>
+                                {% endif %}
                             </div>
                         </div>
                         <div class="card-body bg-light">
@@ -167,17 +169,27 @@
                                         {% if not app.user.hasValidSubscription %}
                                             {{ "PERSO"|trans }}
                                         {% else %} 
-                                            {{ "PRO"|trans }}
+                                            {% if app.user.managedBy %}
+                                                {{ "TEAM"|trans }}
+                                            {% else %}    
+                                                {{ "PRO"|trans }}
+                                            {% endif %}  
                                         {% endif %}   
                                     </p>
                                 </div>
                                 <div class="col-sm-9">
                                     <p class="text-muted mb-0">
-                                        {% set price = app.user.subscription.plan.pricePerYear %}
-                                        {% if price > 0 and app.user.hasValidSubscription %}
-                                            {{ price|round }}€ {{ 'HT/an'|trans }}
-                                        {% else %}
-                                            {{ 'Gratuit'|trans }}
+                                        {% if app.user.managedBy %}
+                                            {{ "Géré par"|trans }} {{ app.user.managedBy }}
+                                        {% else %} 
+
+                                            {% set price = app.user.subscription.plan.pricePerYear %}
+                                            {% if price > 0 and app.user.hasValidSubscription %}
+                                                {{ price|round }}€ {{ 'HT/an'|trans }}
+                                            {% else %}
+                                                {{ 'Gratuit'|trans }}
+                                            {% endif %}
+
                                         {% endif %}    
                                     </p>
                                 </div>
