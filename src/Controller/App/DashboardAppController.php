@@ -928,7 +928,6 @@ class DashboardAppController extends AbstractDashboardController
                 'duration' => '36 sec',
             ],
 
-            //remettre les trajets ici
             [
                 'title' => 'Créer des trajets',
                 'slug' => 'creer-des-trajets',
@@ -945,6 +944,14 @@ class DashboardAppController extends AbstractDashboardController
                 'icon' => 'fa-solid fa-file-lines',
                 'category' => 'Rapports',
                 'duration' => '9 sec',
+            ],
+            [
+                'title' => 'Importer des trajets depuis un calendrier',
+                'slug' => 'import-calendrier',
+                'description' => 'Importez rapidement les trajets de vos calendriers',
+                'icon' => 'fa-solid fa-calendar-week',
+                'category' => 'Trajets',
+                'duration' => '1 min 9 sec',
             ],
             [
                 'title' => 'Dupliquer des trajets avec l’assistant',
@@ -1067,6 +1074,15 @@ class DashboardAppController extends AbstractDashboardController
                 'category' => 'Trajets',
                 'duration' => '28 sec',
                 'video' => 'img/tutoriel_dupplication_avec_assistant.mp4',
+            ],
+
+            'import-calendrier' => [
+                'title' => 'Importer depuis le calendrier',
+                'description' => 'Importez rapidement les trajets de vos calendriers',
+                'icon' => 'fa-solid fa-calendar-week',
+                'category' => 'Trajets',
+                'duration' => '1 min 9 sec',
+                'video' => 'img/tutoriel_calendrier.mp4',
             ],
 
             'dupliquer-une-semaine' => [
