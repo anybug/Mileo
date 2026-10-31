@@ -417,17 +417,6 @@ import TomSelect from 'tom-select';
                 return;
             }
 
-            /*const select = document.querySelector('.js-calendar-start-address');
-
-            if (select?.tomselect) {
-                select.tomselect.addOption({
-                    value: address,
-                    text: `${name} : ${address}`
-                });
-
-                select.tomselect.addItem(address);
-            }*/
-
 	        /* reload assistant form */
             var radioButton = document.getElementById('assistant_ai_action_3');
             
@@ -454,6 +443,7 @@ import TomSelect from 'tom-select';
         bindReadonlyIframeRedirectFallback();
 
         applyReadonlySearchFilter();
+        updateReadonlyBatchSelection();
         updateReadonlyStats();
     }
 
@@ -890,6 +880,49 @@ import TomSelect from 'tom-select';
         return Array.from(container.querySelectorAll('.tm-trip-item[data-trip-item]'));
     }
 
+    function getReadonlySelectedTrips() {
+        return qsa('[data-trip-select]:checked', getReadonlyContainer());
+    }
+
+    function updateReadonlyBatchSelection() {
+        const container = getReadonlyContainer();
+        if (!container) return;
+
+        const allCheckboxes = qsa('[data-trip-select]', container);
+
+        const visibleCheckboxes = allCheckboxes.filter(checkbox => {
+            const item = checkbox.closest('.tm-trip-item[data-trip-item]');
+            return item && !item.classList.contains('d-none');
+        });
+
+        const selectedCount = allCheckboxes.filter(cb => cb.checked).length;
+        const visibleSelectedCount = visibleCheckboxes.filter(cb => cb.checked).length;
+
+        const selectAll = container.querySelector('[data-trip-select-all]');
+        const deleteBtn = container.querySelector('[data-trip-batch-delete]');
+        const counter = container.querySelector('[data-trip-selected-count]');
+
+        if (selectAll) {
+            selectAll.checked =
+                visibleCheckboxes.length > 0 &&
+                visibleSelectedCount === visibleCheckboxes.length;
+
+            selectAll.indeterminate =
+                visibleSelectedCount > 0 &&
+                visibleSelectedCount < visibleCheckboxes.length;
+
+            selectAll.disabled = visibleCheckboxes.length === 0;
+        }
+
+        if (deleteBtn) {
+            deleteBtn.classList.toggle('d-none', selectedCount === 0);
+        }
+
+        if (counter) {
+            counter.textContent = selectedCount;
+        }
+    }
+
     function getReadonlySearchInput() {
         return getReadonlyContainer()?.querySelector('.tm-trip-search-input') || null;
     }
@@ -979,6 +1012,8 @@ import TomSelect from 'tom-select';
         if (emptyState) {
             emptyState.classList.toggle('d-none', visibleCount > 0 || !query);
         }
+
+        updateReadonlyBatchSelection();
     }
 
     function openReadonlySidepanel(url) {
@@ -1017,6 +1052,11 @@ import TomSelect from 'tom-select';
 
         const currentQuery = getReadonlySearchInput()?.value || '';
 
+        // IDs des trajets avant le rafraîchissement
+        const previousIds = new Set(
+            getReadonlyTripItems().map(item => item.dataset.lineId)
+        );
+
         try {
             setReadonlyStatsLoading(true);
 
@@ -1044,6 +1084,79 @@ import TomSelect from 'tom-select';
 
             applyReadonlySearchFilter();
             updateReadonlyStats();
+
+            // Rechercher un trajet qui n'existait pas avant le rafraîchissement
+            const newTrip = getReadonlyTripItems().find(item =>
+                !previousIds.has(item.dataset.lineId)
+            );
+
+            if (newTrip) {
+
+                // Si une recherche masque le nouveau trajet, on efface le filtre
+                if (newTrip.classList.contains('d-none')) {
+                    const searchInput = getReadonlySearchInput();
+
+                    if (searchInput) {
+                        searchInput.value = '';
+                        applyReadonlySearchFilter();
+                    }
+                }
+
+                const scrollContainer = container.querySelector('.tm-trip-list-dropdown');
+
+                if (scrollContainer) {
+                    requestAnimationFrame(() => {
+
+                        const isScrollable =
+                            scrollContainer.scrollHeight > scrollContainer.clientHeight + 1;
+
+                        if (isScrollable) {
+
+                            // 1. Positionner la liste dans la fenêtre
+                            const listRect = scrollContainer.getBoundingClientRect();
+
+                            const desiredTop = 120;
+
+                            const pageOffset = listRect.top - desiredTop;
+
+                            window.scrollBy({
+                                top: pageOffset,
+                                behavior: 'instant'
+                            });
+
+                            // 2. Centrer le trajet dans la scrollbar intérieure
+                            const tripRect = newTrip.getBoundingClientRect();
+                            const containerRect = scrollContainer.getBoundingClientRect();
+
+                            const targetTop =
+                                scrollContainer.scrollTop +
+                                tripRect.top -
+                                containerRect.top -
+                                (scrollContainer.clientHeight - tripRect.height) / 2;
+
+                            scrollContainer.scrollTo({
+                                top: targetTop,
+                                behavior: 'smooth'
+                            });
+
+                        } else {
+
+                            // Sur mobile, la liste n'a pas de scrollbar interne
+                            newTrip.scrollIntoView({
+                                behavior: 'smooth',
+                                block: 'center'
+                            });
+                        }
+
+                        // Animation existante
+                        newTrip.classList.add('tm-trip-item--highlight');
+
+                        setTimeout(() => {
+                            newTrip.classList.remove('tm-trip-item--highlight');
+                        }, 3000);
+                    });
+                }
+            }
 
             initTooltips(container);
             waitForGoogleMaps(() => {
@@ -1097,6 +1210,63 @@ import TomSelect from 'tom-select';
                 return;
             }
 
+            const batchDeleteBtn = e.target.closest('[data-trip-batch-delete]');
+
+            if (batchDeleteBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                if (batchDeleteBtn.disabled) return;
+
+                const selected = getReadonlySelectedTrips();
+                const ids = selected.map(cb => cb.value);
+
+                if (!ids.length) return;
+
+                if (!confirm(
+                    `Confirmer la suppression de ${ids.length} trajet(s) ?`
+                )) {
+                    return;
+                }
+
+                const body = new URLSearchParams({
+                    _token: batchDeleteBtn.dataset.token
+                });
+
+                ids.forEach(id => body.append('ids[]', id));
+
+                batchDeleteBtn.disabled = true;
+
+                try {
+                    const response = await fetch(batchDeleteBtn.dataset.url, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Content-Type': 'application/x-www-form-urlencoded'
+                        },
+                        body
+                    });
+
+                    if (!response.ok) {
+                        const text = await response.text();
+                        throw new Error(text || 'Suppression impossible');
+                    }
+
+                    await refreshReadonlyOrReload();
+
+                } catch (error) {
+                    console.error(error);
+                    alert('Erreur lors de la suppression multiple');
+                } finally {
+                    if (batchDeleteBtn.isConnected) {
+                        batchDeleteBtn.disabled = false;
+                    }
+                }
+
+                return;
+            }
+
             const deleteBtn = e.target.closest('[data-delete]');
             if (deleteBtn) {
                 e.preventDefault();
@@ -1143,6 +1313,34 @@ import TomSelect from 'tom-select';
             }
 
             applyReadonlySearchFilter();
+        });
+
+        document.addEventListener('change', function (e) {
+
+            const container = getReadonlyContainer();
+            if (!container || !container.contains(e.target)) return;
+
+            if (e.target.matches('[data-trip-select-all]')) {
+
+                const checked = e.target.checked;
+
+                getReadonlyTripItems().forEach(item => {
+                    if (item.classList.contains('d-none')) return;
+
+                    const checkbox = item.querySelector('[data-trip-select]');
+
+                    if (checkbox) {
+                        checkbox.checked = checked;
+                    }
+                });
+
+                updateReadonlyBatchSelection();
+                return;
+            }
+
+            if (e.target.matches('[data-trip-select]')) {
+                updateReadonlyBatchSelection();
+            }
         });
     }
 

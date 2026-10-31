@@ -1,5 +1,8 @@
 {% set items = report ? report.lines : [] %}
-{% set sorted = items|sort((a, b) => (a.travelDate ? a.travelDate.timestamp : 0) <=> (b.travelDate ? b.travelDate.timestamp : 0)) %}
+{% set sorted = items|sort((a, b) =>
+    ((a.travelDate ? a.travelDate.timestamp : 0) <=> (b.travelDate ? b.travelDate.timestamp : 0))
+    ?: (a.id <=> b.id)
+) %}
 
 <div class="tm-report-layout">
     <aside class="tm-report-sidebar">
@@ -47,27 +50,46 @@
     </aside>
     <div class="tm-report-main">
         <div class="tm-report-list-card">
-            <div class="tm-report-list-card__header">
-                <h3 class="tm-report-list-card__title">
-                    {{ 'Liste des trajets'|trans }}{% if report %} ({{ sorted|length }}){% endif %}
-                </h3>
+            <div class="tm-report-list-card__header tm-report-list-card__header--batch">
+                {% if sorted is not empty %}
+                    <label class="tm-trip-batch-toolbar__select">
+                        <input type="checkbox"
+                               class="tm-trip-checkbox"
+                               data-trip-select-all>
+                        <span>{{ 'Tout sélectionner'|trans }}</span>
+                    </label>
+                {% endif %}
 
-                <button type="button"
-                        class="btn btn-primary"
-                        data-open-sidepanel
-                        data-url="{{ ea_url()
-                            .setController('App\\Controller\\App\\ReportLineSidebarCrudController')
-                            .setAction('new')
-                            .set('reportId', report.id)
-                            .unset('entityId')
-                            .unset('referrer')
-                            .unset('sort')
-                            .unset('page')
-                            .unset('query')
-                            .generateUrl() }}">
-                    <i class="fa-solid fa-plus me-2"></i>
-                    {{ 'Ajouter un trajet'|trans }}
-                </button>
+                <div class="tm-trip-list-toolbar__actions">
+                    {% if sorted is not empty %}
+                        <button type="button"
+                                class="btn btn-danger d-none"
+                                data-trip-batch-delete
+                                data-url="{{ path('app_report_lines_batch_delete', { id: report.id }) }}"
+                                data-token="{{ csrf_token('batch_delete_report_' ~ report.id) }}">
+                            <i class="far fa-trash-alt me-1"></i>
+                            {{ 'Supprimer la sélection'|trans }}
+                            <span data-trip-selected-count class="badge badge-danger">0</span>
+                        </button>
+                    {% endif %}
+
+                    <button type="button"
+                            class="btn btn-primary"
+                            data-open-sidepanel
+                            data-url="{{ ea_url()
+                                .setController('App\\Controller\\App\\ReportLineSidebarCrudController')
+                                .setAction('new')
+                                .set('reportId', report.id)
+                                .unset('entityId')
+                                .unset('referrer')
+                                .unset('sort')
+                                .unset('page')
+                                .unset('query')
+                                .generateUrl() }}">
+                        <i class="fa-solid fa-plus me-2"></i>
+                        {{ 'Ajouter un trajet'|trans }}
+                    </button>
+                </div>
             </div>
 
             <div class="tm-trip-list-shell">
@@ -77,7 +99,9 @@
                         <input type="search"
                                class="form-control tm-trip-search-input"
                                placeholder="{{ 'Rechercher un trajet, une adresse, un véhicule, un motif…'|trans }}"
-                               autocomplete="off">
+                               autocomplete="off"
+                               id="tm-trip-search-input-id"
+                               />
                     </div>
                     <button type="button" class="btn btn-light tm-trip-search-reset d-none">
                         {{ 'Effacer'|trans }}
@@ -85,6 +109,7 @@
                 </div>
 
                 <div class="tm-trip-list-dropdown">
+
                     {% if sorted is empty %}
                         <div class="text-muted text-center py-4">
                             <i class="fa fa-exclamation-circle me-1"></i>{{ 'Aucun trajet'|trans }}
@@ -103,7 +128,7 @@
                                 data-km="{{ line.kmTotal ?? 0 }}"
                                 data-amount="{{ line.amount ?? 0 }}"
                                 data-search="{{ [
-                                    line.travelDate ? line.travelDate|date('d/m/Y') : '',
+                                    line.travelDate ? line.travelDate|format_datetime(pattern='EEEE dd/MM/yyyy', locale='fr') : '',
                                     line.startAdress ?? '',
                                     line.endAdress ?? '',
                                     line.vehicule ? line.vehicule|striptags : '',
@@ -111,13 +136,21 @@
                                 ]|join(' ')|lower }}">
 
                                     <div class="tm-trip-row">
+                                        <div class="tm-trip-row__selection">
+                                            <input type="checkbox"
+                                                class="tm-trip-checkbox"
+                                                data-trip-select
+                                                value="{{ line.id }}"
+                                                aria-label="{{ 'Sélectionner le trajet du'|trans }} {{ line.travelDate|date('d/m/Y') }}">
+                                        </div>
+
                                         <div class="tm-trip-row__summary">
                                             <div class="tm-trip-row__content">
                                                 <div class="tm-trip-row__left">
                                                     <div class="tm-trip-row__topline">
                                                         <span class="tm-trip-row__date">
                                                             <i class="fa-regular fa-calendar me-2"></i>
-                                                            {{ line.travelDate ? line.travelDate|date('d/m/Y') : 'Date'|trans }}
+                                                            {{ line.travelDate ? line.travelDate|format_datetime(pattern='EEEE dd/MM/yyyy', locale='fr')|capitalize : 'Date'|trans }}
                                                         </span>
                                                         <span class="tm-trip-row__dot">•</span>
 

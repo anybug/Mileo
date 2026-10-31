@@ -93,6 +93,7 @@ class ReportAppCrudController extends AbstractCrudController
         ;
     }
 
+
     public static function getEntityFqcn(): string
     {
         return Report::class;
@@ -2072,6 +2073,70 @@ class ReportAppCrudController extends AbstractCrudController
         );
 
         return $this->redirectToReportIndex();
+    }
+
+    #[Route('/app/report/{id}/lines/batch-delete', name: 'app_report_lines_batch_delete', methods: ['POST'])]
+    public function batchDeleteReportLines(
+        Report $report,
+        Request $request
+    ): JsonResponse {
+
+        // Vérifier le propriétaire du rapport
+        if ($report->getUser()?->getId() !== $this->getUser()?->getId()) {
+            throw new AccessDeniedHttpException();
+        }
+
+
+        // Vérifier le token CSRF
+        if (!$this->isCsrfTokenValid(
+            'batch_delete_report_' . $report->getId(),
+            $request->request->get('_token')
+        )) {
+            return new JsonResponse(['error' => 'Invalid CSRF token'], 400);
+        }
+
+        $ids = $request->request->all('ids');
+
+        // Nettoyage et validation des IDs
+        if (!$ids || count($ids) !== count(array_filter(
+            $ids,
+            static fn ($id) => is_scalar($id)
+                && ctype_digit((string) $id)
+                && (int) $id > 0
+        ))) {
+            return new JsonResponse(['error' => 'Sélection invalide'], 400);
+        }
+
+        $ids = array_values(array_unique(array_map('intval', $ids)));
+
+        // Ne récupérer que les trajets appartenant au rapport
+        $lines = $this->entityManager
+            ->getRepository(ReportLine::class)
+            ->findBy([
+                'id' => $ids,
+                'report' => $report,
+            ]);
+
+        // Éviter une suppression partielle si un ID est incorrect
+        if (count($lines) !== count($ids)) {
+            return new JsonResponse([
+                'error' => 'Certains trajets sont introuvables ou non autorisés.'
+            ], 400);
+        }
+
+        foreach ($lines as $line) {
+            $this->entityManager->remove($line);
+        }
+
+        $this->entityManager->flush();
+
+        // Un seul recalcul après suppression
+        $this->reportService->refreshReport($report);
+
+        return new JsonResponse([
+            'success' => true,
+            'deleted' => count($lines),
+        ]);
     }
 
     private function redirectToReportIndex(): RedirectResponse

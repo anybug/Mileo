@@ -97,8 +97,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    padding: 1rem 1.75rem;
-    border-bottom: 1px solid #eef2f7;
+    padding: 0.75rem 1.75rem;
     background: #fff;
 }
 
@@ -127,7 +126,7 @@
     display: flex;
     gap: .75rem;
     align-items: center;
-    padding: 0 1.25rem;
+    padding: .5rem 1.25rem;
     background: #fff;
     border-bottom: 1px solid #eef2f7;
 }
@@ -780,4 +779,166 @@ body.tm-sidepanel-open {
 .report_is_return-widget .form-check .form-check-label { padding-bottom: 0; }
 @media (min-width: 576px) {
     .report_is_return-widget .form-check { margin-top: 1.9rem; }
+}
+
+/* Actions de sélection intégrées à l'en-tête */
+.tm-report-list-card__header--batch {
+    flex-wrap: wrap;
+    gap: .75rem;
+}
+
+.tm-trip-list-toolbar__actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin-left: auto;
+}
+
+.tm-trip-list-toolbar__actions .btn {
+    white-space: nowrap;
+}
+
+.tm-trip-batch-toolbar__select {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    font-size: .95rem;
+    font-weight: 500;
+    color: #64748b;
+    cursor: pointer;
+}
+
+/* Surcharger la règle mobile qui étire tous les boutons d'en-tête */
+@media (max-width: 767.98px) {
+    .tm-report-list-card__header--batch {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    .tm-report-list-card__header--batch .tm-trip-list-toolbar__actions .btn {
+        width: auto;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .tm-trip-list-toolbar__actions {
+        gap: .4rem;
+    }
+
+    .tm-trip-list-toolbar__actions .btn {
+        font-size: .8rem;
+        padding: .4rem .6rem;
+    }
+}
+
+/* Cases à cocher personnalisées */
+.tm-trip-checkbox {
+    appearance: none;
+    -webkit-appearance: none;
+    display: block;
+    width: 17px;
+    height: 17px;
+    min-width: 17px;
+    margin: 0;
+    padding: 0;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 5px;
+    background-color: #fff;
+    cursor: pointer;
+    position: relative;
+    transition: background-color .15s, border-color .15s;
+}
+
+.tm-trip-checkbox:hover {
+    border-color: var(--bs-primary, #0d6efd);
+}
+
+.tm-trip-checkbox:checked {
+    background-color: var(--bs-primary, #0d6efd);
+    border-color: var(--bs-primary, #0d6efd);
+}
+
+.tm-trip-checkbox:checked::after {
+    content: "";
+    position: absolute;
+    left: 5px;
+    top: 2px;
+    width: 4px;
+    height: 8px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.tm-trip-checkbox:indeterminate {
+    background-color: var(--bs-primary, #0d6efd);
+    border-color: var(--bs-primary, #0d6efd);
+}
+
+.tm-trip-checkbox:indeterminate::after {
+    content: "";
+    position: absolute;
+    left: 3px;
+    right: 3px;
+    top: 7px;
+    height: 2px;
+    background: #fff;
+}
+
+.tm-trip-checkbox:focus-visible {
+    outline: 3px solid rgba(13, 110, 253, .22);
+    outline-offset: 2px;
+}
+
+/* Alignement des cases avec les trajets */
+.tm-trip-row {
+    display: flex;
+    align-items: center;
+}
+
+.tm-trip-row__selection {
+    display: flex;
+    flex: 0 0 17px;
+    align-items: center;
+    justify-content: center;
+    align-self: center;
+    margin-right: 14px;
+    margin-left: 14px;
+}
+
+.tm-trip-row__summary {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+/* Mettre discrètement en évidence les trajets sélectionnés */
+.tm-trip-item:has(.tm-trip-checkbox:checked) {
+    background-color: rgba(13, 110, 253, .035);
+}
+
+/* Mise en évidence d'un trajet nouvellement créé */
+.tm-trip-item--highlight .tm-trip-row {
+    animation: tm-trip-highlight 3s ease-out forwards;
+}
+
+@keyframes tm-trip-highlight {
+    0%, 25% {
+        background-color: #fef08a; /* Jaune vif */
+        border-color: #eab308;
+        box-shadow: 0 0 0 3px rgba(234, 179, 8, .4);
+    }
+
+    55% {
+        background-color: #d9f99d; /* Vert citron clair */
+        border-color: #a3e635;
+    }
+
+    100% {
+        background-color: #fff;
+        border-color: #e5e7eb;
+        box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
+    }
 }

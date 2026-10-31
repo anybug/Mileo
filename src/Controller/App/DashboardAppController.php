@@ -234,7 +234,7 @@ class DashboardAppController extends AbstractDashboardController
             ->setTitle(sprintf('<img src="%s" />', $this->assets->getUrl('img/logo.png')))
             ->setFaviconPath($this->assets->getUrl('img/favicons/favicon.ico'))
             ->disableDarkMode()
-            //->renderContentMaximized()
+            ->renderContentMaximized()
             ;
     }
 
