@@ -145,7 +145,7 @@ class ReportLine
 
     public function setComment(?string $comment): self
     {
-        $this->comment = $comment;
+        $this->comment = self::sanitizeText($comment);
 
         return $this;
     }
@@ -269,5 +269,35 @@ class ReportLine
     public function getLinesReportList(): string
     {
         return '';
+    }
+
+    public static function sanitizeText(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        // 1. Décode les séquences \uXXXX (y compris paires de surrogates -> emoji)
+        if (str_contains($value, '\\u')) {
+            $value = preg_replace_callback(
+                '/(?:\\\\u[0-9a-fA-F]{4})+/',
+                fn (array $m): string => json_decode('"' . $m[0] . '"') ?? '',
+                $value
+            ) ?? $value;
+        }
+
+        // 2. Supprime tout ce qui n'est pas de l'UTF-8 valide (séquences cassées, surrogates isolés)
+        $value = mb_scrub($value, 'UTF-8');
+
+        // 3. Supprime les caractères hors plan multilingue de base : emoji et symboles
+        //    (tout codepoint > U+FFFF), plus les caractères de contrôle
+        $value = preg_replace(
+            '/[\x{10000}-\x{10FFFF}]|[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u',
+            '',
+            $value
+        ) ?? $value;
+
+        // 4. Trim
+        return trim($value);
     }
 }
