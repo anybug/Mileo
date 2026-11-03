@@ -25,6 +25,7 @@ use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
 use EasyCorp\Bundle\EasyAdminBundle\Field\FormField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
+use EasyCorp\Bundle\EasyAdminBundle\Provider\AdminContextProvider;
 use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
 use Error;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
@@ -40,6 +41,7 @@ class VehiculeAppCrudController extends AbstractCrudController
     public function __construct(
         private readonly AdminUrlGenerator $adminUrlGenerator,
         private readonly EntityManagerInterface $entityManager,
+        private readonly AdminContextProvider $adminContextProvider
     ) {}
 
     public static function getEntityFqcn(): string
@@ -105,6 +107,8 @@ class VehiculeAppCrudController extends AbstractCrudController
     public function configureFields(string $pageName): iterable
     {
 
+        $entityInstance = $this->adminContextProvider->getContext()?->getEntity()?->getInstance();
+
         if (Crud::PAGE_INDEX === $pageName) {
             yield ChoiceField::new('type', 'Type')->setChoices([
                 'Voiture' => 'Car',
@@ -123,6 +127,35 @@ class VehiculeAppCrudController extends AbstractCrudController
         }
 
         yield FormField::addColumn(6);
+
+        if (
+            $pageName === Crud::PAGE_EDIT
+            && $entityInstance instanceof Vehicule
+            && $entityInstance->getReportLines()->count() > 0
+        ) {
+            $canAddVehicule = $this->getUser()->canAddVehicule();
+
+            $message = $canAddVehicule
+                ? 'Si vous avez changé de véhicule, nous vous recommandons
+                d’en créer un nouveau plutôt que de modifier celui-ci.'
+                : 'Si vous avez changé de véhicule, un abonnement Pro est
+                nécessaire pour en enregistrer un nouveau tout en
+                conservant l’historique de vos rapports.';
+
+            yield FormField::addPanel('Attention : véhicule déjà utilisé')
+                ->setIcon('fa fa-triangle-exclamation')
+                ->addCssClass('alert alert-warning')
+                ->setHelp(
+                    'Ce véhicule est déjà associé à un ou plusieurs rapports
+                    kilométriques. Vous pouvez modifier ses informations
+                    et actualiser son barème kilométrique si nécessaire.
+                    En revanche, remplacer ses caractéristiques par celles
+                    d’un autre véhicule pourrait compromettre la cohérence
+                    de vos rapports existants. '.$message
+                );
+        }
+
+       
         yield FormField::addFieldset('Fiche véhicule et barème')->setIcon('fa fa-car');
 
         yield ChoiceField::new('type','Type')->setChoices([
