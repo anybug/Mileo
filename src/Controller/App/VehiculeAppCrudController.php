@@ -87,7 +87,7 @@ class VehiculeAppCrudController extends AbstractCrudController
         //limite version Pero: 1 seul véhicule
         if(!$this->getUser()->canAddVehicule())
         {
-            $actions->disable(Action::NEW);
+            $actions->remove(Crud::PAGE_INDEX, Action::NEW); //sinon un compte non pro ne peut plus modifier son véhicule
         }
 
         return $actions;
@@ -292,10 +292,19 @@ class VehiculeAppCrudController extends AbstractCrudController
                 $formModifierType($event->getForm()->getParent(), $type);
             }
         );*/
-        
-        
 
         return $builder;
+    }
+
+    public function persistEntity(EntityManagerInterface $entityManager, $entityInstance): void
+    {
+        if (!$this->getUser()->canAddVehicule()) {
+            throw new AccessDeniedHttpException(
+                'Vous avez atteint le nombre maximum de véhicules autorisés.'
+            );
+        }
+
+        parent::persistEntity($entityManager, $entityInstance);
     }
 
     public function deleteEntity(EntityManagerInterface $entityManager, $entityInstance): void
