@@ -432,6 +432,29 @@ import TomSelect from 'tom-select';
                 document.getElementById('dynamicModal')
             )?.hide();
         });
+
+        // Empêcher l'enregistrement si les kilomètres sont en cours de calcul
+        document.addEventListener('submit', (event) => {
+            const form = event.target;
+
+            const fields = form.querySelectorAll(
+                '.report_km_total, .report_lines_km_total'
+            );
+
+            if (!fields.length) return;
+
+            const notReady = Array.from(fields).some(field =>
+                field.classList.contains('loading') ||
+                field.value.trim() === ''
+            );
+
+            if (notReady) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+
+                alert('Veuillez attendre la fin du calcul des kilomètres avant d’enregistrer.');
+            }
+        }, true);
     }
 
     function initReadonlyReportFeatures() {
